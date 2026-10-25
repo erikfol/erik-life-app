@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dinner Planner</title>
+    <link rel="stylesheet" href="../bills-etc/css/app.css">
+    <link rel="stylesheet" href="../shared/css/records.css">
+    <!-- app-version:start (written by tools/stamp_version.py) -->
+    <script type="module">
+        const VERSION = "20261025120000";
+        const FILES = ["js/app.js", "../bills-etc/css/app.css", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/folder.js"];
+        // After an update, fetch every file fresh once so new pages never run with old cached code.
+        try {
+            if (localStorage.getItem('dinner-planner-version') !== VERSION) {
+                await Promise.all(FILES.map(f => fetch(f, { cache: 'reload' }).catch(() => null)));
+                localStorage.setItem('dinner-planner-version', VERSION);
+                document.querySelectorAll('link[rel=stylesheet]').forEach(l => { l.href = l.getAttribute('href') + '?v=' + VERSION; });
+            }
+        } catch { /* storage blocked: just start */ }
+        await import('./js/app.js');
+    </script>
+    <!-- app-version:end -->
+</head>
+<body>
+    <header class="topbar">
+        <a class="home-link" href="../" title="Back to the home page">⌂ Home</a>
+        <div class="brand">Dinner Planner</div>
+        <div class="status">
+            <span id="st-folder" class="pill">No folder</span>
+        </div>
+    </header>
+    <main id="view"></main>
+    <div id="toast"></div>
+</body>
+</html>

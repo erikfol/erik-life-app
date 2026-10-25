@@ -1,4 +1,4 @@
-"""Stamp each app's index.html (docs/bills-etc/, docs/health/, docs/vehicles/, docs/house/, docs/pets/) with a new version and the list of its files.
+"""Stamp each app's index.html (docs/bills-etc/, docs/health/, docs/vehicles/, docs/house/, docs/pets/, docs/insurance/, docs/dinner-planner/) with a new version and the list of its files.
 
 GitHub Pages lets browsers cache files for up to 10 minutes, so right after an update a browser can get the new
 index.html but old JavaScript. index.html compares this version with the one the browser last ran; when it changed,
@@ -27,6 +27,8 @@ APPS = {
     'insurance': ('insurance-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
                                                  'vehicles/js/views/places.js']),  # Vehicles' views
     'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
+    'dinner-planner': ('dinner-planner-version', ['bills-etc/css/app.css', 'bills-etc/js/fs.js', 'bills-etc/js/util.js',
+                                                  'shared/css/records.css', 'shared/js/folder.js']),  # empty so far: just the folder connection
 }
 
 
