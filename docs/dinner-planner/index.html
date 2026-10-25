@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dinner Planner</title>
     <link rel="stylesheet" href="../bills-etc/css/app.css">
-    <link rel="stylesheet" href="../shared/css/records.css">
+    <link rel="stylesheet" href="css/dinner.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261025120000";
-        const FILES = ["js/app.js", "../bills-etc/css/app.css", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/folder.js"];
+        const VERSION = "20261025121406";
+        const FILES = ["css/dinner.css", "js/ai.js", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/js/fileguard.js", "../shared/js/folder.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('dinner-planner-version') !== VERSION) {
@@ -26,11 +26,169 @@
     <header class="topbar">
         <a class="home-link" href="../" title="Back to the home page">⌂ Home</a>
         <div class="brand">Dinner Planner</div>
+        <nav id="nav"></nav>
         <div class="status">
             <span id="st-folder" class="pill">No folder</span>
         </div>
     </header>
-    <main id="view"></main>
+    <main>
+        <div id="view"></div>
+
+        <div id="app" class="dp" hidden>
+            <!-- Calendar -->
+            <div id="tab-calendar" class="tab-panel">
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <button class="btn" id="cal-prev" aria-label="Previous">‹</button>
+                        <button class="btn" id="cal-today">Today</button>
+                        <button class="btn" id="cal-next" aria-label="Next">›</button>
+                    </div>
+                    <h2 id="cal-title"></h2>
+                    <div class="btn-group">
+                        <button class="btn view-btn active" data-view="week">Week</button>
+                        <button class="btn view-btn" data-view="month">Month</button>
+                    </div>
+                </div>
+                <div class="toolbar week-only">
+                    <button class="btn" id="fill-week">✨ Fill empty days</button>
+                    <button class="btn" id="shopping-list">🛒 Shopping list</button>
+                </div>
+                <div id="calendar"></div>
+                <p class="hint">Click a day to plan it. Meals on past days are your history, and the Ideas tab learns from them.</p>
+            </div>
+
+            <!-- Meals -->
+            <div id="tab-meals" class="tab-panel" hidden>
+                <div class="toolbar">
+                    <input type="search" id="meal-search" placeholder="Search meals or ingredients…">
+                    <select id="meal-sort">
+                        <option value="name">Sort: Name</option>
+                        <option value="most">Sort: Most eaten</option>
+                        <option value="recent">Sort: Recently eaten</option>
+                        <option value="longest">Sort: Longest since eaten</option>
+                    </select>
+                    <button class="btn primary" id="add-meal">+ Add meal</button>
+                </div>
+                <div id="tag-filter" class="chips"></div>
+                <div id="meal-list" class="card-grid"></div>
+            </div>
+
+            <!-- Ideas -->
+            <div id="tab-ideas" class="tab-panel" hidden>
+                <!-- Shown only once an API key is in inputs/dinner-planner/.env (see js/ai.js). -->
+                <section id="ai-section" hidden>
+                    <h2>✨ AI suggestions</h2>
+                    <p class="hint">Claude looks at your meals, favorites and recent dinners and comes up with new ideas, each with a recipe.</p>
+                    <form id="ai-form" class="toolbar">
+                        <input id="ai-request" maxlength="500" placeholder="Anything in particular? e.g. vegetarian, under 30 minutes, uses up zucchini (optional)">
+                        <button type="submit" class="btn primary" id="ai-go">Get AI ideas</button>
+                        <button type="button" class="btn" id="ai-clear" hidden>Clear all</button>
+                    </form>
+                    <div id="ai-list" class="card-grid"></div>
+                </section>
+                <section>
+                    <h2>Your taste profile</h2>
+                    <p class="hint">Built from your meals, favorites and dinner history. Recent dinners count most.</p>
+                    <div id="profile"></div>
+                </section>
+                <section>
+                    <h2>Due for a repeat</h2>
+                    <p class="hint">Meals you like that you haven't had for a while.</p>
+                    <div id="due-list" class="card-grid"></div>
+                </section>
+                <section>
+                    <h2>New meals to try</h2>
+                    <p class="hint">Picked because they share ingredients and styles with what you already eat. <button class="link" id="reset-dismissed">Show hidden ideas again</button></p>
+                    <div id="idea-list" class="card-grid"></div>
+                </section>
+            </div>
+
+            <!-- Backup -->
+            <div id="tab-backup" class="tab-panel" hidden>
+                <section>
+                    <h2>Your data</h2>
+                    <p class="hint">Everything is saved automatically. These files are kept up to date in <code id="data-dir"></code> in your <code>erik-life-app</code> folder:</p>
+                    <ul class="file-list">
+                        <li><strong>meals.csv</strong>: every meal with its ingredients, notes, and how often you've had it</li>
+                        <li><strong>dinner-history.csv</strong>: every day on the calendar with its meal, notes, and whether you ate it</li>
+                        <li><strong>db.json</strong>: the planner's own data file, which holds everything</li>
+                    </ul>
+                    <div class="toolbar">
+                        <button class="btn" data-download="meals.csv">Download meals.csv</button>
+                        <button class="btn" data-download="dinner-history.csv">Download dinner-history.csv</button>
+                        <button class="btn" data-download="backup.json">Download full backup (.json)</button>
+                    </div>
+                </section>
+
+                <section>
+                    <h2>Backups</h2>
+                    <p class="hint">A copy is saved automatically at the start of each day you make changes (the last 60 are kept). Saved in <code id="backup-dir"></code>.</p>
+                    <div class="toolbar">
+                        <button class="btn primary" id="backup-now">Back up now</button>
+                        <label class="btn" for="restore-file">Restore from a file…</label>
+                        <input type="file" id="restore-file" accept=".json,application/json" hidden>
+                    </div>
+                    <div id="backup-list"></div>
+                </section>
+            </div>
+
+            <!-- Meal editor -->
+            <dialog id="meal-dialog">
+                <form id="meal-form" method="dialog">
+                    <h2 id="meal-dialog-title">Add meal</h2>
+                    <label>Name <input name="name" required maxlength="120"></label>
+                    <div class="row">
+                        <label>Tags <input name="tags" placeholder="e.g. chicken, mexican, quick"></label>
+                        <label class="narrow">Minutes <input name="prepMinutes" type="number" min="1" max="1440"></label>
+                    </div>
+                    <label class="check"><input type="checkbox" name="favorite"> ★ Family favorite</label>
+                    <label class="check"><input type="checkbox" name="special"> Special (like "Free For All" or "Eating Out"): only picked by hand, never auto-suggested</label>
+                    <fieldset>
+                        <legend>Ingredients</legend>
+                        <div id="ingredient-rows"></div>
+                        <button type="button" class="btn small" id="add-ingredient">+ Add ingredient</button>
+                    </fieldset>
+                    <label>Notes / recipe <textarea name="notes" rows="4"></textarea></label>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close>Cancel</button>
+                        <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- Day editor -->
+            <dialog id="day-dialog">
+                <form id="day-form" method="dialog">
+                    <h2 id="day-dialog-title"></h2>
+                    <label>Meal
+                        <select name="mealId" id="day-meal"></select>
+                    </label>
+                    <label>Or a note <input name="note" maxlength="200" placeholder="e.g. Leftovers, eating out, Grandma's"></label>
+                    <label class="check past-only"><input type="checkbox" name="skipped"> We didn't end up having this</label>
+                    <div id="day-suggestions" class="chips"></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn danger" id="day-clear">Clear day</button>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn" data-close>Cancel</button>
+                        <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- Shopping list -->
+            <dialog id="shop-dialog">
+                <div class="shop-body">
+                    <h2 id="shop-title">Shopping list</h2>
+                    <ul id="shop-list"></ul>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" id="shop-copy">Copy</button>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn primary" data-close>Done</button>
+                    </div>
+                </div>
+            </dialog>
+        </div>
+    </main>
     <div id="toast"></div>
 </body>
 </html>

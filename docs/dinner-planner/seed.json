@@ -1,0 +1,73 @@
+{
+  "meals": [
+    {
+      "name": "Spaghetti Bolognese",
+      "tags": ["pasta", "italian", "beef"],
+      "prepMinutes": 45,
+      "favorite": true,
+      "notes": "Example meal - edit or delete me.",
+      "ingredients": [
+        { "name": "spaghetti", "quantity": "1 lb" },
+        { "name": "ground beef", "quantity": "1 lb" },
+        { "name": "crushed tomatoes", "quantity": "28 oz can" },
+        { "name": "onion", "quantity": "1" },
+        { "name": "garlic", "quantity": "3 cloves" },
+        { "name": "parmesan", "quantity": "for serving" }
+      ]
+    },
+    {
+      "name": "Chicken Tacos",
+      "tags": ["mexican", "chicken", "quick"],
+      "prepMinutes": 30,
+      "favorite": true,
+      "notes": "Example meal - edit or delete me.",
+      "ingredients": [
+        { "name": "chicken thighs", "quantity": "1.5 lb" },
+        { "name": "tortillas", "quantity": "12" },
+        { "name": "taco seasoning", "quantity": "1 packet" },
+        { "name": "lettuce", "quantity": "1 head" },
+        { "name": "cheddar cheese", "quantity": "1 cup" },
+        { "name": "salsa", "quantity": "1 jar" }
+      ]
+    },
+    {
+      "name": "Sheet Pan Chicken & Vegetables",
+      "tags": ["chicken", "sheet pan", "healthy"],
+      "prepMinutes": 40,
+      "notes": "Example meal - edit or delete me.",
+      "ingredients": [
+        { "name": "chicken breast", "quantity": "1.5 lb" },
+        { "name": "potatoes", "quantity": "1 lb" },
+        { "name": "broccoli", "quantity": "1 head" },
+        { "name": "olive oil", "quantity": "3 tbsp" },
+        { "name": "garlic", "quantity": "2 cloves" }
+      ]
+    },
+    {
+      "name": "Homemade Pizza",
+      "tags": ["italian", "kid friendly"],
+      "prepMinutes": 35,
+      "notes": "Example meal - edit or delete me.",
+      "ingredients": [
+        { "name": "pizza dough", "quantity": "1 lb" },
+        { "name": "pizza sauce", "quantity": "1 cup" },
+        { "name": "mozzarella", "quantity": "2 cups" },
+        { "name": "pepperoni", "quantity": "4 oz" }
+      ]
+    },
+    {
+      "name": "Beef & Broccoli Stir-Fry",
+      "tags": ["asian", "beef", "quick"],
+      "prepMinutes": 25,
+      "notes": "Example meal - edit or delete me.",
+      "ingredients": [
+        { "name": "flank steak", "quantity": "1 lb" },
+        { "name": "broccoli", "quantity": "1 head" },
+        { "name": "soy sauce", "quantity": "1/4 cup" },
+        { "name": "rice", "quantity": "2 cups" },
+        { "name": "garlic", "quantity": "2 cloves" },
+        { "name": "ginger", "quantity": "1 tbsp" }
+      ]
+    }
+  ]
+}

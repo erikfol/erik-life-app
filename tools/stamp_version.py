@@ -28,7 +28,7 @@ APPS = {
                                                  'vehicles/js/views/places.js']),  # Vehicles' views
     'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
     'dinner-planner': ('dinner-planner-version', ['bills-etc/css/app.css', 'bills-etc/js/fs.js', 'bills-etc/js/util.js',
-                                                  'shared/css/records.css', 'shared/js/folder.js']),  # empty so far: just the folder connection
+                                                  'shared/js/fileguard.js', 'shared/js/folder.js']),  # its own page; catalog.json/seed.json are fetched no-cache
 }
 
 
