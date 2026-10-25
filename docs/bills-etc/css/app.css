@@ -53,6 +53,9 @@ body {
 }
 #nav a:hover { color: #fff; background: rgba(255,255,255,0.08); }
 #nav a.active { color: #fff; background: rgba(255,255,255,0.16); }
+#nav a.bad { color: #ffd5d0; background: rgba(231,76,60,0.2); } /* Pets: no future appointment */
+#nav a.bad:hover { background: rgba(231,76,60,0.3); }
+#nav a.bad.active { color: #fff; background: rgba(231,76,60,0.42); }
 .status { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .pill {
     font-size: 0.78em;

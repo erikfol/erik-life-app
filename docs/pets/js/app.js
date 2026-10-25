@@ -4,16 +4,30 @@ import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
-import { loadPets } from './pets.js';
+import { loadPets, loadAppointments, appointmentStatus } from './pets.js';
 import { renderPet, renderNewPet, hasUnsavedEdits, forget } from './views/pet.js';
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('nav');
 let currentHash = null;
+let navList = null; // the pets in the menu
 
 function drawNav(list, active) {
+    navList = list;
     navEl.innerHTML = list.map(p => `<a href="#${esc(p.id)}"${p.id === active ? ' class="active"' : ''}>${esc(p.name)}</a>`).join('')
         + `<a href="#new"${active === 'new' ? ' class="active"' : ''}>＋ Add pet</a>`;
+    markNoAppointment(list);
+}
+
+/** A pet's name in the menu is red while it has no future appointment (the red banner on its page). */
+async function markNoAppointment(list) {
+    const levels = await Promise.all(list.map(p => loadAppointments(p, false).then(r => appointmentStatus(r).level, () => null)));
+    list.forEach((p, i) => {
+        const a = navEl.querySelector(`a[href="#${CSS.escape(p.id)}"]`);
+        if (!a) return;
+        a.classList.toggle('bad', levels[i] === 'none');
+        if (levels[i] === 'none') a.title = 'No future appointment'; else a.removeAttribute('title');
+    });
 }
 
 /** After a pet is added, renamed or removed: re-read the list and open #goTo. */
@@ -51,6 +65,7 @@ async function route(force = false) {
 }
 
 window.addEventListener('hashchange', () => route());
+window.addEventListener('data-saved', () => { if (navList && fs.folder()) markNoAppointment(navList); }); // e.g. an appointment added
 window.addEventListener('beforeunload', e => {
     if (hasUnsavedEdits()) { e.preventDefault(); e.returnValue = ''; }
 });
