@@ -1,5 +1,5 @@
 /* Kid Lunches: the calendar, buttons and dialogs come from ../dinner-planner/css/dinner.css (everything under .dp);
-   this adds a colored box per kid on each day and in the day dialog. */
+   this adds each kid's color and the lunch box drawn like the real one. */
 .dp .cal-week, .dp .cal-month { grid-template-columns: repeat(5, 1fr); } /* Monday to Friday */
 
 .dp .k0 { --kid: var(--blue); }
@@ -10,15 +10,15 @@
 .dp .kid-lunch {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 3px;
     padding: 3px 0 3px 8px;
     border-left: 3px solid var(--kid);
     min-width: 0;
 }
 .dp .kid-lunch .kid { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--kid); }
-.dp .kid-lunch .lunch { font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
+.dp .kid-lunch .lunch { font-weight: 600; overflow-wrap: anywhere; }
 .dp .kid-lunch .empty { font-size: .85rem; }
-.dp .cal-month .kid-lunch { padding: 1px 0 1px 5px; border-left-width: 2px; }
+.dp .cal-month .kid-lunch { padding: 1px 0 1px 5px; border-left-width: 2px; gap: 1px; }
 .dp .cal-month .kid-lunch .kid { font-size: .65rem; }
 .dp .cal-month .kid-lunch .lunch {
     font-weight: 500;
@@ -28,16 +28,75 @@
     overflow: hidden;
 }
 
+/* ---------- the lunch box: teal tray; gray square over yellow on the left, circle over small on the right ---------- */
+.dp .box {
+    --tray: #2b8c9b;
+    --well: #1f6f7d;
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    grid-template-rows: minmax(130px, auto) minmax(95px, auto);
+    grid-template-areas: "square circle" "yellow small";
+    gap: 8px;
+    padding: 9px;
+    background: var(--tray);
+    border-radius: 16px;
+}
+.dp .box .comp {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding: 7px;
+    border-radius: 10px;
+}
+.dp .box .comp.square { grid-area: square; background: #cdc8c8; }
+.dp .box .comp.yellow { grid-area: yellow; background: #e2e36c; }
+.dp .box .comp.small { grid-area: small; background: var(--well); color: #fff; border-radius: 16px; }
+.dp .box .comp.circle {
+    grid-area: circle;
+    background: var(--well);
+    color: #fff;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 14% 12%; /* keeps what's inside off the curve */
+}
+.dp .box .comp-name { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; opacity: .7; }
+.dp .box .comp-items { display: flex; flex-wrap: wrap; gap: 5px; }
+.dp .box .comp.circle .comp-items { justify-content: center; }
+.dp .box .chip { font-size: .78rem; padding: 2px 9px; }
+.dp .box .chip.active { background: var(--navy-2); border-color: var(--navy-2); color: #fff; }
+.dp .box .new-item { font-size: .78rem; padding: 3px 7px; margin-top: auto; background: rgba(255,255,255,.85); }
+.dp .box .comp.circle .new-item { width: 85%; margin-top: 0; }
+.dp .box textarea { flex: 1; font-size: .85rem; padding: 5px 7px; resize: vertical; background: rgba(255,255,255,.9); }
+.dp #box-items .comp { font-weight: 400; } /* labels in dialogs are bold by default */
+.dp #box-items .comp.circle textarea { width: 100%; }
+
+/* Small and read-only on the calendar. */
+.dp .box.mini {
+    grid-template-rows: minmax(34px, auto) minmax(26px, auto);
+    gap: 3px;
+    padding: 3px;
+    border-radius: 7px;
+    font-size: .72rem;
+    line-height: 1.2;
+}
+.dp .box.mini .comp { padding: 3px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.dp .box.mini .comp.small { border-radius: 6px; }
+.dp .box.mini .comp.circle { border-radius: 50%; padding: 6px 4px; }
+
 .dp #no-kids { margin-bottom: 12px; }
+.dp #day-dialog { width: min(640px, calc(100vw - 32px)); }
 .dp fieldset.kid-field { border-left: 4px solid var(--kid); display: flex; flex-direction: column; gap: 8px; }
 .dp fieldset.kid-field legend { color: var(--kid); }
-.dp fieldset.kid-field textarea { resize: vertical; }
-.dp fieldset.kid-field .chips { margin-bottom: 0; align-items: center; }
 .dp .kid-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .dp .kid-row .btn { flex: 0 0 auto; }
 
 @media (max-width: 760px) {
     .dp .cal-week { grid-template-columns: 1fr; } /* as in dinner.css, which the 5 columns above would override */
     .dp .cal-week .kid-lunch { width: 100%; }
+    .dp .cal-week .box.mini { max-width: 280px; }
     .dp .cal-month .kid-lunch .kid { display: none; } /* the color says whose it is */
+    .dp .box { grid-template-rows: minmax(110px, auto) minmax(80px, auto); }
 }

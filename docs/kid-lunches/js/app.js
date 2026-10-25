@@ -1,5 +1,6 @@
-// Kid Lunches: a week/month calendar like the Dinner Planner's, with a lunch for each kid on every day. Uses the same
-// folder as Bills Etc (the browser remembers it for the whole site); the data lives in inputs/kid-lunches/ (js/store.js).
+// Kid Lunches: a week/month calendar like the Dinner Planner's, with a lunch box for each kid on every day. Each part of
+// the box (store.COMPARTMENTS) only takes its own items, set in ✎ Box. Uses the same folder as Bills Etc (the browser
+// remembers it for the whole site); the data lives in inputs/kid-lunches/ (js/store.js).
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
@@ -8,10 +9,10 @@ import * as store from './store.js';
 // School days only: weeks run Monday to Friday, and Saturday and Sunday aren't shown.
 const WEEK_START = 1;
 const SCHOOL_DAYS = 5;
-const RECENT = 6; // past lunches offered as chips under each kid in the day dialog
 
 const state = {
     kids: [],
+    items: {},
     days: {},
     view: 'week',
     cursor: new Date(),
@@ -51,7 +52,7 @@ const guard = fn => async (...args) => {
 };
 
 function reload() {
-    ({ kids: state.kids, days: state.days } = store.data());
+    ({ kids: state.kids, items: state.items, days: state.days } = store.data());
     renderCalendar();
 }
 
@@ -95,16 +96,25 @@ function renderCalendar() {
         const label = state.view === 'week' ? `${fmt(d, { weekday: 'short' })} ${d.getDate()}` : d.getDate();
         const badge = key === today ? '<span class="badge">Today</span>' : '';
 
-        // Week: a box for every kid, filled or not. Month: only the kids with a lunch, to fit.
+        // Week: every kid, with a small lunch box once something's in it. Month: only the kids with a lunch, as text.
         const body = state.kids.map((kid, i) => {
-            if (e[kid]) return `<span class="kid-lunch ${kidClass(i)}"><span class="kid">${esc(kid)}</span><span class="lunch">${esc(e[kid])}</span></span>`;
-            return state.view === 'week'
-                ? `<span class="kid-lunch ${kidClass(i)}"><span class="kid">${esc(kid)}</span><span class="empty">${key < today ? '—' : '+ Add lunch'}</span></span>`
-                : '';
+            const lunch = e[kid];
+            const head = `<span class="kid-lunch ${kidClass(i)}"><span class="kid">${esc(kid)}</span>`;
+            if (state.view === 'month') {
+                const items = lunch && store.COMPARTMENTS.flatMap(c => lunch[c.id] || []).join(', ');
+                return lunch ? `${head}<span class="lunch">${esc(items || lunch.note)}</span></span>` : '';
+            }
+            if (!lunch) return `${head}<span class="empty">${key < today ? '—' : '+ Add lunch'}</span></span>`;
+            const box = store.COMPARTMENTS.some(c => lunch[c.id]) ? miniBox(lunch) : '';
+            return `${head}${box}${lunch.note ? `<span class="meal-note">${esc(lunch.note)}</span>` : ''}</span>`;
         }).join('');
         return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}</div>`;
     }).join('');
 }
+
+/** A kid's lunch drawn as the box, each item in its part. */
+const miniBox = lunch => `<span class="box mini">${store.COMPARTMENTS.map(c =>
+    `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(esc).join('<br>')}</span>`).join('')}</span>`;
 
 function shiftCursor(dir) {
     const c = state.cursor;
@@ -114,18 +124,21 @@ function shiftCursor(dir) {
 
 // ---------- day dialog ----------
 
-/** A kid's most recent different lunches, newest first, leaving out the day being edited. */
-function recentLunches(kid, exceptDate) {
-    const seen = new Set();
-    const out = [];
-    for (const date of Object.keys(state.days).sort().reverse()) {
-        const lunch = state.days[date][kid];
-        if (date === exceptDate || !lunch || seen.has(lunch.toLowerCase())) continue;
-        seen.add(lunch.toLowerCase());
-        out.push(lunch);
-        if (out.length === RECENT) break;
-    }
-    return out;
+const itemChip = (name, on, isNew = false) =>
+    `<button type="button" class="chip ${on ? 'active' : ''}" data-item="${esc(name)}" aria-pressed="${on}"${isNew ? ' data-new' : ''}>${esc(name)}</button>`;
+
+/** A kid's lunch box to build: each part offers its own items (plus any saved on this day that have since left its
+ *  list) as chips to click on or off, and takes a new item typed below them. */
+function buildBox(lunch = {}) {
+    return `<div class="box">${store.COMPARTMENTS.map(c => {
+        const picked = lunch[c.id] || [];
+        const names = [...state.items[c.id], ...picked.filter(p => !state.items[c.id].some(n => store.sameName(n, p)))];
+        return `<div class="comp ${c.id}" data-comp="${c.id}">
+            <span class="comp-name">${esc(c.name)}</span>
+            <span class="comp-items">${names.map(n => itemChip(n, picked.some(p => store.sameName(p, n)))).join('')}</span>
+            <input class="new-item" maxlength="60" placeholder="+ New…" aria-label="New item for the ${esc(c.name.toLowerCase())}">
+        </div>`;
+    }).join('')}</div>`;
 }
 
 function openDay(date) {
@@ -134,23 +147,58 @@ function openDay(date) {
     const form = $('#day-form');
     form.dataset.date = date;
     $('#day-dialog-title').textContent = fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    $('#kid-fields').innerHTML = state.kids.map((kid, i) => {
-        const recent = recentLunches(kid, date);
-        return `<fieldset class="kid-field ${kidClass(i)}">
+    $('#kid-fields').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
-            <textarea rows="2" maxlength="300" data-kid="${i}" aria-label="${esc(kid)}'s lunch" placeholder="e.g. Turkey sandwich, apple, pretzels"></textarea>
-            ${recent.length ? `<div class="chips"><span class="hint">Recent:</span>${recent.map(l => `<button type="button" class="chip" data-fill="${i}">${esc(l)}</button>`).join('')}</div>` : ''}
-        </fieldset>`;
-    }).join('');
-    state.kids.forEach((kid, i) => { $(`textarea[data-kid="${i}"]`, form).value = e[kid] || ''; });
+            ${buildBox(e[kid])}
+            <input class="kid-note" maxlength="200" aria-label="${esc(kid)}'s note" placeholder="Note (e.g. buying lunch, field trip)">
+        </fieldset>`).join('');
+    state.kids.forEach((kid, i) => { $(`.kid-field[data-kid="${i}"] .kid-note`, form).value = e[kid]?.note || ''; });
     $('#day-dialog').showModal();
+}
+
+/** The parts an item already belongs to: its list in ✎ Box, or typed as new into that part in this dialog. */
+function homesOf(name) {
+    return store.COMPARTMENTS.filter(c => state.items[c.id].some(n => store.sameName(n, name))
+        || $$(`[data-comp="${c.id}"] .chip[data-new]`, $('#day-form')).some(b => store.sameName(b.dataset.item, name)));
+}
+
+/** Put the item typed below a part into it. False (with a message) when it belongs in a different part. */
+function addTyped(input) {
+    const name = input.value.trim();
+    if (!name) return true;
+    const comp = input.closest('[data-comp]');
+    const existing = $$('.chip', comp).find(b => store.sameName(b.dataset.item, name));
+    if (existing) {
+        existing.classList.add('active');
+        existing.setAttribute('aria-pressed', 'true');
+    } else {
+        const homes = homesOf(name).filter(c => c.id !== comp.dataset.comp);
+        if (homes.length) {
+            const listed = state.items[homes[0].id].find(n => store.sameName(n, name)) || name;
+            toast(`${listed} goes in the ${homes.map(c => c.name.toLowerCase()).join(' or the ')}. To change that, use ✎ Box.`, 'bad');
+            input.select();
+            return false;
+        }
+        // A new item for this part: picked for this kid, offered to the others.
+        $$(`[data-comp="${comp.dataset.comp}"] .comp-items`, $('#day-form')).forEach(list =>
+            list.insertAdjacentHTML('beforeend', itemChip(name, list.closest('[data-comp]') === comp, true)));
+    }
+    input.value = '';
+    return true;
 }
 
 async function saveDay(ev) {
     ev.preventDefault();
     const form = $('#day-form');
-    const lunches = Object.fromEntries($$('textarea[data-kid]', form).map(t => [state.kids[t.dataset.kid], t.value]));
-    await store.setDay(form.dataset.date, lunches);
+    if (!$$('.new-item', form).every(addTyped)) return; // typed but not added with Enter yet
+    const lunches = {};
+    for (const field of $$('.kid-field', form)) {
+        const lunch = { note: $('.kid-note', field).value };
+        for (const c of store.COMPARTMENTS) lunch[c.id] = $$(`[data-comp="${c.id}"] .chip.active`, field).map(b => b.dataset.item);
+        lunches[state.kids[field.dataset.kid]] = lunch;
+    }
+    const newItems = Object.fromEntries(store.COMPARTMENTS.map(c => [c.id, $$(`[data-comp="${c.id}"] .chip[data-new]`, form).map(b => b.dataset.item)]));
+    await store.setDay(form.dataset.date, lunches, newItems);
     $('#day-dialog').close();
     reload();
 }
@@ -158,6 +206,24 @@ async function saveDay(ev) {
 async function clearDay() {
     await store.setDay($('#day-form').dataset.date, {});
     $('#day-dialog').close();
+    reload();
+}
+
+// ---------- box dialog ----------
+
+function openBox() {
+    $('#box-items').innerHTML = store.COMPARTMENTS.map(c => `<label class="comp ${c.id}">
+            <span class="comp-name">${esc(c.name)}</span>
+            <textarea rows="5" data-comp="${c.id}" aria-label="What goes in the ${esc(c.name.toLowerCase())}, one per line"></textarea>
+        </label>`).join('');
+    for (const c of store.COMPARTMENTS) $(`#box-items textarea[data-comp="${c.id}"]`).value = state.items[c.id].join('\n');
+    $('#box-dialog').showModal();
+}
+
+async function saveBox(ev) {
+    ev.preventDefault();
+    await store.setItems(Object.fromEntries($$('#box-items textarea').map(t => [t.dataset.comp, t.value.split('\n')])));
+    $('#box-dialog').close();
     reload();
 }
 
@@ -219,9 +285,19 @@ function wire() {
     $('#day-form').onsubmit = guard(saveDay);
     $('#day-clear').onclick = guard(clearDay);
     $('#kid-fields').onclick = ev => {
-        const chip = ev.target.closest('[data-fill]');
-        if (chip) $(`textarea[data-kid="${chip.dataset.fill}"]`).value = chip.textContent;
+        const chip = ev.target.closest('.chip');
+        if (!chip) return;
+        chip.classList.toggle('active');
+        chip.setAttribute('aria-pressed', chip.classList.contains('active'));
     };
+    $('#kid-fields').onkeydown = ev => {
+        if (ev.key === 'Enter' && ev.target.classList.contains('new-item')) {
+            ev.preventDefault(); // Enter adds the item instead of saving the day
+            addTyped(ev.target);
+        }
+    };
+    $('#open-box').onclick = openBox;
+    $('#box-form').onsubmit = guard(saveBox);
     $$('[data-open-kids]').forEach(b => (b.onclick = openKids));
     $('#add-kid').onclick = () => addKidRow().querySelector('input').focus();
     $('#kids-form').onsubmit = guard(saveKids);
