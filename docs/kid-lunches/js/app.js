@@ -39,6 +39,7 @@ const schoolWeek = d => startOfWeek(d.getDay() === 0 || d.getDay() === 6 ? addDa
 const schoolDays = start => Array.from({ length: SCHOOL_DAYS }, (_, i) => addDays(start, i));
 const todayKey = () => dateKey(new Date());
 const fmt = (d, opts) => d.toLocaleDateString(undefined, opts);
+const daysBetween = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 86400000);
 const kidClass = i => `k${i % 4}`; // each kid's color
 
 /** Wrap an event handler so a failed save shows what went wrong. */
@@ -169,8 +170,7 @@ function addTyped(input) {
     const comp = input.closest('[data-comp]');
     const existing = $$('.chip', comp).find(b => store.sameName(b.dataset.item, name));
     if (existing) {
-        existing.classList.add('active');
-        existing.setAttribute('aria-pressed', 'true');
+        setChip(existing, true);
     } else {
         const homes = homesOf(name).filter(c => c.id !== comp.dataset.comp);
         if (homes.length) {
@@ -185,6 +185,80 @@ function addTyped(input) {
     }
     input.value = '';
     return true;
+}
+
+/** Pick an item on or off. Suggested picks are marked so ✨ Suggest can swap them; anything picked by hand stays. */
+function setChip(chip, on, suggested = false) {
+    chip.classList.toggle('active', on);
+    chip.setAttribute('aria-pressed', on);
+    chip.toggleAttribute('data-suggested', on && suggested);
+}
+
+// ---------- suggestions ----------
+
+/** How many days this kid has had an item (in any part), and how far the nearest of those days is from `date`. */
+function itemHistory(kid, item, date) {
+    let count = 0;
+    let near = null;
+    for (const [d, e] of Object.entries(state.days)) {
+        const lunch = e[kid];
+        if (d === date || !lunch || !store.COMPARTMENTS.some(c => (lunch[c.id] || []).some(n => store.sameName(n, item)))) continue;
+        count++;
+        const gap = Math.abs(daysBetween(d, date));
+        if (near === null || gap < near) near = gap;
+    }
+    return { count, near };
+}
+
+/** A weighted random pick: mostly things the kid hasn't had in the days around this one (planned days count too),
+ *  a little more often what they've had a lot, and something new when Suggest is pressed again. */
+function suggestItem(kid, date, options, previous) {
+    if (!options.length) return null;
+    const weighted = options.map(name => {
+        const { count, near } = itemHistory(kid, name, date);
+        let w = (near === null ? 1 : Math.max(0.02, Math.min(1, near / 7) ** 2)) * (1 + Math.min(count, 10) / 10);
+        if (options.length > 1 && previous.some(p => store.sameName(p, name))) w *= 0.05;
+        return { name, w };
+    });
+    let x = Math.random() * weighted.reduce((s, o) => s + o.w, 0);
+    for (const o of weighted) if ((x -= o.w) <= 0) return o.name;
+    return weighted.at(-1).name;
+}
+
+/** ✨ Suggest: one item in every part of each kid's box that wasn't picked by hand (if every part was, all of them get
+ *  new picks). The same item never goes in two parts of one box. */
+function suggestDay() {
+    const form = $('#day-form');
+    const date = form.dataset.date;
+    let filled = 0;
+    for (const field of $$('.kid-field', form)) {
+        const kid = state.kids[field.dataset.kid];
+        const parts = store.COMPARTMENTS.map(c => {
+            const el = $(`[data-comp="${c.id}"]`, field);
+            const chips = $$('.chip', el);
+            return {
+                chips,
+                byHand: chips.some(b => b.classList.contains('active') && !b.hasAttribute('data-suggested')),
+                // its list in ✎ Box, plus anything typed in as new while this dialog is open
+                options: chips.filter(b => b.hasAttribute('data-new') || state.items[c.id].some(n => store.sameName(n, b.dataset.item))).map(b => b.dataset.item),
+            };
+        });
+        let open = parts.filter(p => !p.byHand && p.options.length);
+        if (!open.length) open = parts.filter(p => p.options.length);
+        const taken = new Set(parts.filter(p => !open.includes(p)).flatMap(p => p.chips.filter(b => b.classList.contains('active')).map(b => b.dataset.item.toLowerCase())));
+        // Fewest choices first, so a part with few items isn't left with only what another part took.
+        open.sort((a, b) => a.options.length - b.options.length);
+        for (const p of open) {
+            const previous = p.chips.filter(b => b.classList.contains('active')).map(b => b.dataset.item);
+            p.chips.forEach(b => setChip(b, false));
+            const pick = suggestItem(kid, date, p.options.filter(n => !taken.has(n.toLowerCase())), previous);
+            if (!pick) continue;
+            setChip(p.chips.find(b => b.dataset.item === pick), true, true);
+            taken.add(pick.toLowerCase());
+            filled++;
+        }
+    }
+    if (!filled) toast('Nothing to suggest yet. Add what can go in each part with ✎ Box.');
 }
 
 async function saveDay(ev) {
@@ -287,9 +361,9 @@ function wire() {
     $('#kid-fields').onclick = ev => {
         const chip = ev.target.closest('.chip');
         if (!chip) return;
-        chip.classList.toggle('active');
-        chip.setAttribute('aria-pressed', chip.classList.contains('active'));
+        setChip(chip, !chip.classList.contains('active'));
     };
+    $('#day-suggest').onclick = suggestDay;
     $('#kid-fields').onkeydown = ev => {
         if (ev.key === 'Enter' && ev.target.classList.contains('new-item')) {
             ev.preventDefault(); // Enter adds the item instead of saving the day

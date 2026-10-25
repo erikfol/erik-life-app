@@ -88,6 +88,8 @@
 
 .dp #no-kids { margin-bottom: 12px; }
 .dp #day-dialog { width: min(640px, calc(100vw - 32px)); }
+.dp .day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.dp #day-form > .hint { margin-top: -6px; }
 .dp fieldset.kid-field { border-left: 4px solid var(--kid); display: flex; flex-direction: column; gap: 8px; }
 .dp fieldset.kid-field legend { color: var(--kid); }
 .dp .kid-row { display: flex; gap: 6px; margin-bottom: 6px; }
