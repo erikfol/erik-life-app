@@ -28,10 +28,16 @@
     overflow: hidden;
 }
 
-/* ---------- the lunch box: teal tray; gray square over yellow on the left, circle over small on the right ---------- */
+/* ---------- a lunch: the main entree's own container above the lunch box; the box is a teal tray with the gray square
+   over yellow on the left, circle over small on the right ---------- */
 .dp .box {
     --tray: #2b8c9b;
     --well: #1f6f7d;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.dp .box .tray {
     display: grid;
     grid-template-columns: 1.15fr 1fr;
     grid-template-rows: minmax(130px, auto) minmax(95px, auto);
@@ -49,6 +55,7 @@
     padding: 7px;
     border-radius: 10px;
 }
+.dp .box .comp.main { background: #f1e7d6; border: 2px solid #cdb58f; color: #5a4526; border-radius: 12px; }
 .dp .box .comp.square { grid-area: square; background: #cdc8c8; }
 .dp .box .comp.yellow { grid-area: yellow; background: #e2e36c; }
 .dp .box .comp.small { grid-area: small; background: var(--well); color: #fff; border-radius: 16px; }
@@ -75,15 +82,15 @@
 .dp #box-items .comp.circle textarea { width: 100%; }
 
 /* Small and read-only on the calendar. */
-.dp .box.mini {
+.dp .box.mini { gap: 3px; font-size: .72rem; line-height: 1.2; }
+.dp .box.mini .tray {
     grid-template-rows: minmax(34px, auto) minmax(26px, auto);
     gap: 3px;
     padding: 3px;
     border-radius: 7px;
-    font-size: .72rem;
-    line-height: 1.2;
 }
 .dp .box.mini .comp { padding: 3px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.dp .box.mini .comp.main { border-width: 1px; border-radius: 6px; min-height: 20px; font-weight: 600; }
 .dp .box.mini .comp.small { border-radius: 6px; }
 .dp .box.mini .comp.circle { border-radius: 50%; padding: 6px 4px; }
 
@@ -101,5 +108,5 @@
     .dp .cal-week .kid-lunch { width: 100%; }
     .dp .cal-week .box.mini { max-width: 280px; }
     .dp .cal-month .kid-lunch .kid { display: none; } /* the color says whose it is */
-    .dp .box { grid-template-rows: minmax(110px, auto) minmax(80px, auto); }
+    .dp .box .tray { grid-template-rows: minmax(110px, auto) minmax(80px, auto); }
 }

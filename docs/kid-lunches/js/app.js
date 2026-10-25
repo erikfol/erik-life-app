@@ -114,9 +114,13 @@ function renderCalendar() {
     }).join('');
 }
 
+/** A kid's lunch as markup, `part(c)` giving each part's: the main entree on its own, above the box's tray. */
+const boxHtml = (part, cls = '', tag = 'div') => `<${tag} class="box ${cls}">${store.COMPARTMENTS.filter(c => !c.tray).map(part).join('')}`
+    + `<${tag} class="tray">${store.COMPARTMENTS.filter(c => c.tray).map(part).join('')}</${tag}></${tag}>`;
+
 /** A kid's lunch drawn as the box, each item in its part. */
-const miniBox = lunch => `<span class="box mini">${store.COMPARTMENTS.map(c =>
-    `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(esc).join('<br>')}</span>`).join('')}</span>`;
+const miniBox = lunch => boxHtml(c =>
+    `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(esc).join('<br>')}</span>`, 'mini', 'span');
 
 function shiftCursor(dir) {
     const c = state.cursor;
@@ -132,7 +136,7 @@ const itemChip = (name, on, isNew = false) =>
 /** A kid's lunch box to build: each part offers that kid's items for it (plus any saved on this day that have since left
  *  the list) as chips to click on or off, and takes a new item typed below them. */
 function buildBox(kid, lunch = {}) {
-    return `<div class="box">${store.COMPARTMENTS.map(c => {
+    return boxHtml(c => {
         const list = state.items[kid][c.id];
         const picked = lunch[c.id] || [];
         const names = [...list, ...picked.filter(p => !list.some(n => store.sameName(n, p)))];
@@ -141,7 +145,7 @@ function buildBox(kid, lunch = {}) {
             <span class="comp-items">${names.map(n => itemChip(n, picked.some(p => store.sameName(p, n)))).join('')}</span>
             <input class="new-item" maxlength="60" placeholder="+ New…" aria-label="New item for the ${esc(c.name.toLowerCase())}">
         </div>`;
-    }).join('')}</div>`;
+    });
 }
 
 function openDay(date) {
@@ -367,10 +371,10 @@ function openBox() {
     if (!state.kids.length) return openKids();
     $('#box-items').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
-            <div class="box">${store.COMPARTMENTS.map(c => `<label class="comp ${c.id}">
+            ${boxHtml(c => `<label class="comp ${c.id}">
                 <span class="comp-name">${esc(c.name)}</span>
-                <textarea rows="4" data-comp="${c.id}" aria-label="What goes in ${esc(kid)}'s ${esc(c.name.toLowerCase())}, one per line"></textarea>
-            </label>`).join('')}</div>
+                <textarea rows="${c.tray ? 4 : 3}" data-comp="${c.id}" aria-label="What goes in ${esc(kid)}'s ${esc(c.name.toLowerCase())}, one per line"></textarea>
+            </label>`)}
         </fieldset>`).join('');
     state.kids.forEach((kid, i) => {
         for (const c of store.COMPARTMENTS) $(`#box-items [data-kid="${i}"] textarea[data-comp="${c.id}"]`).value = state.items[kid][c.id].join('\n');

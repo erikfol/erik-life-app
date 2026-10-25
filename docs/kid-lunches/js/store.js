@@ -10,13 +10,14 @@ export const DIR = 'inputs/kid-lunches';
 export const PATH = `${DIR}/lunches.json`;
 export const CSV_PATH = `${DIR}/lunches.csv`;
 
-/** The parts of the lunch box, as in the photo: big gray square and yellow rectangle on the left, circle and small
- *  rectangle on the right. */
+/** The parts of a lunch: the main entree in its own container, and the lunch box's tray as in the photo (big gray
+ *  square and yellow rectangle on the left, circle and small rectangle on the right). */
 export const COMPARTMENTS = [
-    { id: 'square', name: 'Gray square' },
-    { id: 'circle', name: 'Circle' },
-    { id: 'yellow', name: 'Yellow' },
-    { id: 'small', name: 'Small' },
+    { id: 'main', name: 'Main entree' },
+    { id: 'square', name: 'Gray square', tray: true },
+    { id: 'circle', name: 'Circle', tray: true },
+    { id: 'yellow', name: 'Yellow', tray: true },
+    { id: 'small', name: 'Small', tray: true },
 ];
 const STARTING_ITEMS = { circle: ['Yogurt', 'Apple sauce'] }; // only these go in the circle; a new kid starts with this
 
