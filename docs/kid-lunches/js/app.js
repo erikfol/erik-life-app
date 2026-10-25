@@ -1,6 +1,6 @@
 // Kid Lunches: a week/month calendar like the Dinner Planner's, with a lunch box for each kid on every day. Each part of
-// the box (store.COMPARTMENTS) only takes its own items, set in ✎ Box. Uses the same folder as Bills Etc (the browser
-// remembers it for the whole site); the data lives in inputs/kid-lunches/ (js/store.js).
+// the box (store.COMPARTMENTS) only takes that kid's items for it, set in ✎ Box. Uses the same folder as Bills Etc (the
+// browser remembers it for the whole site); the data lives in inputs/kid-lunches/ (js/store.js).
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
@@ -63,6 +63,7 @@ function renderCalendar() {
     const cal = $('#calendar');
     const today = todayKey();
     $$('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
+    $$('.week-only').forEach(el => (el.hidden = state.view !== 'week'));
     $('#no-kids').hidden = state.kids.length > 0;
 
     let days;
@@ -128,12 +129,13 @@ function shiftCursor(dir) {
 const itemChip = (name, on, isNew = false) =>
     `<button type="button" class="chip ${on ? 'active' : ''}" data-item="${esc(name)}" aria-pressed="${on}"${isNew ? ' data-new' : ''}>${esc(name)}</button>`;
 
-/** A kid's lunch box to build: each part offers its own items (plus any saved on this day that have since left its
- *  list) as chips to click on or off, and takes a new item typed below them. */
-function buildBox(lunch = {}) {
+/** A kid's lunch box to build: each part offers that kid's items for it (plus any saved on this day that have since left
+ *  the list) as chips to click on or off, and takes a new item typed below them. */
+function buildBox(kid, lunch = {}) {
     return `<div class="box">${store.COMPARTMENTS.map(c => {
+        const list = state.items[kid][c.id];
         const picked = lunch[c.id] || [];
-        const names = [...state.items[c.id], ...picked.filter(p => !state.items[c.id].some(n => store.sameName(n, p)))];
+        const names = [...list, ...picked.filter(p => !list.some(n => store.sameName(n, p)))];
         return `<div class="comp ${c.id}" data-comp="${c.id}">
             <span class="comp-name">${esc(c.name)}</span>
             <span class="comp-items">${names.map(n => itemChip(n, picked.some(p => store.sameName(p, n)))).join('')}</span>
@@ -150,17 +152,18 @@ function openDay(date) {
     $('#day-dialog-title').textContent = fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     $('#kid-fields').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
-            ${buildBox(e[kid])}
+            ${buildBox(kid, e[kid])}
             <input class="kid-note" maxlength="200" aria-label="${esc(kid)}'s note" placeholder="Note (e.g. buying lunch, field trip)">
         </fieldset>`).join('');
     state.kids.forEach((kid, i) => { $(`.kid-field[data-kid="${i}"] .kid-note`, form).value = e[kid]?.note || ''; });
     $('#day-dialog').showModal();
 }
 
-/** The parts an item already belongs to: its list in ✎ Box, or typed as new into that part in this dialog. */
-function homesOf(name) {
-    return store.COMPARTMENTS.filter(c => state.items[c.id].some(n => store.sameName(n, name))
-        || $$(`[data-comp="${c.id}"] .chip[data-new]`, $('#day-form')).some(b => store.sameName(b.dataset.item, name)));
+/** The parts of a kid's box an item already belongs to: on that kid's list in ✎ Box, or typed in as new in this dialog. */
+function homesOf(field, name) {
+    const kid = state.kids[field.dataset.kid];
+    return store.COMPARTMENTS.filter(c => state.items[kid][c.id].some(n => store.sameName(n, name))
+        || $$(`[data-comp="${c.id}"] .chip[data-new]`, field).some(b => store.sameName(b.dataset.item, name)));
 }
 
 /** Put the item typed below a part into it. False (with a message) when it belongs in a different part. */
@@ -168,20 +171,21 @@ function addTyped(input) {
     const name = input.value.trim();
     if (!name) return true;
     const comp = input.closest('[data-comp]');
+    const field = input.closest('.kid-field');
     const existing = $$('.chip', comp).find(b => store.sameName(b.dataset.item, name));
     if (existing) {
         setChip(existing, true);
     } else {
-        const homes = homesOf(name).filter(c => c.id !== comp.dataset.comp);
+        const homes = homesOf(field, name).filter(c => c.id !== comp.dataset.comp);
         if (homes.length) {
-            const listed = state.items[homes[0].id].find(n => store.sameName(n, name)) || name;
-            toast(`${listed} goes in the ${homes.map(c => c.name.toLowerCase()).join(' or the ')}. To change that, use ✎ Box.`, 'bad');
+            const kid = state.kids[field.dataset.kid];
+            const listed = state.items[kid][homes[0].id].find(n => store.sameName(n, name)) || name;
+            toast(`${listed} goes in the ${homes.map(c => c.name.toLowerCase()).join(' or the ')} of ${kid}'s box. To change that, use ✎ Box.`, 'bad');
             input.select();
             return false;
         }
-        // A new item for this part: picked for this kid, offered to the others.
-        $$(`[data-comp="${comp.dataset.comp}"] .comp-items`, $('#day-form')).forEach(list =>
-            list.insertAdjacentHTML('beforeend', itemChip(name, list.closest('[data-comp]') === comp, true)));
+        // A new item for this part of this kid's box.
+        $('.comp-items', comp).insertAdjacentHTML('beforeend', itemChip(name, true, true));
     }
     input.value = '';
     return true;
@@ -210,23 +214,64 @@ function itemHistory(kid, item, date) {
     return { count, near };
 }
 
-/** A weighted random pick: mostly things the kid hasn't had in the days around this one (planned days count too),
- *  a little more often what they've had a lot, and something new when Suggest is pressed again. */
-function suggestItem(kid, date, options, previous) {
-    if (!options.length) return null;
-    const weighted = options.map(name => {
-        const { count, near } = itemHistory(kid, name, date);
-        let w = (near === null ? 1 : Math.max(0.02, Math.min(1, near / 7) ** 2)) * (1 + Math.min(count, 10) / 10);
-        if (options.length > 1 && previous.some(p => store.sameName(p, name))) w *= 0.05;
-        return { name, w };
-    });
-    let x = Math.random() * weighted.reduce((s, o) => s + o.w, 0);
-    for (const o of weighted) if ((x -= o.w) <= 0) return o.name;
-    return weighted.at(-1).name;
+const MAX_COMBOS = 20000; // more ways to fill a box than this and the parts are picked one at a time instead
+
+/** A random pick from [{ w, … }], each as likely as its weight. */
+function weightedPick(list) {
+    let x = Math.random() * list.reduce((s, o) => s + o.w, 0);
+    for (const o of list) if ((x -= o.w) <= 0) return o;
+    return list.at(-1);
+}
+
+/** Picks for some parts of one kid's box, { part id: item }. Each of `parts` is { id, options, previous }; `taken` is
+ *  what's already in the box's other parts, since the same item never goes in two parts of one box. Each item weighs
+ *  mostly by how long it's been since the kid had it (days around this one, planned days count too), a little more for
+ *  what they've had a lot, and much less for the part's previous pick, so pressing again gives something else. */
+function pickParts(kid, date, parts, taken = []) {
+    const base = new Map();
+    const weight = (p, name) => {
+        const key = name.toLowerCase();
+        if (!base.has(key)) {
+            const { count, near } = itemHistory(kid, name, date);
+            base.set(key, (near === null ? 1 : Math.max(0.02, Math.min(1, near / 7) ** 2)) * (1 + Math.min(count, 10) / 10));
+        }
+        return base.get(key) * (p.options.length > 1 && (p.previous || []).some(n => store.sameName(n, name)) ? 0.05 : 1);
+    };
+    // Every way to fill the parts without repeating an item, weighted by its items, then one picked at random. Picking
+    // the whole box at once matters when parts share items (Strawberry in two parts): one at a time, the first part
+    // would keep taking the shared item and leave the other part the same leftover every day.
+    let combos = [{ picks: {}, used: new Set(taken.map(n => n.toLowerCase())), w: 1 }];
+    for (const p of parts) {
+        const next = [];
+        for (const combo of combos) {
+            const options = p.options.filter(n => !combo.used.has(n.toLowerCase()));
+            if (!options.length) next.push(combo);
+            for (const n of options) {
+                next.push({ picks: { ...combo.picks, [p.id]: n }, used: new Set([...combo.used, n.toLowerCase()]), w: combo.w * weight(p, n) });
+            }
+        }
+        combos = next;
+        if (combos.length > MAX_COMBOS) return pickPartsOneByOne(parts, taken, weight);
+    }
+    const most = Math.max(...combos.map(c => Object.keys(c.picks).length)); // fill every part that can be filled
+    return weightedPick(combos.filter(c => Object.keys(c.picks).length === most)).picks;
+}
+
+/** The same, one part at a time (fewest choices first), for boxes with very long lists. */
+function pickPartsOneByOne(parts, taken, weight) {
+    const used = new Set(taken.map(n => n.toLowerCase()));
+    const picks = {};
+    for (const p of [...parts].sort((a, b) => a.options.length - b.options.length)) {
+        const options = p.options.filter(n => !used.has(n.toLowerCase()));
+        if (!options.length) continue;
+        picks[p.id] = weightedPick(options.map(name => ({ name, w: weight(p, name) }))).name;
+        used.add(picks[p.id].toLowerCase());
+    }
+    return picks;
 }
 
 /** ✨ Suggest: one item in every part of each kid's box that wasn't picked by hand (if every part was, all of them get
- *  new picks). The same item never goes in two parts of one box. */
+ *  new picks). */
 function suggestDay() {
     const form = $('#day-form');
     const date = form.dataset.date;
@@ -234,31 +279,58 @@ function suggestDay() {
     for (const field of $$('.kid-field', form)) {
         const kid = state.kids[field.dataset.kid];
         const parts = store.COMPARTMENTS.map(c => {
-            const el = $(`[data-comp="${c.id}"]`, field);
-            const chips = $$('.chip', el);
+            const chips = $$(`[data-comp="${c.id}"] .chip`, field);
+            const active = chips.filter(b => b.classList.contains('active'));
             return {
+                id: c.id,
                 chips,
-                byHand: chips.some(b => b.classList.contains('active') && !b.hasAttribute('data-suggested')),
-                // its list in ✎ Box, plus anything typed in as new while this dialog is open
-                options: chips.filter(b => b.hasAttribute('data-new') || state.items[c.id].some(n => store.sameName(n, b.dataset.item))).map(b => b.dataset.item),
+                byHand: active.some(b => !b.hasAttribute('data-suggested')),
+                previous: active.map(b => b.dataset.item),
+                // the kid's list in ✎ Box, plus anything typed in as new while this dialog is open
+                options: chips.filter(b => b.hasAttribute('data-new') || state.items[kid][c.id].some(n => store.sameName(n, b.dataset.item))).map(b => b.dataset.item),
             };
         });
         let open = parts.filter(p => !p.byHand && p.options.length);
         if (!open.length) open = parts.filter(p => p.options.length);
-        const taken = new Set(parts.filter(p => !open.includes(p)).flatMap(p => p.chips.filter(b => b.classList.contains('active')).map(b => b.dataset.item.toLowerCase())));
-        // Fewest choices first, so a part with few items isn't left with only what another part took.
-        open.sort((a, b) => a.options.length - b.options.length);
+        const picks = pickParts(kid, date, open, parts.filter(p => !open.includes(p)).flatMap(p => p.previous));
         for (const p of open) {
-            const previous = p.chips.filter(b => b.classList.contains('active')).map(b => b.dataset.item);
             p.chips.forEach(b => setChip(b, false));
-            const pick = suggestItem(kid, date, p.options.filter(n => !taken.has(n.toLowerCase())), previous);
-            if (!pick) continue;
-            setChip(p.chips.find(b => b.dataset.item === pick), true, true);
-            taken.add(pick.toLowerCase());
-            filled++;
+            if (picks[p.id]) setChip(p.chips.find(b => b.dataset.item === picks[p.id]), true, true);
         }
+        filled += Object.keys(picks).length;
     }
     if (!filled) toast('Nothing to suggest yet. Add what can go in each part with ✎ Box.');
+}
+
+/** ✨ Fill empty days: a suggested lunch for every kid without one on the days left in the week shown. */
+async function fillWeek() {
+    const today = todayKey();
+    const partsFor = kid => store.COMPARTMENTS.map(c => ({ id: c.id, options: state.items[kid][c.id] }));
+    let count = 0;
+    try {
+        for (const d of schoolDays(schoolWeek(state.cursor))) {
+            const date = dateKey(d);
+            if (date < today) continue;
+            const day = { ...state.days[date] };
+            let packed = 0;
+            for (const kid of state.kids) {
+                if (day[kid]) continue; // anything there already (even just a note) stays as it is
+                const picks = pickParts(kid, date, partsFor(kid));
+                if (!Object.keys(picks).length) continue;
+                day[kid] = Object.fromEntries(Object.entries(picks).map(([id, item]) => [id, [item]]));
+                packed++;
+            }
+            if (!packed) continue;
+            await store.setDay(date, day); // state.days is the store's, so later days see it
+            count += packed;
+        }
+    } finally {
+        reload();
+    }
+    if (count) toast(`Packed ${count} lunch${count > 1 ? 'es' : ''}`);
+    else toast(state.kids.some(kid => store.COMPARTMENTS.some(c => state.items[kid][c.id].length))
+        ? 'Every day left this week already has a lunch for each kid'
+        : 'Nothing to pack yet. Add the kids and what goes in each part (✎ Kids, ✎ Box).');
 }
 
 async function saveDay(ev) {
@@ -266,12 +338,17 @@ async function saveDay(ev) {
     const form = $('#day-form');
     if (!$$('.new-item', form).every(addTyped)) return; // typed but not added with Enter yet
     const lunches = {};
+    const newItems = {};
     for (const field of $$('.kid-field', form)) {
-        const lunch = { note: $('.kid-note', field).value };
-        for (const c of store.COMPARTMENTS) lunch[c.id] = $$(`[data-comp="${c.id}"] .chip.active`, field).map(b => b.dataset.item);
-        lunches[state.kids[field.dataset.kid]] = lunch;
+        const kid = state.kids[field.dataset.kid];
+        const chips = (c, sel) => $$(`[data-comp="${c.id}"] .chip${sel}`, field).map(b => b.dataset.item);
+        lunches[kid] = { note: $('.kid-note', field).value };
+        newItems[kid] = {};
+        for (const c of store.COMPARTMENTS) {
+            lunches[kid][c.id] = chips(c, '.active');
+            newItems[kid][c.id] = chips(c, '[data-new]');
+        }
     }
-    const newItems = Object.fromEntries(store.COMPARTMENTS.map(c => [c.id, $$(`[data-comp="${c.id}"] .chip[data-new]`, form).map(b => b.dataset.item)]));
     await store.setDay(form.dataset.date, lunches, newItems);
     $('#day-dialog').close();
     reload();
@@ -285,18 +362,28 @@ async function clearDay() {
 
 // ---------- box dialog ----------
 
+/** Each kid's own box (they like different things), one item per line in each part. */
 function openBox() {
-    $('#box-items').innerHTML = store.COMPARTMENTS.map(c => `<label class="comp ${c.id}">
-            <span class="comp-name">${esc(c.name)}</span>
-            <textarea rows="5" data-comp="${c.id}" aria-label="What goes in the ${esc(c.name.toLowerCase())}, one per line"></textarea>
-        </label>`).join('');
-    for (const c of store.COMPARTMENTS) $(`#box-items textarea[data-comp="${c.id}"]`).value = state.items[c.id].join('\n');
+    if (!state.kids.length) return openKids();
+    $('#box-items').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
+            <legend>${esc(kid)}</legend>
+            <div class="box">${store.COMPARTMENTS.map(c => `<label class="comp ${c.id}">
+                <span class="comp-name">${esc(c.name)}</span>
+                <textarea rows="4" data-comp="${c.id}" aria-label="What goes in ${esc(kid)}'s ${esc(c.name.toLowerCase())}, one per line"></textarea>
+            </label>`).join('')}</div>
+        </fieldset>`).join('');
+    state.kids.forEach((kid, i) => {
+        for (const c of store.COMPARTMENTS) $(`#box-items [data-kid="${i}"] textarea[data-comp="${c.id}"]`).value = state.items[kid][c.id].join('\n');
+    });
     $('#box-dialog').showModal();
 }
 
 async function saveBox(ev) {
     ev.preventDefault();
-    await store.setItems(Object.fromEntries($$('#box-items textarea').map(t => [t.dataset.comp, t.value.split('\n')])));
+    await store.setItems(Object.fromEntries($$('#box-items .kid-field').map(f => [
+        state.kids[f.dataset.kid],
+        Object.fromEntries($$('textarea', f).map(t => [t.dataset.comp, t.value.split('\n')])),
+    ])));
     $('#box-dialog').close();
     reload();
 }
@@ -364,6 +451,7 @@ function wire() {
         setChip(chip, !chip.classList.contains('active'));
     };
     $('#day-suggest').onclick = suggestDay;
+    $('#fill-week').onclick = guard(fillWeek);
     $('#kid-fields').onkeydown = ev => {
         if (ev.key === 'Enter' && ev.target.classList.contains('new-item')) {
             ev.preventDefault(); // Enter adds the item instead of saving the day

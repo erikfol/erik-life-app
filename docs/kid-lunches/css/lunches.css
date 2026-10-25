@@ -70,6 +70,7 @@
 .dp .box .new-item { font-size: .78rem; padding: 3px 7px; margin-top: auto; background: rgba(255,255,255,.85); }
 .dp .box .comp.circle .new-item { width: 85%; margin-top: 0; }
 .dp .box textarea { flex: 1; font-size: .85rem; padding: 5px 7px; resize: vertical; background: rgba(255,255,255,.9); }
+.dp #box-items { display: flex; flex-direction: column; gap: 12px; }
 .dp #box-items .comp { font-weight: 400; } /* labels in dialogs are bold by default */
 .dp #box-items .comp.circle textarea { width: 100%; }
 

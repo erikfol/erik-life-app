@@ -1,5 +1,5 @@
-// Kid Lunches data: inputs/kid-lunches/lunches.json holds the kids, what may go in each part of the lunch box, and each
-// day's lunches. lunches.csv is a spreadsheet copy (Date, Day, a column per kid) rewritten after every change. The kids'
+// Kid Lunches data: inputs/kid-lunches/lunches.json holds the kids, what may go in each part of each kid's lunch box, and
+// each day's lunches. lunches.csv is a spreadsheet copy (Date, Day, a column per kid) rewritten after every change. The kids'
 // names live only in those files (inputs/ is kept out of git), not in this code.
 import * as fs from '../../bills-etc/js/fs.js';
 import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
@@ -18,12 +18,12 @@ export const COMPARTMENTS = [
     { id: 'yellow', name: 'Yellow' },
     { id: 'small', name: 'Small' },
 ];
-const STARTING_ITEMS = { circle: ['Yogurt', 'Apple sauce'] }; // only these go in the circle
+const STARTING_ITEMS = { circle: ['Yogurt', 'Apple sauce'] }; // only these go in the circle; a new kid starts with this
 
 const FIXED = ['Date', 'Day'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-let db = null; // { version, kids: [names], items: { compartment: [names] }, days: { date: { kid: lunch } } }
+let db = null; // { version, kids: [names], items: { kid: { compartment: [names] } }, days: { date: { kid: lunch } } }
 
 export const data = () => db;
 
@@ -63,9 +63,14 @@ function cleanDb(input) {
         }
         if (Object.keys(day).length) days[date] = day;
     }
-    const items = Object.fromEntries(COMPARTMENTS.map(c => [c.id, uniqueNames(input.items?.[c.id])]));
-    return { version: 1, kids, items, days };
+    // Version 1 had one set of lists for both kids; each kid now starts from a copy of it.
+    const shared = COMPARTMENTS.some(c => Array.isArray(input.items?.[c.id])) ? input.items : null;
+    const items = Object.fromEntries(kids.map(kid => [kid, boxItems(shared || input.items?.[kid])]));
+    return { version: 2, kids, items, days };
 }
+
+/** One kid's lists: { compartment: [names] }. */
+const boxItems = src => Object.fromEntries(COMPARTMENTS.map(c => [c.id, uniqueNames(src?.[c.id])]));
 
 // ---------- loading and saving ----------
 
@@ -77,20 +82,16 @@ export async function load() {
         db = cleanDb(JSON.parse(text));
         return;
     }
-    db = cleanDb({ items: STARTING_ITEMS });
     const old = await fs.readText(CSV_PATH);
-    if (old === null) return;
-    const { columns, rows } = parseCSV(old);
-    db.kids = uniqueNames(columns.filter(c => !FIXED.includes(c)), 40);
+    const { columns, rows } = parseCSV(old ?? '');
+    const kids = columns.filter(c => !FIXED.includes(c));
+    const days = {};
     for (const r of rows) {
         const d = parseDate(r.Date);
-        if (!d) continue;
-        for (const kid of db.kids) {
-            const lunch = cleanLunch({ note: r[kid] });
-            if (lunch) (db.days[localDate(d)] ||= {})[kid] = lunch;
-        }
+        if (d) days[localDate(d)] = Object.fromEntries(kids.map(kid => [kid, { note: r[kid] }]));
     }
-    await save();
+    db = cleanDb({ kids, items: STARTING_ITEMS, days }); // the starting lists, copied to each kid
+    if (old !== null) await save();
 }
 
 async function save() {
@@ -135,11 +136,14 @@ async function change(fn) {
 
 // ---------- changes (each one saves) ----------
 
-/** One day's lunches, { kid: lunch }; newItems { compartment: [names] } typed while building them join those lists. */
+/** One day's lunches, { kid: lunch }; newItems { kid: { compartment: [names] } } typed while building them join that
+ *  kid's lists. */
 export function setDay(date, lunches, newItems = {}) {
     if (!DATE_RE.test(date)) throw new Error('Bad date');
     return change(() => {
-        for (const c of COMPARTMENTS) db.items[c.id] = uniqueNames([...db.items[c.id], ...(newItems[c.id] || [])]);
+        for (const kid of db.kids) {
+            for (const c of COMPARTMENTS) db.items[kid][c.id] = uniqueNames([...db.items[kid][c.id], ...(newItems[kid]?.[c.id] || [])]);
+        }
         const day = {};
         for (const kid of db.kids) {
             const lunch = cleanLunch(lunches[kid]);
@@ -150,15 +154,15 @@ export function setDay(date, lunches, newItems = {}) {
     });
 }
 
-/** What may go in each part of the box: { compartment: [names] }. Lunches already saved keep their items. */
+/** What may go in each part of each kid's box: { kid: { compartment: [names] } }. Lunches already saved keep their items. */
 export function setItems(items) {
     return change(() => {
-        for (const c of COMPARTMENTS) db.items[c.id] = uniqueNames(items[c.id]);
+        for (const kid of db.kids) if (items[kid]) db.items[kid] = boxItems(items[kid]);
     });
 }
 
-/** The kids, in order: [{ from: current name or null for a new kid, name }]. Renaming keeps a kid's lunches; leaving
- *  a kid out removes their lunches. */
+/** The kids, in order: [{ from: current name or null for a new kid, name }]. Renaming keeps a kid's lunches and box;
+ *  leaving a kid out removes them; a new kid's box starts with the starting lists. */
 export function setKids(list) {
     const names = list.map(k => clean(k.name, 40));
     if (names.some(n => !n)) throw new Error('Every kid needs a name');
@@ -171,6 +175,7 @@ export function setKids(list) {
             if (Object.keys(next).length) db.days[date] = next;
             else delete db.days[date];
         }
+        db.items = Object.fromEntries(list.map((k, i) => [names[i], k.from && db.items[k.from] ? db.items[k.from] : boxItems(STARTING_ITEMS)]));
         db.kids = names;
     });
 }
