@@ -56,9 +56,9 @@ function sanitizeDb(input) {
     const plan = {};
     for (const [date, e] of Object.entries(input.plan)) {
         if (!DATE_RE.test(date) || !e || typeof e !== 'object') continue;
-        const mealId = ids.has(e.mealId) ? e.mealId : null;
+        const mealIds = [...new Set(mealsOf(e))].filter(id => ids.has(id));
         const note = cleanStr(e.note, 200);
-        if (mealId || note) plan[date] = { mealId, note, skipped: !!e.skipped };
+        if (mealIds.length || note) plan[date] = { mealIds, note, skipped: !!e.skipped };
     }
     const strings = a => (Array.isArray(a) ? a.filter(s => typeof s === 'string') : []);
     return {
@@ -71,18 +71,26 @@ function sanitizeDb(input) {
     };
 }
 
+/** A calendar day's meals (days saved before version 3 had one mealId). */
+export const mealsOf = e => (Array.isArray(e?.mealIds) ? e.mealIds : e?.mealId ? [e.mealId] : []);
+
 /** One-time data upgrades, tracked by db.version so they never run twice. True if anything changed. */
 function migrate(d) {
     const version = d.version || 1;
-    if (version >= 2) return false;
-    if (!d.meals.some(m => m.name.toLowerCase() === 'free for all')) {
+    if (version >= 3) return false;
+    if (version < 2 && !d.meals.some(m => m.name.toLowerCase() === 'free for all')) {
         d.meals.push(normalizeMeal({
             name: 'Free For All',
             special: true,
             notes: 'Everyone fends for themselves: leftovers, ramen, sandwiches, whatever is around.',
         }));
     }
-    d.version = 2;
+    // Version 3: a day can have several meals (e.g. one for the adults, one for the kids).
+    for (const e of Object.values(d.plan)) {
+        e.mealIds = mealsOf(e);
+        delete e.mealId;
+    }
+    d.version = 3;
     return true;
 }
 
@@ -175,10 +183,12 @@ function eatenStats() {
     const today = localDate();
     const stats = {};
     for (const [date, e] of Object.entries(db.plan).sort(([a], [b]) => a.localeCompare(b))) {
-        if (date >= today || !e.mealId || e.skipped) continue;
-        const s = (stats[e.mealId] ||= { count: 0, last: '' });
-        s.count++;
-        s.last = date;
+        if (date >= today || e.skipped) continue;
+        for (const id of mealsOf(e)) {
+            const s = (stats[id] ||= { count: 0, last: '' });
+            s.count++;
+            s.last = date;
+        }
     }
     return stats;
 }
@@ -210,7 +220,7 @@ export function historyCsv() {
         const [y, mo, d] = date.split('-').map(Number);
         const weekday = new Date(y, mo - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
         const status = e.skipped ? 'Skipped' : date < today ? 'Eaten' : date === today ? 'Today' : 'Planned';
-        rows.push([date, weekday, (e.mealId && names.get(e.mealId)) || '', e.note || '', status]);
+        rows.push([date, weekday, mealsOf(e).map(id => names.get(id)).filter(Boolean).join(' + '), e.note || '', status]);
     }
     return toCsv(rows);
 }
@@ -252,22 +262,22 @@ export async function deleteMeal(id) {
     const [removed] = db.meals.splice(idx, 1);
     // Keep plan history readable by remembering the name of the deleted meal.
     for (const entry of Object.values(db.plan)) {
-        if (entry.mealId === id) {
-            entry.mealId = null;
+        if (entry.mealIds.includes(id)) {
+            entry.mealIds = entry.mealIds.filter(x => x !== id);
             entry.note = entry.note || removed.name;
         }
     }
     await save();
 }
 
-/** A day on the calendar: { mealId, note, skipped }; no meal and no note clears it. */
-export async function setDay(date, { mealId, note, skipped } = {}) {
+/** A day on the calendar: { mealIds, note, skipped }; no meals and no note clears it. */
+export async function setDay(date, { mealIds = [], note, skipped } = {}) {
     if (!DATE_RE.test(date)) throw new Error('Bad date');
-    mealId = mealId && db.meals.some(m => m.id === mealId) ? mealId : null;
+    mealIds = [...new Set(mealIds)].filter(id => db.meals.some(m => m.id === id));
     note = cleanStr(note, 200);
     // skipped: the plan didn't happen, so it shouldn't count as history.
-    if (!mealId && !note) delete db.plan[date];
-    else db.plan[date] = { mealId, note, skipped: !!skipped };
+    if (!mealIds.length && !note) delete db.plan[date];
+    else db.plan[date] = { mealIds, note, skipped: !!skipped };
     await save();
 }
 

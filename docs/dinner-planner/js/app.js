@@ -77,12 +77,12 @@ const mealById = id => state.meals.find(m => m.id === id);
 
 // ---------- history & learning ----------
 
-// Every past, non-skipped calendar entry with a meal counts as "we ate this".
+// Every meal on a past, non-skipped calendar day counts as "we ate this".
 function pastDinners() {
     const today = todayKey();
     return Object.entries(state.plan)
-        .filter(([date, e]) => date < today && e.mealId && !e.skipped)
-        .map(([date, e]) => ({ date, mealId: e.mealId, daysAgo: daysBetween(date, today) }))
+        .filter(([date, e]) => date < today && !e.skipped)
+        .flatMap(([date, e]) => e.mealIds.map(mealId => ({ date, mealId, daysAgo: daysBetween(date, today) })))
         .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -171,7 +171,7 @@ function rankDue(stats, { aroundDate = todayKey(), exclude = new Set() } = {}) {
     const near = new Set();
     for (let i = -span; i <= span; i++) {
         const e = state.plan[dateKey(addDays(parseKey(aroundDate), i))];
-        if (e?.mealId && !e.skipped) near.add(e.mealId);
+        if (e && !e.skipped) e.mealIds.forEach(id => near.add(id));
     }
     return state.meals
         .filter(m => !m.special && !near.has(m.id) && !exclude.has(m.id))
@@ -237,7 +237,7 @@ function renderCalendar() {
     cal.innerHTML = dowHeader + days.map(d => {
         const key = dateKey(d);
         const e = state.plan[key];
-        const meal = e?.mealId && mealById(e.mealId);
+        const meals = (e?.mealIds || []).map(mealById).filter(Boolean);
         const classes = ['day'];
         if (key === today) classes.push('today');
         if (key < today) classes.push('past');
@@ -247,18 +247,18 @@ function renderCalendar() {
         const badge = key === today ? '<span class="badge">Today</span>' : '';
 
         let body;
-        if (meal) {
-            body = `<span class="meal-name ${meal.special ? 'special' : ''} ${e.skipped ? 'skipped' : ''}">${meal.favorite ? '★ ' : ''}${esc(meal.name)}</span>`;
+        if (meals.length) {
+            body = meals.map(meal => `<span class="meal-name ${meal.special ? 'special' : ''} ${e.skipped ? 'skipped' : ''}">${meal.favorite ? '★ ' : ''}${esc(meal.name)}</span>`
+                + (meal.prepMinutes && state.view === 'week' ? `<span class="meta">⏱ ${meal.prepMinutes} min</span>` : '')).join('');
             if (e.note) body += `<span class="meal-note">${esc(e.note)}</span>`;
-            if (meal.prepMinutes && state.view === 'week') body += `<span class="meta">⏱ ${meal.prepMinutes} min</span>`;
         } else if (e?.note) {
             body = `<span class="meal-note ${e.skipped ? 'skipped' : ''}">${esc(e.note)}</span>`;
         } else {
             body = state.view === 'week' ? `<span class="empty">${key < today ? 'Nothing logged' : '+ Plan dinner'}</span>` : '';
         }
-        // Quick actions for upcoming planned days, so you can reject a suggestion in one click.
+        // Quick actions for upcoming planned days, so you can reject a suggestion in one click (↻ only with one meal).
         const quick = state.view === 'week' && key >= today && e
-            ? `<span class="day-actions">${meal ? '<button type="button" class="day-act" data-day-act="swap" title="Swap for another suggestion" aria-label="Swap meal">↻</button>' : ''}<button type="button" class="day-act" data-day-act="clear" title="Clear this day" aria-label="Clear day">✕</button></span>`
+            ? `<span class="day-actions">${meals.length === 1 ? '<button type="button" class="day-act" data-day-act="swap" title="Swap for another suggestion" aria-label="Swap meal">↻</button>' : ''}<button type="button" class="day-act" data-day-act="clear" title="Clear this day" aria-label="Clear day">✕</button></span>`
             : '';
         return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${quick}</div>`;
     }).join('');
@@ -283,7 +283,7 @@ async function fillWeek() {
             const meal = pickFor(key, stats, used);
             if (!meal) break;
             used.add(meal.id);
-            await store.setDay(key, { mealId: meal.id }); // later picks see it
+            await store.setDay(key, { mealIds: [meal.id] }); // later picks see it
             count++;
         }
     } finally {
@@ -292,18 +292,20 @@ async function fillWeek() {
     toast(count ? `Planned ${count} day${count > 1 ? 's' : ''}` : 'No empty upcoming days this week');
 }
 
+const dayMealNames = e => (e?.mealIds || []).map(id => mealById(id)?.name).filter(Boolean).join(' + ');
+
 async function quickClearDay(date) {
-    const name = mealById(state.plan[date]?.mealId)?.name || state.plan[date]?.note;
+    const name = dayMealNames(state.plan[date]) || state.plan[date]?.note;
     await store.clearDay(date);
     reload();
     toast(`Cleared ${name || 'day'}`);
 }
 
 async function swapDay(date) {
-    const current = state.plan[date]?.mealId;
-    const meal = pickFor(date, computeStats(), new Set([current]));
+    const e = state.plan[date];
+    const meal = pickFor(date, computeStats(), new Set(e?.mealIds));
     if (!meal) return toast('No other meals to suggest. Add more meals first.');
-    await store.setDay(date, { mealId: meal.id });
+    await store.setDay(date, { mealIds: [meal.id], note: e?.note, skipped: e?.skipped });
     reload();
     toast(`Swapped to ${meal.name}`);
 }
@@ -313,14 +315,15 @@ function openShoppingList() {
     const items = new Map();
     for (let i = 0; i < 7; i++) {
         const e = state.plan[dateKey(addDays(start, i))];
-        const meal = e?.mealId && !e.skipped && mealById(e.mealId);
-        if (!meal) continue;
-        for (const ing of meal.ingredients) {
-            const k = ing.name.toLowerCase();
-            if (!items.has(k)) items.set(k, { name: ing.name, qty: [], from: new Set() });
-            const it = items.get(k);
-            if (ing.quantity) it.qty.push(ing.quantity);
-            it.from.add(meal.name);
+        if (!e || e.skipped) continue;
+        for (const meal of e.mealIds.map(mealById).filter(Boolean)) {
+            for (const ing of meal.ingredients) {
+                const k = ing.name.toLowerCase();
+                if (!items.has(k)) items.set(k, { name: ing.name, qty: [], from: new Set() });
+                const it = items.get(k);
+                if (ing.quantity) it.qty.push(ing.quantity);
+                it.from.add(meal.name);
+            }
         }
     }
     const list = [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -342,17 +345,53 @@ function openShoppingList() {
 
 // ---------- day dialog ----------
 
-function openDay(date, presetMealId) {
-    const e = state.plan[date] || {};
-    const form = $('#day-form');
+let activeMealRow = null; // the day dialog's meal that a suggestion chip fills in
+
+function mealOptions() {
     const sorted = [...state.meals].sort((a, b) => a.name.localeCompare(b.name));
     const opt = m => `<option value="${m.id}">${m.favorite ? '★ ' : ''}${esc(m.name)}</option>`;
     const specials = sorted.filter(m => m.special);
-    $('#day-meal').innerHTML = '<option value="">— No meal —</option>'
+    return '<option value="">— No meal —</option>'
         + (specials.length ? `<optgroup label="Special">${specials.map(opt).join('')}</optgroup><optgroup label="Meals">` : '')
         + sorted.filter(m => !m.special).map(opt).join('')
         + (specials.length ? '</optgroup>' : '');
-    form.mealId.value = presetMealId || e.mealId || '';
+}
+
+function setActiveMealRow(row) {
+    activeMealRow = row;
+    $$('.day-meal-row').forEach(r => r.classList.toggle('active', r === row));
+}
+
+/** One of the day's meals (e.g. one for the adults, one for the kids). */
+function addDayMealRow(mealId = '') {
+    const row = document.createElement('div');
+    row.className = 'ing-row day-meal-row';
+    row.innerHTML = `<select aria-label="Meal">${mealOptions()}</select><button type="button" class="btn small" aria-label="Remove meal" title="Remove this meal">✕</button>`;
+    const select = row.querySelector('select');
+    select.value = mealId;
+    select.onfocus = () => setActiveMealRow(row);
+    select.onchange = () => { setActiveMealRow(row); updateDayDialog(); };
+    row.querySelector('button').onclick = () => {
+        if ($$('.day-meal-row').length === 1) select.value = ''; // keep one to choose from
+        else {
+            row.remove();
+            if (activeMealRow === row) setActiveMealRow($$('.day-meal-row').at(-1));
+        }
+        updateDayDialog();
+    };
+    $('#day-meal-rows').append(row);
+    setActiveMealRow(row);
+    return row;
+}
+
+const dayMealIds = () => [...new Set($$('.day-meal-row select').map(s => s.value).filter(Boolean))];
+
+function openDay(date, presetMealId) {
+    const e = state.plan[date] || {};
+    const form = $('#day-form');
+    $('#day-meal-rows').innerHTML = '';
+    const ids = presetMealId ? [presetMealId] : e.mealIds || [];
+    (ids.length ? ids : ['']).forEach(id => addDayMealRow(id));
     form.note.value = e.note || '';
     form.skipped.checked = !!e.skipped;
     form.dataset.date = date;
@@ -368,7 +407,7 @@ function updateDayDialog() {
     $$('.past-only', form).forEach(el => (el.hidden = !isPast));
 
     const stats = computeStats();
-    const sugg = rankDue(stats, { aroundDate: date }).slice(0, 5);
+    const sugg = rankDue(stats, { aroundDate: date, exclude: new Set(dayMealIds()) }).slice(0, 5);
     const specials = state.meals.filter(m => m.special).sort((a, b) => a.name.localeCompare(b.name));
     $('#day-suggestions').innerHTML =
         (sugg.length ? '<span class="hint">Suggestions:</span>' + sugg.map(r => `<button type="button" class="chip" data-meal="${r.meal.id}" title="${esc(describeStats(r.stats))}">${esc(r.meal.name)}</button>`).join('') : '')
@@ -379,7 +418,7 @@ async function saveDay(ev) {
     ev.preventDefault();
     const form = $('#day-form');
     const date = form.dataset.date;
-    await store.setDay(date, { mealId: form.mealId.value || null, note: form.note.value, skipped: form.skipped.checked && date < todayKey() });
+    await store.setDay(date, { mealIds: dayMealIds(), note: form.note.value, skipped: form.skipped.checked && date < todayKey() });
     $('#day-dialog').close();
     reload();
 }
@@ -506,8 +545,10 @@ async function mealAction(act, id) {
     if (act === 'ate') {
         const today = todayKey();
         const cur = state.plan[today];
-        if (cur?.mealId && cur.mealId !== id && !confirm(`Today already has "${mealById(cur.mealId)?.name}". Replace it?`)) return;
-        await store.setDay(today, { mealId: id });
+        const ids = cur?.mealIds || [];
+        if (ids.includes(id)) return toast(`${meal.name} is already on today`);
+        if (ids.length && !confirm(`Today already has ${dayMealNames(cur)}. Add "${meal.name}" to today too?`)) return;
+        await store.setDay(today, { mealIds: [...ids, id], note: cur?.note });
         toast(`Logged ${meal.name} for today`);
         return reload();
     }
@@ -722,8 +763,12 @@ function wire() {
     $('#day-clear').onclick = guard(clearDay);
     $('#day-suggestions').onclick = ev => {
         const chip = ev.target.closest('[data-meal]');
-        if (chip) $('#day-form').mealId.value = chip.dataset.meal;
+        if (!chip) return;
+        const row = activeMealRow?.isConnected ? activeMealRow : $$('.day-meal-row').at(-1);
+        row.querySelector('select').value = chip.dataset.meal;
+        updateDayDialog();
     };
+    $('#add-day-meal').onclick = () => addDayMealRow().querySelector('select').focus();
 
     $('#add-meal').onclick = () => openMealEditor(null);
     $('#add-ingredient').onclick = () => addIngredientRow().querySelector('input').focus();

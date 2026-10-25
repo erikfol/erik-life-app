@@ -1,7 +1,7 @@
 // Optional AI meal ideas from Claude, ported from the old Node app. Off until inputs/dinner-planner/.env has a line
 // ANTHROPIC_API_KEY=… (optionally DINNER_AI_MODEL=…). The key stays on this computer except in the request to Anthropic.
 import * as fs from '../../bills-etc/js/fs.js';
-import { DIR, localDate, normalizeMeal, cleanStr } from './store.js';
+import { DIR, localDate, normalizeMeal, cleanStr, mealsOf } from './store.js';
 
 export const ENV_PATH = `${DIR}/.env`;
 const DEFAULT_MODEL = 'claude-opus-5-5';
@@ -60,10 +60,11 @@ function buildPrompt(db, request) {
 
     const stats = {};
     for (const [d, e] of eaten) {
-        if (!e.mealId) continue;
-        const s = (stats[e.mealId] ||= { count: 0, last: d });
-        s.count++;
-        s.last = d;
+        for (const id of mealsOf(e)) {
+            const s = (stats[id] ||= { count: 0, last: d });
+            s.count++;
+            s.last = d;
+        }
     }
 
     const mealLines = db.meals.map(m => {
@@ -74,7 +75,7 @@ function buildPrompt(db, request) {
 
     const recent = eaten
         .filter(([d]) => daysAgo(d) <= 28)
-        .map(([d, e]) => `- ${d}: ${(e.mealId && db.meals.find(m => m.id === e.mealId)?.name) || e.note}`);
+        .map(([d, e]) => `- ${d}: ${mealsOf(e).map(id => db.meals.find(m => m.id === id)?.name).filter(Boolean).join(' + ') || e.note}`);
 
     const avoid = [...db.aiRejected.slice(-60), ...db.aiIdeas.map(i => i.name)];
 

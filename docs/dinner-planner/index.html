@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="css/dinner.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261025121406";
+        const VERSION = "20261025131117";
         const FILES = ["css/dinner.css", "js/ai.js", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/js/fileguard.js", "../shared/js/folder.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
@@ -160,9 +160,11 @@
             <dialog id="day-dialog">
                 <form id="day-form" method="dialog">
                     <h2 id="day-dialog-title"></h2>
-                    <label>Meal
-                        <select name="mealId" id="day-meal"></select>
-                    </label>
+                    <fieldset>
+                        <legend>Meals</legend>
+                        <div id="day-meal-rows"></div>
+                        <button type="button" class="btn small" id="add-day-meal">+ Add another meal</button>
+                    </fieldset>
                     <label>Or a note <input name="note" maxlength="200" placeholder="e.g. Leftovers, eating out, Grandma's"></label>
                     <label class="check past-only"><input type="checkbox" name="skipped"> We didn't end up having this</label>
                     <div id="day-suggestions" class="chips"></div>
