@@ -1,0 +1,40 @@
+/* Kid Lunches: the calendar, buttons and dialogs come from ../dinner-planner/css/dinner.css (everything under .dp);
+   this adds a colored box per kid on each day and in the day dialog. */
+.dp .k0 { --kid: var(--blue); }
+.dp .k1 { --kid: var(--green); }
+.dp .k2 { --kid: var(--orange); }
+.dp .k3 { --kid: var(--purple); }
+
+.dp .kid-lunch {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 3px 0 3px 8px;
+    border-left: 3px solid var(--kid);
+    min-width: 0;
+}
+.dp .kid-lunch .kid { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--kid); }
+.dp .kid-lunch .lunch { font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
+.dp .kid-lunch .empty { font-size: .85rem; }
+.dp .cal-month .kid-lunch { padding: 1px 0 1px 5px; border-left-width: 2px; }
+.dp .cal-month .kid-lunch .kid { font-size: .65rem; }
+.dp .cal-month .kid-lunch .lunch {
+    font-weight: 500;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.dp #no-kids { margin-bottom: 12px; }
+.dp fieldset.kid-field { border-left: 4px solid var(--kid); display: flex; flex-direction: column; gap: 8px; }
+.dp fieldset.kid-field legend { color: var(--kid); }
+.dp fieldset.kid-field textarea { resize: vertical; }
+.dp fieldset.kid-field .chips { margin-bottom: 0; align-items: center; }
+.dp .kid-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.dp .kid-row .btn { flex: 0 0 auto; }
+
+@media (max-width: 760px) {
+    .dp .cal-week .kid-lunch { width: 100%; }
+    .dp .cal-month .kid-lunch .kid { display: none; } /* the color says whose it is */
+}

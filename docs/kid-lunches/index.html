@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kid Lunches</title>
     <link rel="stylesheet" href="../bills-etc/css/app.css">
-    <link rel="stylesheet" href="../shared/css/records.css">
+    <link rel="stylesheet" href="../dinner-planner/css/dinner.css">
+    <link rel="stylesheet" href="css/lunches.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261025194807";
-        const FILES = ["js/app.js", "../bills-etc/css/app.css", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/folder.js"];
+        const VERSION = "20261025222234";
+        const FILES = ["css/lunches.css", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/dates.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../dinner-planner/css/dinner.css", "../shared/js/fileguard.js", "../shared/js/folder.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('kid-lunches-version') !== VERSION) {
@@ -30,7 +31,57 @@
             <span id="st-folder" class="pill">No folder</span>
         </div>
     </header>
-    <main id="view"></main>
+    <main>
+        <div id="view"></div>
+
+        <!-- The Dinner Planner's calendar look (its styles sit under .dp); css/lunches.css adds the kids' boxes. -->
+        <div id="app" class="dp" hidden>
+            <div class="toolbar">
+                <div class="btn-group">
+                    <button class="btn" id="cal-prev" aria-label="Previous">‹</button>
+                    <button class="btn" id="cal-today">Today</button>
+                    <button class="btn" id="cal-next" aria-label="Next">›</button>
+                </div>
+                <h2 id="cal-title"></h2>
+                <div class="btn-group">
+                    <button class="btn view-btn active" data-view="week">Week</button>
+                    <button class="btn view-btn" data-view="month">Month</button>
+                </div>
+                <button class="btn" data-open-kids>✎ Kids</button>
+            </div>
+            <div id="no-kids" class="banner" hidden>No kids yet. <button class="link" data-open-kids>Add them</button> and each one gets a lunch box on every day.</div>
+            <div id="calendar"></div>
+            <p class="hint">Click a day to fill in each kid's lunch.</p>
+
+            <!-- Day editor -->
+            <dialog id="day-dialog">
+                <form id="day-form" method="dialog">
+                    <h2 id="day-dialog-title"></h2>
+                    <div id="kid-fields"></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn danger" id="day-clear">Clear day</button>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn" data-close>Cancel</button>
+                        <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- Kids editor -->
+            <dialog id="kids-dialog">
+                <form id="kids-form" method="dialog">
+                    <h2>Kids</h2>
+                    <p class="hint">Each kid gets a lunch box on every day. Renaming one keeps their lunches; removing one deletes them.</p>
+                    <div id="kid-rows"></div>
+                    <div><button type="button" class="btn small" id="add-kid">+ Add kid</button></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close>Cancel</button>
+                        <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+        </div>
+    </main>
     <div id="toast"></div>
 </body>
 </html>

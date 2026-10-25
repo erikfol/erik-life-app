@@ -30,8 +30,9 @@ APPS = {
     'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
     'dinner-planner': ('dinner-planner-version', ['bills-etc/css/app.css', 'bills-etc/js/fs.js', 'bills-etc/js/util.js',
                                                   'shared/js/fileguard.js', 'shared/js/folder.js']),  # its own page; catalog.json/seed.json are fetched no-cache
-    'kid-lunches': ('kid-lunches-version', ['bills-etc/css/app.css', 'bills-etc/js/fs.js', 'bills-etc/js/util.js',
-                                            'shared/css/records.css', 'shared/js/folder.js']),  # empty so far: just the folder connection
+    'kid-lunches': ('kid-lunches-version', ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/dates.js',
+                                            'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'dinner-planner/css/dinner.css',
+                                            'shared/js/fileguard.js', 'shared/js/folder.js']),  # the Dinner Planner's calendar look
 }
 
 
