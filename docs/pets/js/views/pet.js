@@ -87,15 +87,16 @@ export async function renderPet(el, list, p, onListChanged) {
     renderGallery(el.querySelector('#photos'), photosDir(p), { noun: 'photo' }).catch(err => {
         el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
     });
+    // Location (in both tables) offers what's been typed before plus every pet's Vet.
+    const vets = [...new Set(list.flatMap(x => (x.info || []).filter(f => /\bvet\b/i.test(f.label) && f.value.trim()).map(f => f.value.trim())))];
+    const withVets = cols => cols.map(c => (c.name === 'Location' ? { ...c, suggestions: vets } : c));
     appts = recordTable(el.querySelector('#appointments'), {
-        columns: APPOINTMENT_COLUMNS,
+        columns: withVets(APPOINTMENT_COLUMNS),
         rows: apptRows,
         save: async r => { await saveAppointments(p, r); drawBanner(r); },
     });
-    // Location offers what's been typed before plus every pet's Vet.
-    const vets = [...new Set(list.flatMap(x => (x.info || []).filter(f => /\bvet\b/i.test(f.label) && f.value.trim()).map(f => f.value.trim())))];
     table = recordTable(el.querySelector('#records'), {
-        columns: RECORD_COLUMNS.map(c => (c.name === 'Location' ? { ...c, suggestions: vets } : c)),
+        columns: withVets(RECORD_COLUMNS),
         rows,
         save: rows => saveRecords(p, rows),
     });

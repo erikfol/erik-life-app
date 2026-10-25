@@ -97,6 +97,7 @@ export const appointmentsPath = p => `${PETS_DIR}/${p.id}-appointments.csv`;
 export const APPOINTMENT_COLUMNS = [
     { name: 'Date', kind: 'date' },
     { name: 'Time', kind: 'suggest' },
+    { name: 'Location', kind: 'suggest' }, // where it is; files saved before it was added just have it blank
     { name: 'Description', kind: 'text' },
     { name: 'Other Notes', kind: 'text' },
 ];
