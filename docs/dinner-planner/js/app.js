@@ -365,7 +365,7 @@ function setActiveMealRow(row) {
 /** One of the day's meals (e.g. one for the adults, one for the kids). */
 function addDayMealRow(mealId = '') {
     const row = document.createElement('div');
-    row.className = 'ing-row day-meal-row';
+    row.className = 'day-meal-row';
     row.innerHTML = `<select aria-label="Meal">${mealOptions()}</select><button type="button" class="btn small" aria-label="Remove meal" title="Remove this meal">✕</button>`;
     const select = row.querySelector('select');
     select.value = mealId;
@@ -518,7 +518,7 @@ async function saveMeal(ev) {
         favorite: form.favorite.checked,
         special: form.special.checked,
         notes: form.notes.value,
-        ingredients: $$('.ing-row').map(r => {
+        ingredients: $$('#ingredient-rows .ing-row').map(r => {
             const [n, q] = $$('input', r);
             return { name: n.value, quantity: q.value };
         }),

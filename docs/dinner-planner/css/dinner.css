@@ -224,10 +224,10 @@
 .dp .row > label.narrow { flex: 0 0 100px; }
 .dp fieldset { border: 1px solid var(--dp-border); border-radius: var(--dp-radius); padding: 10px; margin: 0; }
 .dp legend { font-size: .9rem; font-weight: 600; padding: 0 4px; }
-.dp .ing-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.dp .ing-row, .dp .day-meal-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .dp .ing-row input:first-child { flex: 2; }
 .dp .ing-row input:nth-child(2) { flex: 1; }
-.dp .ing-row .btn { flex: 0 0 auto; }
+.dp .ing-row .btn, .dp .day-meal-row .btn { flex: 0 0 auto; }
 .dp .day-meal-row select { flex: 1; }
 .dp .day-meal-row.active select { border-color: var(--dp-accent); } /* the one a suggestion fills in */
 .dp .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
