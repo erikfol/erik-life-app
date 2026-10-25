@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="css/lunches.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261025222234";
+        const VERSION = "20261025222643";
         const FILES = ["css/lunches.css", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/dates.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../dinner-planner/css/dinner.css", "../shared/js/fileguard.js", "../shared/js/folder.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
@@ -51,7 +51,7 @@
             </div>
             <div id="no-kids" class="banner" hidden>No kids yet. <button class="link" data-open-kids>Add them</button> and each one gets a lunch box on every day.</div>
             <div id="calendar"></div>
-            <p class="hint">Click a day to fill in each kid's lunch.</p>
+            <p class="hint">Click a day to fill in each kid's lunch. School days only: Saturday and Sunday aren't shown.</p>
 
             <!-- Day editor -->
             <dialog id="day-dialog">

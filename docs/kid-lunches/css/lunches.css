@@ -1,5 +1,7 @@
 /* Kid Lunches: the calendar, buttons and dialogs come from ../dinner-planner/css/dinner.css (everything under .dp);
    this adds a colored box per kid on each day and in the day dialog. */
+.dp .cal-week, .dp .cal-month { grid-template-columns: repeat(5, 1fr); } /* Monday to Friday */
+
 .dp .k0 { --kid: var(--blue); }
 .dp .k1 { --kid: var(--green); }
 .dp .k2 { --kid: var(--orange); }
@@ -35,6 +37,7 @@
 .dp .kid-row .btn { flex: 0 0 auto; }
 
 @media (max-width: 760px) {
+    .dp .cal-week { grid-template-columns: 1fr; } /* as in dinner.css, which the 5 columns above would override */
     .dp .cal-week .kid-lunch { width: 100%; }
     .dp .cal-month .kid-lunch .kid { display: none; } /* the color says whose it is */
 }

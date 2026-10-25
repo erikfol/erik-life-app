@@ -5,8 +5,9 @@ import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import * as store from './store.js';
 
-// 0 = weeks start on Sunday, 1 = Monday (same as the Dinner Planner).
-const WEEK_START = 0;
+// School days only: weeks run Monday to Friday, and Saturday and Sunday aren't shown.
+const WEEK_START = 1;
+const SCHOOL_DAYS = 5;
 const RECENT = 6; // past lunches offered as chips under each kid in the day dialog
 
 const state = {
@@ -32,6 +33,9 @@ function addDays(d, n) {
     return r;
 }
 const startOfWeek = d => addDays(d, -((d.getDay() - WEEK_START + 7) % 7));
+// On a Saturday or Sunday, the school week ahead.
+const schoolWeek = d => startOfWeek(d.getDay() === 0 || d.getDay() === 6 ? addDays(d, 2) : d);
+const schoolDays = start => Array.from({ length: SCHOOL_DAYS }, (_, i) => addDays(start, i));
 const todayKey = () => dateKey(new Date());
 const fmt = (d, opts) => d.toLocaleDateString(undefined, opts);
 const kidClass = i => `k${i % 4}`; // each kid's color
@@ -61,22 +65,23 @@ function renderCalendar() {
 
     let days;
     if (state.view === 'week') {
-        const start = startOfWeek(state.cursor);
-        days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-        const end = days[6];
+        const start = schoolWeek(state.cursor);
+        days = schoolDays(start);
+        const end = days.at(-1);
         const sameMonth = start.getMonth() === end.getMonth();
         $('#cal-title').textContent = `${fmt(start, { month: 'short', day: 'numeric' })} – ${fmt(end, sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}, ${end.getFullYear()}`;
         cal.className = 'cal-week';
     } else {
         const first = new Date(state.cursor.getFullYear(), state.cursor.getMonth(), 1);
-        const start = startOfWeek(first);
-        days = Array.from({ length: 42 }, (_, i) => addDays(start, i));
+        const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+        days = [];
+        for (let w = schoolWeek(first); w <= last; w = addDays(w, 7)) days.push(...schoolDays(w));
         $('#cal-title').textContent = fmt(first, { month: 'long', year: 'numeric' });
         cal.className = 'cal-month';
     }
 
     const dowHeader = state.view === 'month'
-        ? days.slice(0, 7).map(d => `<div class="cal-dow">${fmt(d, { weekday: 'short' })}</div>`).join('')
+        ? days.slice(0, SCHOOL_DAYS).map(d => `<div class="cal-dow">${fmt(d, { weekday: 'short' })}</div>`).join('')
         : '';
 
     cal.innerHTML = dowHeader + days.map(d => {
