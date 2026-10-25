@@ -19,7 +19,8 @@ SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatabl
           'shared/js/recordtable.js',
           'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js']  # the phone copy reads every app's data
 APPS = {
-    'bills-etc': ('billsetc-version', []),
+    'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/fileguard.js', 'shared/js/infobox.js',
+                                       'shared/js/recordtable.js']),  # Forgettable Subs uses the Home sections' table
     'health': ('health-version', SHARED),
     'vehicles': ('vehicles-version', SHARED),
     'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
