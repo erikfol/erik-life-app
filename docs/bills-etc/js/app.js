@@ -7,12 +7,13 @@ import month from './views/month.js';
 import dashboard from './views/dashboard.js';
 import edit from './views/edit.js';
 import config from './views/config.js';
+import subs from './views/subs.js';
 import utilities from './views/utilities.js';
 import loans from './views/loans.js';
 import savings from './views/savings.js';
 import bills from './views/bills.js';
 
-const VIEWS = { home, month, bills, dashboard, utilities, loans, savings, edit, config };
+const VIEWS = { home, month, bills, dashboard, utilities, loans, savings, edit, subs, config };
 const viewEl = document.getElementById('view');
 let current = null;
 let currentName = null;
