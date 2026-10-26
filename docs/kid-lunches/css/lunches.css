@@ -1,5 +1,7 @@
 /* Kid Lunches: the calendar, buttons and dialogs come from ../dinner-planner/css/dinner.css (everything under .dp);
    this adds each kid's color and the lunch box drawn like the real one. */
+.page-links { margin-bottom: 12px; } /* links to other sites, above everything else */
+
 .dp .cal-week, .dp .cal-month { grid-template-columns: repeat(5, 1fr); } /* Monday to Friday */
 
 .dp .k0 { --kid: var(--blue); }
