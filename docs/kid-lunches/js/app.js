@@ -108,7 +108,7 @@ function renderCalendar() {
                 return lunch ? `${head}<span class="lunch">${esc(items || lunch.note)}</span></span>` : '';
             }
             if (!lunch) return `${head}<span class="empty">${key < today ? '—' : '+ Add lunch'}</span></span>`;
-            const box = store.COMPARTMENTS.some(c => lunch[c.id]) ? miniBox(lunch) : '';
+            const box = store.COMPARTMENTS.some(c => lunch[c.id]) ? miniBox(lunch, key) : '';
             return `${head}${box}${lunch.note ? `<span class="meal-note">${esc(lunch.note)}</span>` : ''}</span>`;
         }).join('');
         return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${schoolLunch(key)}</div>`;
@@ -135,9 +135,16 @@ function schoolLunch(date, wide = false) {
 const boxHtml = (part, cls = '', tag = 'div') => `<${tag} class="box ${cls}">${store.COMPARTMENTS.filter(c => !c.tray).map(part).join('')}`
     + `<${tag} class="tray">${store.COMPARTMENTS.filter(c => c.tray).map(part).join('')}</${tag}></${tag}>`;
 
-/** A kid's lunch drawn as the box, each item in its part. */
-const miniBox = lunch => boxHtml(c =>
-    `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(esc).join('<br>')}</span>`, 'mini', 'span');
+// A main entree every kid can pick, instead of a packed one: they eat what the school serves that day.
+const SCHOOL_LUNCH = 'School lunch';
+const isSchoolLunch = name => store.sameName(name, SCHOOL_LUNCH);
+
+/** A kid's lunch drawn as the box, each item in its part; School lunch says what the school is serving. */
+const miniBox = (lunch, date) => boxHtml(c => `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(n => {
+    if (!isSchoolLunch(n)) return esc(n);
+    const dish = school.dayMenu(date)?.items?.[0]?.name;
+    return `🏫 ${esc(SCHOOL_LUNCH)}${dish ? `<span class="school-dish">${esc(dish)}</span>` : ''}`;
+}).join('<br>')}</span>`, 'mini', 'span');
 
 function shiftCursor(dir) {
     const c = state.cursor;
@@ -147,16 +154,23 @@ function shiftCursor(dir) {
 
 // ---------- day dialog ----------
 
-const itemChip = (name, on, isNew = false) =>
-    `<button type="button" class="chip ${on ? 'active' : ''}" data-item="${esc(name)}" aria-pressed="${on}"${isNew ? ' data-new' : ''}>${esc(name)}</button>`;
+const itemChip = (name, on, isNew = false) => `<button type="button" class="chip ${on ? 'active' : ''}${isSchoolLunch(name) ? ' school-pick' : ''}"`
+    + ` data-item="${esc(name)}" aria-pressed="${on}"${isNew ? ' data-new' : ''}>${isSchoolLunch(name) ? '🏫 ' : ''}${esc(name)}</button>`;
 
 /** A kid's lunch box to build: each part offers that kid's items for it (plus any saved on this day that have since left
- *  the list) as chips to click on or off, and takes a new item typed below them. */
-function buildBox(kid, lunch = {}) {
+ *  the list) as chips to click on or off, and takes a new item typed below them. The main entree also offers School
+ *  lunch first, unless the school is closed that day. */
+function buildBox(kid, lunch, date) {
+    lunch ||= {};
     return boxHtml(c => {
         const list = state.items[kid][c.id];
         const picked = lunch[c.id] || [];
-        const names = [...list, ...picked.filter(p => !list.some(n => store.sameName(n, p)))];
+        let names = [...list, ...picked.filter(p => !list.some(n => store.sameName(n, p)))];
+        if (c.id === 'main') {
+            const schoolPicked = picked.some(isSchoolLunch);
+            names = names.filter(n => !isSchoolLunch(n));
+            if (schoolPicked || !school.dayMenu(date)?.closed) names.unshift(SCHOOL_LUNCH);
+        }
         return `<div class="comp ${c.id}" data-comp="${c.id}">
             <span class="comp-name">${esc(c.name)}</span>
             <span class="comp-items">${names.map(n => itemChip(n, picked.some(p => store.sameName(p, n)))).join('')}</span>
@@ -174,7 +188,7 @@ function openDay(date) {
     $('#day-school').innerHTML = schoolLunch(date, true);
     $('#kid-fields').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
-            ${buildBox(kid, e[kid])}
+            ${buildBox(kid, e[kid], date)}
             <input class="kid-note" maxlength="200" aria-label="${esc(kid)}'s note" placeholder="Note (e.g. buying lunch, field trip)">
         </fieldset>`).join('');
     state.kids.forEach((kid, i) => { $(`.kid-field[data-kid="${i}"] .kid-note`, form).value = e[kid]?.note || ''; });
@@ -196,9 +210,10 @@ function addTyped(input) {
     const field = input.closest('.kid-field');
     const existing = $$('.chip', comp).find(b => store.sameName(b.dataset.item, name));
     if (existing) {
-        setChip(existing, true);
+        pickChip(existing, true);
     } else {
-        const homes = homesOf(field, name).filter(c => c.id !== comp.dataset.comp);
+        const homes = isSchoolLunch(name) ? store.COMPARTMENTS.filter(c => c.id === 'main' && c.id !== comp.dataset.comp)
+            : homesOf(field, name).filter(c => c.id !== comp.dataset.comp);
         if (homes.length) {
             const kid = state.kids[field.dataset.kid];
             const listed = state.items[kid][homes[0].id].find(n => store.sameName(n, name)) || name;
@@ -218,6 +233,16 @@ function setChip(chip, on, suggested = false) {
     chip.classList.toggle('active', on);
     chip.setAttribute('aria-pressed', on);
     chip.toggleAttribute('data-suggested', on && suggested);
+}
+
+/** Pick an item on or off by hand. In the main entree, School lunch takes the place of a packed entree and the other
+ *  way round. */
+function pickChip(chip, on) {
+    setChip(chip, on);
+    const main = chip.closest('[data-comp="main"]');
+    if (!on || !main) return;
+    const buying = isSchoolLunch(chip.dataset.item);
+    $$('.chip.active', main).filter(b => b !== chip && (buying || isSchoolLunch(b.dataset.item))).forEach(b => setChip(b, false));
 }
 
 // ---------- suggestions ----------
@@ -307,13 +332,15 @@ function suggestDay() {
                 id: c.id,
                 chips,
                 byHand: active.some(b => !b.hasAttribute('data-suggested')),
+                schoolLunch: active.some(b => isSchoolLunch(b.dataset.item)), // only ever picked by hand, and it stays
                 previous: active.map(b => b.dataset.item),
                 // the kid's list in ✎ Box, plus anything typed in as new while this dialog is open
-                options: chips.filter(b => b.hasAttribute('data-new') || state.items[kid][c.id].some(n => store.sameName(n, b.dataset.item))).map(b => b.dataset.item),
+                options: chips.filter(b => !isSchoolLunch(b.dataset.item)
+                    && (b.hasAttribute('data-new') || state.items[kid][c.id].some(n => store.sameName(n, b.dataset.item)))).map(b => b.dataset.item),
             };
         });
         let open = parts.filter(p => !p.byHand && p.options.length);
-        if (!open.length) open = parts.filter(p => p.options.length);
+        if (!open.length) open = parts.filter(p => p.options.length && !p.schoolLunch);
         const picks = pickParts(kid, date, open, parts.filter(p => !open.includes(p)).flatMap(p => p.previous));
         for (const p of open) {
             p.chips.forEach(b => setChip(b, false));
@@ -328,7 +355,7 @@ function suggestDay() {
  *  school menu says the school is closed). */
 async function fillWeek() {
     const today = todayKey();
-    const partsFor = kid => store.COMPARTMENTS.map(c => ({ id: c.id, options: state.items[kid][c.id] }));
+    const partsFor = kid => store.COMPARTMENTS.map(c => ({ id: c.id, options: state.items[kid][c.id].filter(n => !isSchoolLunch(n)) }));
     let count = 0;
     try {
         for (const d of schoolDays(schoolWeek(state.cursor))) {
@@ -512,7 +539,7 @@ function wire() {
     $('#kid-fields').onclick = ev => {
         const chip = ev.target.closest('.chip');
         if (!chip) return;
-        setChip(chip, !chip.classList.contains('active'));
+        pickChip(chip, !chip.classList.contains('active'));
     };
     $('#day-suggest').onclick = suggestDay;
     $('#fill-week').onclick = guard(fillWeek);

@@ -74,6 +74,8 @@
 .dp .box .comp.circle .comp-items { justify-content: center; }
 .dp .box .chip { font-size: .78rem; padding: 2px 9px; }
 .dp .box .chip.active { background: var(--navy-2); border-color: var(--navy-2); color: #fff; }
+.dp .box .chip.school-pick { border-style: dashed; border-color: #b39a72; }
+.dp .box .school-dish { display: block; font-weight: 400; font-size: .92em; opacity: .8; }
 .dp .box .new-item { font-size: .78rem; padding: 3px 7px; margin-top: auto; background: rgba(255,255,255,.85); }
 .dp .box .comp.circle .new-item { width: 85%; margin-top: 0; }
 .dp .box textarea { flex: 1; font-size: .85rem; padding: 5px 7px; resize: vertical; background: rgba(255,255,255,.9); }
