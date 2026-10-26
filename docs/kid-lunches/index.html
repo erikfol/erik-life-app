@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="css/lunches.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261025235650";
-        const FILES = ["css/lunches.css", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/dates.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../dinner-planner/css/dinner.css", "../shared/js/fileguard.js", "../shared/js/folder.js"];
+        const VERSION = "20261026103501";
+        const FILES = ["css/lunches.css", "js/app.js", "js/school.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/dates.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../dinner-planner/css/dinner.css", "../shared/js/fileguard.js", "../shared/js/folder.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('kid-lunches-version') !== VERSION) {
@@ -47,6 +47,7 @@
                     <button class="btn view-btn active" data-view="week">Week</button>
                     <button class="btn view-btn" data-view="month">Month</button>
                 </div>
+                <button class="btn" id="open-school">🏫 School menu</button>
                 <button class="btn" id="open-box">✎ Box</button>
                 <button class="btn" data-open-kids>✎ Kids</button>
             </div>
@@ -55,7 +56,7 @@
             </div>
             <div id="no-kids" class="banner" hidden>No kids yet. <button class="link" data-open-kids>Add them</button> and each one gets a lunch box on every day.</div>
             <div id="calendar"></div>
-            <p class="hint">Click a day to build each kid's lunch box. ✨ Fill empty days packs a suggested lunch for every kid who doesn't have one yet, on the days left this week. ✎ Box sets what can go in each part. School days only: Saturday and Sunday aren't shown.</p>
+            <p class="hint">Click a day to build each kid's lunch box. ✨ Fill empty days packs a suggested lunch for every kid who doesn't have one yet, on the days left this week (skipping days the school is closed). ✎ Box sets what can go in each part. 🏫 School menu shows what the school is serving each day. School days only: Saturday and Sunday aren't shown.</p>
 
             <!-- Day editor -->
             <dialog id="day-dialog">
@@ -65,12 +66,29 @@
                         <button type="button" class="btn" id="day-suggest">✨ Suggest</button>
                     </div>
                     <p class="hint">✨ Suggest fills every part you haven't picked yourself, mostly with things they haven't had lately. Press it again for different picks.</p>
+                    <div id="day-school"></div>
                     <div id="kid-fields"></div>
                     <div class="dialog-actions">
                         <button type="button" class="btn danger" id="day-clear">Clear day</button>
                         <span class="spacer"></span>
                         <button type="button" class="btn" data-close>Cancel</button>
                         <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- The school's lunch menu, a month at a time -->
+            <dialog id="school-dialog">
+                <form id="school-form" method="dialog">
+                    <h2>School lunch menu</h2>
+                    <p class="hint">Paste the link to a month of the school's menu from FD MealPlanner (the page with the calendar of school lunches) and press Load. Each day's school lunch then shows on the calendar, just for reference. If the school changes its menu, press ↻ Reload.</p>
+                    <div class="school-load">
+                        <input id="school-url" type="url" autocomplete="off" placeholder="https://www.fdmealplanner.com/pages/menuPrintout/?…" aria-label="Link to a month of the school menu">
+                        <button type="submit" class="btn primary" id="school-go">Load</button>
+                    </div>
+                    <div id="school-months"></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close>Close</button>
                     </div>
                 </form>
             </dialog>

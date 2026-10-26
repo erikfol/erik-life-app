@@ -5,6 +5,7 @@ import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import * as store from './store.js';
+import * as school from './school.js';
 
 // School days only: weeks run Monday to Friday, and Saturday and Sunday aren't shown.
 const WEEK_START = 1;
@@ -110,8 +111,24 @@ function renderCalendar() {
             const box = store.COMPARTMENTS.some(c => lunch[c.id]) ? miniBox(lunch) : '';
             return `${head}${box}${lunch.note ? `<span class="meal-note">${esc(lunch.note)}</span>` : ''}</span>`;
         }).join('');
-        return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}</div>`;
+        return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${schoolLunch(key)}</div>`;
     }).join('');
+}
+
+/** The school's lunch that day, read-only, from 🏫 School menu: in week view the first main dish and then the rest; in
+ *  month view just the first. */
+function schoolLunch(date, wide = false) {
+    const m = school.dayMenu(date);
+    if (!m) return '';
+    const tag = wide ? 'div' : 'span';
+    if (state.view === 'month' && !wide) {
+        return `<span class="school" title="${m.closed ? 'School closed' : `School lunch: ${esc(m.items.map(i => i.name).join(', '))}`}">`
+            + `<span class="school-main">🏫 ${m.closed ? 'Closed' : esc(m.items[0].name)}</span></span>`;
+    }
+    if (m.closed) return `<${tag} class="school"><span class="school-name">🏫 School</span><span class="school-main">Closed</span></${tag}>`;
+    const [first, ...rest] = m.items;
+    return `<${tag} class="school" title="From the school's menu"><span class="school-name">🏫 School lunch</span><span class="school-main">${esc(first.name)}</span>`
+        + `${rest.length ? `<span class="school-rest">${rest.map(i => esc(i.name)).join(' · ')}</span>` : ''}</${tag}>`;
 }
 
 /** A kid's lunch as markup, `part(c)` giving each part's: the main entree on its own, above the box's tray. */
@@ -154,6 +171,7 @@ function openDay(date) {
     const form = $('#day-form');
     form.dataset.date = date;
     $('#day-dialog-title').textContent = fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    $('#day-school').innerHTML = schoolLunch(date, true);
     $('#kid-fields').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
             ${buildBox(kid, e[kid])}
@@ -306,7 +324,8 @@ function suggestDay() {
     if (!filled) toast('Nothing to suggest yet. Add what can go in each part with ✎ Box.');
 }
 
-/** ✨ Fill empty days: a suggested lunch for every kid without one on the days left in the week shown. */
+/** ✨ Fill empty days: a suggested lunch for every kid without one on the days left in the week shown (not on days the
+ *  school menu says the school is closed). */
 async function fillWeek() {
     const today = todayKey();
     const partsFor = kid => store.COMPARTMENTS.map(c => ({ id: c.id, options: state.items[kid][c.id] }));
@@ -314,7 +333,7 @@ async function fillWeek() {
     try {
         for (const d of schoolDays(schoolWeek(state.cursor))) {
             const date = dateKey(d);
-            if (date < today) continue;
+            if (date < today || school.dayMenu(date)?.closed) continue; // no school, no lunch to pack
             const day = { ...state.days[date] };
             let packed = 0;
             for (const kid of state.kids) {
@@ -392,6 +411,47 @@ async function saveBox(ev) {
     reload();
 }
 
+// ---------- school menu dialog ----------
+
+function renderSchoolMonths() {
+    const months = Object.entries(school.months()).sort(([a], [b]) => b.localeCompare(a));
+    $('#school-months').innerHTML = months.length
+        ? months.map(([ym, m]) => {
+            const days = Object.values(m.days);
+            const closed = days.filter(d => d.closed).length;
+            return `<div class="backup-row">
+                <span class="name"><span class="when">${esc(school.monthLabel(ym))}</span>
+                    <span class="kind">· ${days.length - closed} school days${closed ? `, ${closed} closed` : ''} · loaded ${esc(new Date(m.loaded).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
+                <button type="button" class="btn small" data-school-reload="${ym}" title="Load this month again, in case the school changed its menu">↻ Reload</button>
+                <button type="button" class="btn small danger" data-school-remove="${ym}">Remove</button>
+            </div>`;
+        }).join('')
+        : '<p class="hint">No months loaded yet.</p>';
+}
+
+function openSchool() {
+    renderSchoolMonths();
+    $('#school-dialog').showModal();
+    $('#school-url').focus();
+}
+
+/** Load a month from a pasted link, or (`link` given) load a loaded month again. */
+async function loadSchoolMonth(link) {
+    const btn = $('#school-go');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    try {
+        const { ym, days } = await school.loadMonth(link);
+        toast(`Loaded the school menu for ${school.monthLabel(ym)}: ${days} school days`, 'ok');
+        $('#school-url').value = '';
+        renderSchoolMonths();
+        renderCalendar();
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Load';
+    }
+}
+
 // ---------- kids dialog ----------
 
 /** One kid in the Kids dialog; `from` is the index of an existing kid (so renaming keeps their lunches), '' for a new one. */
@@ -463,6 +523,21 @@ function wire() {
         }
     };
     $('#open-box').onclick = openBox;
+    $('#open-school').onclick = openSchool;
+    $('#school-form').onsubmit = guard(async ev => {
+        ev.preventDefault();
+        if (!$('#school-url').value.trim()) return toast('Paste the link to a month of the school menu first.', 'bad');
+        await loadSchoolMonth($('#school-url').value);
+    });
+    $('#school-months').onclick = guard(async ev => {
+        const reload = ev.target.closest('[data-school-reload]');
+        if (reload) return loadSchoolMonth(school.months()[reload.dataset.schoolReload].url);
+        const remove = ev.target.closest('[data-school-remove]');
+        if (!remove) return;
+        await school.removeMonth(remove.dataset.schoolRemove);
+        renderSchoolMonths();
+        renderCalendar();
+    });
     $('#box-form').onsubmit = guard(saveBox);
     $$('[data-open-kids]').forEach(b => (b.onclick = openKids));
     $('#add-kid').onclick = () => addKidRow().querySelector('input').focus();
@@ -480,7 +555,7 @@ async function start() {
     }
     viewEl.innerHTML = '<p class="muted">Loading…</p>';
     try {
-        await store.load();
+        await Promise.all([store.load(), school.load()]);
     } catch (e) {
         console.error(e);
         viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
