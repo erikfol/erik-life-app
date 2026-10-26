@@ -18,6 +18,9 @@ export function moveItem(e, itemSelector) {
     return true;
 }
 
+// Fields that hold a paragraph: shown the full width of the box, and edited in a box of several lines.
+const LONG = /notes|summary/i;
+
 /**
  * Draw the box into `el`.
  *   info: [{ label, value }]; name: also edit this name (shown in the menu), or null; noun: 'vehicle', 'house', 'pet'
@@ -33,7 +36,7 @@ export function infoBox(el, { info, name = null, noun = 'item', save, remove = n
         el.innerHTML = `
             <div class="row table-tools"><button type="button" class="small" data-edit>✎ Edit</button>
                 <span class="muted edit-hint">Turn on editing to change, add, remove or reorder information.</span></div>
-            <dl class="info-grid">${info.map(f => `<div class="info-item${/notes/i.test(f.label) ? ' wide' : ''}">
+            <dl class="info-grid">${info.map(f => `<div class="info-item${LONG.test(f.label) ? ' wide' : ''}">
                 <dt>${esc(f.label)}</dt><dd${mono?.test(f.label) ? ' class="mono"' : ''}>${f.value ? esc(f.value) : '<span class="muted">—</span>'}</dd></div>${extra(f)}`).join('')
                 || '<p class="muted">No information yet. Press Edit to add some.</p>'}</dl>`;
         el.querySelector('[data-edit]').onclick = edit;
@@ -58,7 +61,7 @@ export function infoBox(el, { info, name = null, noun = 'item', save, remove = n
         const fieldRow = f => `<tr>
             <td class="move">${moveButtons()}</td>
             <td><input type="text" data-f="label" value="${esc(f.label)}" aria-label="Field name"></td>
-            <td>${/notes/i.test(f.label)
+            <td>${LONG.test(f.label)
                 ? `<textarea data-f="value" rows="2" aria-label="Value">${esc(f.value)}</textarea>`
                 : `<input type="text" data-f="value" value="${esc(f.value)}" aria-label="Value">`}</td>
             <td class="remove"><button type="button" class="danger" data-remove title="Remove this field" aria-label="Remove this field">✕</button></td></tr>`;

@@ -1,0 +1,58 @@
+/* Working Career: the tables and the Profile box use the shared styles (records.css, vehicles.css); this is the Resume
+   Builder — what goes in on the left, the resume on the right (one above the other on a narrow window) — and how the
+   resume prints. */
+main:has(.rb) { max-width: 1440px; }
+.rb { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 18px; align-items: start; }
+.rb-preview { position: sticky; top: 12px; }
+.rb-actions { margin-bottom: 10px; gap: 8px; }
+.rb-controls textarea { width: 100%; }
+.rb-hint { margin: -6px 0 10px; font-size: 0.9em; }
+
+.kws { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw { font-size: 0.82em; padding: 2px 9px; border-radius: 999px; background: #eef0f4; color: #666; border: 1px solid #dde1e8; }
+.kw.have { background: #e8f8ef; color: #1e7a46; border-color: #bfe8cf; }
+
+.rb-h3 { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 18px 0 8px; }
+.pick-skills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-skill { display: inline-flex; align-items: center; gap: 5px; font-size: 0.88em; padding: 3px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: #fff; cursor: pointer; }
+.pick-skill.hit-skill { border-color: #8fd3ab; background: #f1fbf5; }
+.pick-line { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; cursor: pointer; font-size: 0.92em; }
+.pick-line input { margin-top: 3px; flex: 0 0 auto; }
+.pick-job { margin: 6px 0 12px; }
+.pick-job ul { list-style: none; margin: 2px 0 0 22px; padding: 0; }
+.pick-empty { margin-left: 22px; font-size: 0.88em; }
+.hit { font-size: 0.8em; color: #1e7a46; margin-left: 4px; }
+.saved-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.saved-name { flex: 1; min-width: 0; }
+
+/* The resume, looking like the printed page. */
+.resume { background: #fff; color: #222; padding: 40px 46px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); border-radius: 4px;
+    font-family: Georgia, 'Times New Roman', serif; font-size: 10.5pt; line-height: 1.4; }
+.resume header { text-align: center; margin-bottom: 14px; }
+.resume h1 { font-size: 20pt; margin: 0; letter-spacing: 0.5px; }
+.resume .headline { font-size: 11pt; color: #444; margin: 2px 0; }
+.resume .contact { font-size: 9.5pt; color: #444; margin: 2px 0 0; overflow-wrap: anywhere; }
+.resume section { background: none; box-shadow: none; padding: 0; margin: 0 0 12px; border-radius: 0; }
+.resume section h2 { display: block; font-family: inherit; font-size: 10.5pt; color: #222; letter-spacing: 1px; margin: 0 0 6px;
+    padding-bottom: 2px; border-bottom: 1px solid #999; }
+.resume p { margin: 0; }
+.resume ul { margin: 3px 0 0 18px; padding: 0; }
+.resume li { margin: 1px 0; }
+.resume .job { margin-bottom: 8px; }
+.resume .job-head { display: flex; justify-content: space-between; gap: 12px; }
+.resume .dates { white-space: nowrap; color: #444; }
+
+@media (max-width: 1000px) {
+    .rb { grid-template-columns: 1fr; }
+    .rb-preview { position: static; }
+}
+
+/* 🖨 Print / Save as PDF: only the resume. */
+@media print {
+    @page { margin: 0.5in; }
+    body { background: #fff; }
+    .topbar, .no-print, #toast { display: none !important; }
+    main, main:has(.rb) { max-width: none; margin: 0; padding: 0; }
+    .rb { display: block; }
+    .resume { box-shadow: none; padding: 0; border-radius: 0; }
+}
