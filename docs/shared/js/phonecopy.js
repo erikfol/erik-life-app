@@ -21,7 +21,7 @@ import * as dinner from '../../dinner-planner/js/store.js';
 import * as lunches from '../../kid-lunches/js/store.js';
 import * as school from '../../kid-lunches/js/school.js';
 
-const FILE_NAME = 'Vehicles, House, Health and Pets.html';
+const FILE_NAME = "Erik's Life App.html";
 const HANDLE_KEY = 'phoneCopyDir';
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 const MAX_SIDE = 1400; // px, longest side of an embedded photo — sharp on a phone, small in the file
