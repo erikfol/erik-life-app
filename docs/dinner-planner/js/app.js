@@ -4,6 +4,7 @@
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
+import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import * as store from './store.js';
 import { aiSettings, suggestMeals } from './ai.js';
 
@@ -851,6 +852,8 @@ async function start() {
     reload();
     showTab();
 }
+
+setupPhoneCopy(document.getElementById('phone-copy'));
 
 (async () => {
     if (fs.isSupported()) await fs.rememberedFolder().catch(() => null);

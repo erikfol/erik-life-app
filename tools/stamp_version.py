@@ -17,7 +17,8 @@ SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatabl
           'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
           'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js', 'shared/js/phonecopy.js',
           'shared/js/recordtable.js',
-          'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js']  # the phone copy reads every app's data
+          'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js',
+          'dinner-planner/js/store.js', 'kid-lunches/js/store.js', 'kid-lunches/js/school.js']  # the phone copy reads every app's data
 APPS = {
     'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/fileguard.js', 'shared/js/infobox.js',
                                        'shared/js/recordtable.js']),  # Forgettable Subs uses the Home sections' table
@@ -28,11 +29,8 @@ APPS = {
     'insurance': ('insurance-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
                                                  'vehicles/js/views/places.js']),  # Vehicles' views
     'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
-    'dinner-planner': ('dinner-planner-version', ['bills-etc/css/app.css', 'bills-etc/js/fs.js', 'bills-etc/js/util.js',
-                                                  'shared/js/fileguard.js', 'shared/js/folder.js']),  # its own page; catalog.json/seed.json are fetched no-cache
-    'kid-lunches': ('kid-lunches-version', ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/dates.js',
-                                            'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'dinner-planner/css/dinner.css',
-                                            'shared/js/fileguard.js', 'shared/js/folder.js']),  # the Dinner Planner's calendar look
+    'dinner-planner': ('dinner-planner-version', SHARED),  # its own page + the 📱 phone copy; catalog.json/seed.json are fetched no-cache
+    'kid-lunches': ('kid-lunches-version', SHARED + ['dinner-planner/css/dinner.css']),  # the Dinner Planner's calendar look
     'career': ('career-version', ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
                                   'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
                                   'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js', 'shared/js/recordtable.js',

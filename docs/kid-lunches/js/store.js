@@ -103,6 +103,7 @@ async function save() {
         // Most likely lunches.csv is open in Excel, which locks it. It's rewritten on the next change.
         console.warn(`Could not update lunches.csv: ${err.message}`);
     }
+    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /** One kid's lunch as text: "Gray square: Turkey sandwich; Circle: Yogurt; Note: …". */

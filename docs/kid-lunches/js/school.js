@@ -21,7 +21,10 @@ export async function load() {
     menu.months ||= {};
 }
 
-const save = () => writeTracked(PATH, JSON.stringify(menu, null, 2));
+async function save() {
+    await writeTracked(PATH, JSON.stringify(menu, null, 2));
+    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
+}
 
 const pad = n => String(n).padStart(2, '0');
 export const monthLabel = ym => new Date(+ym.slice(0, 4), +ym.slice(5) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });

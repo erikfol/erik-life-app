@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kid Lunches</title>
     <link rel="stylesheet" href="../bills-etc/css/app.css">
+    <link rel="stylesheet" href="../shared/css/records.css">
     <link rel="stylesheet" href="../dinner-planner/css/dinner.css">
     <link rel="stylesheet" href="css/lunches.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261026163218";
-        const FILES = ["css/lunches.css", "js/app.js", "js/school.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/dates.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../dinner-planner/css/dinner.css", "../shared/js/fileguard.js", "../shared/js/folder.js"];
+        const VERSION = "20261026211201";
+        const FILES = ["css/lunches.css", "js/app.js", "js/school.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/datatable.js", "../bills-etc/js/dates.js", "../bills-etc/js/filtermenu.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/fileguard.js", "../shared/js/folder.js", "../shared/js/infobox.js", "../shared/js/phonecopy.js", "../shared/js/recordtable.js", "../health/js/records.js", "../vehicles/js/vehicles.js", "../house/js/house.js", "../pets/js/pets.js", "../dinner-planner/js/store.js", "../kid-lunches/js/store.js", "../kid-lunches/js/school.js", "../dinner-planner/css/dinner.css"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('kid-lunches-version') !== VERSION) {
@@ -28,6 +29,7 @@
         <a class="home-link" href="../" title="Back to the home page">⌂ Home</a>
         <div class="brand">Kid Lunches</div>
         <div class="status">
+            <button type="button" id="phone-copy" class="phone-btn" title="Make a read-only copy for your phone">📱 Phone copy</button>
             <span id="st-folder" class="pill">No folder</span>
         </div>
     </header>

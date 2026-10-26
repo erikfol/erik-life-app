@@ -1,7 +1,10 @@
-// "📱 Phone copy" (Vehicles, House, Health and Pets top bars): writes one self-contained, read-only page — every vehicle
-// (information, current mileage for cars, service places, maintenance, photos, guides, notes), every house
-// (information, service companies, photos, and per area information, photos, maintenance with its due banners, records; Updates; Projects), every
-// Health section (General Health, Dental and Eye with their information and future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
+// "📱 Phone copy" (Vehicles, House, Health, Pets, Dinner Planner and Kid Lunches top bars): writes one self-contained,
+// read-only page — every vehicle (information, current mileage for cars, service places, maintenance, photos, guides,
+// notes), every house (information, service companies, photos, and per area information, photos, maintenance with its
+// due banners, records; Updates; Projects), every Health section (General Health, Dental and Eye with their information
+// and future appointments), every pet (information, future appointments, photos, records), the Dinner Planner (the
+// calendar a week at a time with its shopping list, every meal) and Kid Lunches (each school day's lunch boxes and the
+// school's menu) — into a folder you pick once,
 // e.g. in Google Drive so it syncs to your phone. Photos are shrunk and embedded, so the page is a single file that
 // opens offline (Android hands Chrome a single file, so a page can't load anything from next to itself).
 import * as fs from '../../bills-etc/js/fs.js';
@@ -14,6 +17,9 @@ import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSectio
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
+import * as dinner from '../../dinner-planner/js/store.js';
+import * as lunches from '../../kid-lunches/js/store.js';
+import * as school from '../../kid-lunches/js/school.js';
 
 const FILE_NAME = 'Vehicles, House, Health and Pets.html';
 const HANDLE_KEY = 'phoneCopyDir';
@@ -134,7 +140,24 @@ export async function collectData(progress = () => {}) {
     }
     const pets = [];
     for (const p of await loadPets(false)) pets.push({ name: p.name, info: p.info || [], appointments: { columns: APPOINTMENT_COLUMNS, rows: await loadAppointments(p, false) }, records: { columns: RECORD_COLUMNS, rows: await loadPetRecords(p, false) }, photos: await images(petPhotosDir(p), tick) });
-    return { made: new Date().toISOString(), vehicles, houses, health, pets };
+    // The Dinner Planner's meals and planned days, and Kid Lunches' days and school menu, read as they are on disk (the
+    // apps' own load() can upgrade and save). The phone works out the week, the shopping list and how often each meal
+    // was had on the day it's opened. Nothing before the app's first save.
+    const readJson = async path => JSON.parse(await fs.readText(path) ?? 'null');
+    const dinnerDb = await readJson(dinner.DB_PATH);
+    const dinnerPlanner = dinnerDb && {
+        meals: (dinnerDb.meals || []).map(m => ({ id: m.id, name: m.name || '', favorite: !!m.favorite, tags: m.tags || [],
+            prepMinutes: m.prepMinutes ?? null, ingredients: m.ingredients || [], notes: m.notes || '' })),
+        plan: Object.fromEntries(Object.entries(dinnerDb.plan || {}).map(([date, e]) => [date, { mealIds: dinner.mealsOf(e), note: e.note || '', skipped: !!e.skipped }])),
+    };
+    const lunchDb = await readJson(lunches.PATH), menu = await readJson(school.PATH);
+    const kidLunches = lunchDb && {
+        kids: lunchDb.kids || [],
+        parts: lunches.COMPARTMENTS.map(c => ({ id: c.id, name: c.name })),
+        days: lunchDb.days || {},
+        school: Object.assign({}, ...Object.values(menu?.months || {}).map(m => m.days || {})), // { date: { closed } | { items: [{ name, main }] } }
+    };
+    return { made: new Date().toISOString(), vehicles, houses, health, pets, dinnerPlanner, kidLunches };
 }
 
 /** The phone page: data + viewer in one HTML file. */
@@ -146,11 +169,11 @@ export function buildHtml(data) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Vehicles, House, Health &amp; Pets</title>
+<title>Erik's Life App</title>
 <style>${VIEWER_CSS}</style>
 </head>
 <body>
-<header><div class="brand">Vehicles, House, Health &amp; Pets</div><select id="page" aria-label="Page"></select></header>
+<header><div class="brand">Erik's Life App</div><select id="page" aria-label="Page"></select></header>
 <main id="main"><p class="muted">This page needs JavaScript. On Android, open it with Chrome.</p></main>
 <div id="lightbox" hidden><button id="lb-prev" aria-label="Previous">‹</button><img alt=""><button id="lb-next" aria-label="Next">›</button><div id="lb-cap"></div></div>
 <script>(${viewer.toString()})(${json}, ${ageText.toString()}, ${house.houseAge.toString()}, ${appointmentStatus.toString()}, ${house.maintenanceStatus.toString()});</script>
@@ -179,6 +202,9 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
         ]),
         ...D.health.map((h, i) => ({ group: 'Health', label: h.label, draw: () => drawHealth(h) })),
         ...(D.pets || []).map(p => ({ group: 'Pets', label: p.name, draw: () => drawPet(p) })),
+        ...(D.dinnerPlanner ? [{ group: 'Dinner Planner', label: 'Calendar', draw: () => drawDinners(D.dinnerPlanner) },
+            { group: 'Dinner Planner', label: 'Meals', draw: () => drawMeals(D.dinnerPlanner) }] : []),
+        ...(D.kidLunches ? [{ group: 'Kid Lunches', label: 'Lunches', draw: () => drawLunches(D.kidLunches) }] : []),
     ];
     const groups = [...new Set(pages.map(p => p.group))];
     pick.innerHTML = groups.map(g => `<optgroup label="${esc(g)}">${pages.map((p, i) => p.group === g
@@ -233,15 +259,17 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
         lb.hidden = false;
     });
 
-    /** Records as cards with a search box and newest/oldest order; money columns get a total of what's shown. */
-    function records(el, cols, rows, { empty = 'Nothing here yet.' } = {}) {
+    /** Records as cards with a search box and newest/oldest order; money columns get a total of what's shown. sorted:
+     *  'desc' or 'asc' for rows that have no order of their own (no "Your order"). */
+    function records(el, cols, rows, { empty = 'Nothing here yet.', sorted = '' } = {}) {
         const dates = cols.filter(c => c.kind === 'date' || c.kind === 'end');
         const first = dates[0]?.name;
         const moneyCols = cols.filter(c => c.kind === 'money'), moneyCol = moneyCols[0]; // the first is shown in each card's heading
         el.innerHTML = `<div class="tools"><input type="search" placeholder="Search" aria-label="Search">
-            <select aria-label="Order"><option value="saved">Your order</option><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></div>
+            <select aria-label="Order">${sorted ? '' : '<option value="saved">Your order</option>'}<option value="desc">Newest first</option><option value="asc">Oldest first</option></select></div>
             <div class="cards"></div><div class="total"></div>`;
         const q = el.querySelector('input'), order = el.querySelector('select'), list = el.querySelector('.cards'), total = el.querySelector('.total');
+        if (sorted) order.value = sorted;
         const text = r => cols.map(c => (c.kind === 'date' || c.kind === 'end' ? showDate(r[c.name]) + ' ' : '') + (r[c.name] || '')).join(' ').toLowerCase();
         const card = r => {
             const when = dates.map(c => (c.kind === 'end' ? (r[c.name] ? showDate(r[c.name]) : 'ongoing') : showDate(r[c.name]))).filter(Boolean).join(' – ');
@@ -413,6 +441,144 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
         section(`Records (${p.records.rows.length})`, true, el => records(el, p.records.columns, p.records.rows));
     }
 
+    // ── Dinner Planner and Kid Lunches: a week at a time, counted from the day the page is opened ──
+    const pad = n => String(n).padStart(2, '0');
+    const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    const opened = new Date(), today = dayKey(opened);
+    const weekday = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); // 'Mon, Oct 26'
+
+    /** ‹ Today › and the week's dates over `draw(el, days)`: `length` days from `first` (a Date), a week per step. */
+    function weekPager(first, length, draw) {
+        let start = first;
+        main.insertAdjacentHTML('beforeend', `<div class="week-nav"><button data-w="-1" aria-label="Previous week">‹</button>
+            <button data-w="0">Today</button><button data-w="1" aria-label="Next week">›</button><b></b></div><div></div>`);
+        const nav = main.lastElementChild.previousElementSibling, body = main.lastElementChild;
+        const show = () => {
+            const days = Array.from({ length }, (_, i) => addDays(start, i)), end = days.at(-1);
+            nav.querySelector('b').textContent = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US',
+                start.getMonth() === end.getMonth() ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}, ${end.getFullYear()}`;
+            draw(body, days);
+        };
+        nav.onclick = e => { const b = e.target.closest('[data-w]'); if (!b) return; start = +b.dataset.w ? addDays(start, 7 * b.dataset.w) : first; show(); };
+        show();
+    }
+
+    /** A day's card: its date (Today marked, past days faded) over `body`. */
+    const dayCard = (d, body) => `<div class="day${dayKey(d) === today ? ' today' : dayKey(d) < today ? ' past' : ''}">
+        <div class="card-head"><span class="when">${esc(weekday(d))}</span>${dayKey(d) === today ? '<span class="tag">Today</span>' : ''}</div>${body}</div>`;
+
+    /** How often each meal was had (days before today, not skipped), like the Dinner Planner's: { id: { count, last } }. */
+    const mealStats = plan => {
+        const stats = {};
+        for (const [date, e] of Object.entries(plan).sort(([a], [b]) => a.localeCompare(b))) {
+            if (date >= today || e.skipped) continue;
+            for (const id of e.mealIds) { const s = (stats[id] ||= { count: 0, last: '' }); s.count++; s.last = date; }
+        }
+        return stats;
+    };
+
+    /** A meal, tap for its ingredients and notes. */
+    const mealHtml = (m, stat) => {
+        const facts = [m.prepMinutes ? `Prep ${m.prepMinutes} min` : '', stat ? `Had ${stat.count} time${stat.count === 1 ? '' : 's'}, last ${showDate(stat.last)}` : ''].filter(Boolean);
+        return `<details class="guide meal"><summary>${m.favorite ? '★ ' : ''}${esc(m.name)}${m.tags.map(t => ` <span class="tag">${esc(t)}</span>`).join('')}</summary>
+            <div class="steps">${facts.length ? `<p class="sub">${esc(facts.join(' · '))}</p>` : ''}
+                ${m.ingredients.length ? `<h4>Ingredients</h4>${m.ingredients.map(i => `<div class="step"><span class="num">•</span><span>${esc(i.name)}${i.quantity ? ` — ${esc(i.quantity)}` : ''}</span></div>`).join('')}` : ''}
+                ${m.notes ? `<h4>Notes</h4><p class="desc">${esc(m.notes)}</p>` : ''}${!facts.length && !m.ingredients.length && !m.notes ? '<p class="muted">Nothing more saved for this meal.</p>' : ''}</div></details>`;
+    };
+
+    // Ticked shopping-list items, per week; kept in this browser when it allows it, else until the page is closed.
+    const ticked = {};
+    const loadTicks = start => { try { return new Set(JSON.parse(localStorage.getItem(`shop-${start}`) || '[]')); } catch { return ticked[start] || new Set(); } };
+    const saveTicks = (start, set) => { ticked[start] = set; try { localStorage.setItem(`shop-${start}`, JSON.stringify([...set])); } catch { /* storage blocked */ } };
+
+    function drawDinners(dp) {
+        main.insertAdjacentHTML('beforeend', '<h1>Dinner Planner</h1><p class="muted">Calendar · tap a meal for its ingredients and notes</p>');
+        const byId = new Map(dp.meals.map(m => [m.id, m])), stats = mealStats(dp.plan);
+        weekPager(addDays(opened, -opened.getDay()), 7, (el, days) => { // Sunday to Saturday, like the Dinner Planner
+            el.innerHTML = `<div class="days">${days.map(d => {
+                const e = dp.plan[dayKey(d)], meals = (e?.mealIds || []).map(id => byId.get(id)).filter(Boolean);
+                const body = !e ? `<p class="muted">${dayKey(d) < today ? '—' : 'Nothing planned'}</p>`
+                    : `${e.skipped ? '<p><span class="tag">Skipped</span></p>' : ''}<div class="${e.skipped ? 'skipped' : ''}">${meals.map(m => mealHtml(m, stats[m.id])).join('')}</div>`
+                        + (e.note ? `<div class="note">${esc(e.note)}</div>` : '');
+                return dayCard(d, body);
+            }).join('')}</div>`;
+            // The week's shopping list, like the Dinner Planner's 🛒: every ingredient of the meals planned (not skipped)
+            const items = new Map();
+            for (const d of days) {
+                const e = dp.plan[dayKey(d)];
+                if (!e || e.skipped) continue;
+                for (const m of e.mealIds.map(id => byId.get(id)).filter(Boolean)) for (const ing of m.ingredients) {
+                    const k = ing.name.toLowerCase();
+                    if (!items.has(k)) items.set(k, { name: ing.name, qty: [], from: new Set() });
+                    const it = items.get(k);
+                    if (ing.quantity) it.qty.push(ing.quantity);
+                    it.from.add(m.name);
+                }
+            }
+            const list = [...items.values()].sort((a, b) => a.name.localeCompare(b.name)), start = dayKey(days[0]), ticks = loadTicks(start);
+            el.insertAdjacentHTML('beforeend', `<details class="sec"><summary>🛒 Shopping list (${list.length})</summary><div class="sec-body">${list.length
+                ? `<ul class="shop">${list.map(it => `<li><label><input type="checkbox" data-k="${esc(it.name.toLowerCase())}"${ticks.has(it.name.toLowerCase()) ? ' checked' : ''}>
+                    <span>${esc(it.name)}${it.qty.length ? ` — ${esc(it.qty.join(' + '))}` : ''}<br><span class="sub">${esc([...it.from].join(', '))}</span></span></label></li>`).join('')}</ul>`
+                : '<p class="muted">No meals planned this week.</p>'}</div></details>`);
+            el.querySelector('.shop')?.addEventListener('change', e => {
+                const set = loadTicks(start);
+                if (e.target.checked) set.add(e.target.dataset.k); else set.delete(e.target.dataset.k);
+                saveTicks(start, set);
+            });
+        });
+        const rows = Object.entries(dp.plan).map(([date, e]) => ({ Date: date, Meals: e.mealIds.map(id => byId.get(id)?.name).filter(Boolean).join(' + '), Note: e.note,
+            Status: e.skipped ? 'Skipped' : date < today ? 'Eaten' : date === today ? 'Today' : 'Planned' }));
+        section(`All days (${rows.length})`, false, el => records(el, [{ name: 'Date', kind: 'date' }, { name: 'Status', kind: 'choice' },
+            { name: 'Meals', kind: 'text' }, { name: 'Note', kind: 'text' }], rows, { sorted: 'desc' }));
+    }
+
+    function drawMeals(dp) {
+        main.insertAdjacentHTML('beforeend', `<h1>Meals</h1><p class="muted">Dinner Planner · ${dp.meals.length} meal${dp.meals.length === 1 ? '' : 's'}</p>`);
+        const stats = mealStats(dp.plan);
+        section('Meals', true, el => {
+            el.innerHTML = `<div class="tools"><input type="search" placeholder="Search meals or ingredients" aria-label="Search meals">
+                <select aria-label="Order"><option value="name">Name</option><option value="most">Most eaten</option><option value="recent">Recently eaten</option><option value="longest">Longest since eaten</option></select></div><div></div>`;
+            const q = el.querySelector('input'), order = el.querySelector('select'), list = el.lastElementChild;
+            const text = m => [m.name, ...m.tags, ...m.ingredients.map(i => i.name), m.notes].join(' ').toLowerCase();
+            const last = m => stats[m.id]?.last || '', count = m => stats[m.id]?.count || 0;
+            const draw = () => {
+                const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+                const shown = dp.meals.filter(m => words.every(w => text(m).includes(w))).sort((a, b) =>
+                    (order.value === 'most' ? count(b) - count(a)
+                        : order.value === 'recent' ? last(b).localeCompare(last(a))
+                            : order.value === 'longest' ? last(a).localeCompare(last(b)) : 0) || a.name.localeCompare(b.name));
+                list.innerHTML = shown.length ? shown.map(m => mealHtml(m, stats[m.id])).join('') : `<p class="muted">${dp.meals.length ? 'No matches.' : 'No meals yet.'}</p>`;
+            };
+            q.oninput = draw;
+            order.onchange = draw;
+            draw();
+        });
+    }
+
+    function drawLunches(kl) {
+        main.insertAdjacentHTML('beforeend', '<h1>Kid Lunches</h1><p class="muted">School days · each kid\'s lunch box and what the school is serving</p>');
+        const weekend = opened.getDay() === 0 || opened.getDay() === 6, from = weekend ? addDays(opened, 2) : opened; // a weekend shows the week ahead
+        weekPager(addDays(from, -((from.getDay() + 6) % 7)), 5, (el, days) => { // Monday to Friday
+            el.innerHTML = `<div class="days">${days.map(d => {
+                const key = dayKey(d), menu = kl.school[key], e = kl.days[key] || {};
+                const schoolLine = !menu ? '' : menu.closed ? '<div class="school"><b>🏫 School closed</b></div>'
+                    : `<div class="school">🏫 <b>${esc(menu.items[0]?.name || '')}</b>${menu.items.length > 1 ? `<div class="sub">${menu.items.slice(1).map(i => esc(i.name)).join(' · ')}</div>` : ''}</div>`;
+                const kids = kl.kids.map((kid, i) => {
+                    const lunch = e[kid];
+                    const parts = lunch ? kl.parts.filter(c => lunch[c.id]?.length).map(c => {
+                        // "School lunch" in the main entree: with the dish the school serves that day
+                        const items = lunch[c.id].map(n => (/^school lunch$/i.test(n) && menu?.items?.length ? `${n} (${menu.items[0].name})` : n));
+                        return `<div><span class="part">${esc(c.name)}:</span> ${esc(items.join(', '))}</div>`;
+                    }).join('') : '';
+                    return `<div class="kid k${i % 4}"><b>${esc(kid)}</b>${parts}${lunch?.note ? `<div class="note">${esc(lunch.note)}</div>` : ''}${lunch ? ''
+                        : `<div class="muted">${key < today ? '—' : 'No lunch yet'}</div>`}</div>`;
+                }).join('');
+                return dayCard(d, schoolLine + (kids || '<p class="muted">No kids yet.</p>'));
+            }).join('')}</div>`;
+        });
+    }
+
     show();
 }
 
@@ -484,11 +650,33 @@ a.btn { display:inline-block; text-decoration:none; border:1px solid var(--line)
 .banner.soon { background:#fffbe0; color:#7a6400; border-color:#f0e08a; }
 .banner.ok { background:#e8f8ef; color:#1e7a46; border-color:#bfe8cf; }
 .made { margin-top:20px; font-size:.8em; color:var(--muted); text-align:center; }
+.week-nav { display:flex; gap:6px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+.week-nav button { font:inherit; font-size:15px; padding:6px 14px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+.week-nav b { margin-left:6px; }
+.days .day { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.days .day.today { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.days .day.past { opacity:.7; }
+.days .day > p { margin:2px 0; }
+.meal { margin:6px 0 0; }
+.meal > summary { padding:8px 10px; }
+.skipped .meal > summary { text-decoration:line-through; color:var(--muted); }
+.shop { list-style:none; }
+.shop li { border-top:1px solid var(--line); padding:8px 0; }
+.shop li:first-child { border-top:0; padding-top:0; }
+.shop label { display:flex; gap:10px; align-items:flex-start; }
+.shop input { width:20px; height:20px; margin-top:2px; flex:none; }
+.shop input:checked + span { text-decoration:line-through; color:var(--muted); }
+.school { margin:4px 0 8px; padding:6px 10px; background:var(--tag); border-radius:6px; }
+.kid { border-left:4px solid var(--kid); padding:4px 0 4px 10px; margin-top:8px; }
+.kid > b { color:var(--kid); }
+.kid .part { color:var(--muted); font-size:.88em; }
+.k0 { --kid:#3a7bd5; } .k1 { --kid:#27ae60; } .k2 { --kid:#e67e22; } .k3 { --kid:#8e44ad; }
 `;
 
 // ── Keeping it up to date ─────────────────────────────────────────────────────────────────────────────────────
-// Every save in Vehicles, House, Health or Pets fires a 'data-saved' event on window (the save functions in vehicles.js,
-// house/js/house.js, health/js/records.js, pets/js/pets.js and the image gallery). A few seconds after the last one,
+// Every save in Vehicles, House, Health, Pets, Dinner Planner or Kid Lunches fires a 'data-saved' event on window (the
+// save functions in vehicles.js, house/js/house.js, health/js/records.js, pets/js/pets.js, dinner-planner/js/store.js,
+// kid-lunches/js/store.js and school.js, and the image gallery). A few seconds after the last one,
 // the phone copy is rebuilt in the background — if a folder was chosen and Chrome still allows writing to it. After
 // Chrome restarts it has to ask again, which needs a click: then an "Update phone copy" notice stays up instead.
 // "Out of date" is remembered in this browser, so the notice is back if the page is closed before updating.
@@ -580,7 +768,7 @@ export function setupPhoneCopy(button) {
         const dir = await fs.rememberedHandle(HANDLE_KEY);
         panel.innerHTML = `
             <h3>📱 Phone copy</h3>
-            <p>A read-only page with Vehicles, House, Health and Pets (information, maintenance, guides, notes, photos, health and pet records) as one file.
+            <p>A read-only page with Vehicles, House, Health, Pets, the Dinner Planner and Kid Lunches (information, maintenance, guides, notes, photos, health and pet records, dinners, lunches) as one file.
                Save it in a Google Drive folder and open it on your phone from the Drive app with Chrome.</p>
             <p>It updates by itself a few seconds after you save something here.</p>
             <p class="pc-folder">Folder: <strong>${dir ? esc(dir.name) : 'not chosen yet'}</strong>

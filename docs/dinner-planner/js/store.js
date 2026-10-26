@@ -118,6 +118,7 @@ async function save() {
     await dailyBackup();
     await writeTracked(DB_PATH, JSON.stringify(db, null, 2));
     await writeSpreadsheets();
+    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 // ---------- backups and spreadsheets ----------
