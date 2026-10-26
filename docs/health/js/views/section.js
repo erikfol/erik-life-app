@@ -1,10 +1,13 @@
 // One Health section (General Health, Dental, Eye, HSA): the shared record table over the section's CSV. A section with
+// appointments (General Health) has a future appointments table above it and a banner like a pet's. A section with
 // accounts (the HSA: FLORES, WealthCare…) has a box per account instead, like a Loan/CC card: the account's title,
 // sign-in hint, website and total balance above its own table of entries.
 import { esc, toast, money } from '../../../bills-etc/js/util.js';
-import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
+import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
+import { appointmentStatus } from '../../../pets/js/pets.js';
 import {
     HEALTH_DIR, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount, accountSection,
+    appointmentsSection,
 } from '../records.js';
 
 let checks = []; // one "has unsaved edits?" per table and account box on the page
@@ -12,14 +15,49 @@ let checks = []; // one "has unsaved edits?" per table and account box on the pa
 export const hasUnsavedEdits = () => checks.some(f => f());
 export const forget = () => { checks = []; closeFilterMenu(); };
 
+const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+
+/** Like a pet's (pets/js/views/pet.js): red with no future appointment, yellow when the next is within 2 weeks, else green. */
+const appointmentBanner = rows => {
+    const s = appointmentStatus(rows);
+    if (s.level === 'none') return '<div class="banner bad"><strong>No future appointment.</strong> Add one under Future appointments.</div>';
+    const r = s.next;
+    const what = `${esc(showDate(r.Date))}${r.Time ? ` at ${esc(r.Time)}` : ''}${r.Description ? ` — ${esc(r.Description)}` : ''}`;
+    return s.level === 'soon'
+        ? `<div class="banner"><strong>Appointment coming up ${inDays(s.days)}:</strong> ${what}</div>`
+        : `<div class="banner ok"><strong>Next appointment ${inDays(s.days)}:</strong> ${what}</div>`;
+};
+
 export async function renderSection(el, section) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     if (section.accounts) return renderAccounts(el, section);
-    const [rows, locations] = await Promise.all([loadRecords(section), loadLocations()]);
-    el.innerHTML = `
+    const appts = section.appointments && appointmentsSection(section);
+    const [rows, locations, apptRows] = await Promise.all([loadRecords(section), loadLocations(), appts ? loadRecords(appts) : null]);
+    el.innerHTML = appts ? `
+        <h1 class="page">${esc(section.label)}</h1>
+        <div id="appt-banner"></div>
+        <p class="lead">Appointments in <code>${esc(appts.path)}</code>, records in <code>${esc(section.path)}</code> in your folder.</p>
+        <section>
+            <h2>Future appointments</h2>
+            <div id="appointments"></div>
+        </section>
+        <section>
+            <h2>Records</h2>
+            <div id="records"></div>
+        </section>` : `
         <h1 class="page">${esc(section.label)}</h1>
         <p class="lead">Saved in <code>${esc(section.path)}</code> in your folder.</p>
         <section id="records"></section>`;
+    if (appts) {
+        const drawBanner = r => { el.querySelector('#appt-banner').innerHTML = appointmentBanner(r); };
+        drawBanner(apptRows);
+        const apptTable = recordTable(el.querySelector('#appointments'), {
+            columns: appts.columns,
+            rows: apptRows,
+            save: async r => { await saveRecords(appts, r); drawBanner(r); },
+        });
+        checks.push(() => apptTable.hasUnsavedEdits());
+    }
     const location = { list: locations, noun: 'location', add: name => saveLocations([...location.list, name]) };
     const table = recordTable(el.querySelector('#records'), {
         columns: section.columns,

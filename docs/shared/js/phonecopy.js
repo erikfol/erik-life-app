@@ -1,7 +1,7 @@
 // "📱 Phone copy" (Vehicles, House, Health and Pets top bars): writes one self-contained, read-only page — every vehicle
 // (information, current mileage for cars, service places, maintenance, photos, guides, notes), every house
 // (information, service companies, photos, and per area information, photos, maintenance with its due banners, records; Updates; Projects), every
-// Health section and every pet (information, future appointments, photos, records) — into a folder you pick once,
+// Health section (General Health with its future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
 // e.g. in Google Drive so it syncs to your phone. Photos are shrunk and embedded, so the page is a single file that
 // opens offline (Android hands Chrome a single file, so a page can't load anything from next to itself).
 import * as fs from '../../bills-etc/js/fs.js';
@@ -10,7 +10,7 @@ import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
     latestMileage, mileageRate, mileageRateColumns,
 } from '../../vehicles/js/vehicles.js';
-import { SECTIONS, loadRecords, loadAccounts, accountSection } from '../../health/js/records.js';
+import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection } from '../../health/js/records.js';
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
@@ -113,7 +113,12 @@ export async function collectData(progress = () => {}) {
     }
     const health = [];
     for (const s of SECTIONS) {
-        if (!s.accounts) { health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false) }); continue; }
+        if (!s.accounts) {
+            const appts = s.appointments && appointmentsSection(s); // General Health's future appointments
+            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false),
+                appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
+            continue;
+        }
         // the HSA: each account's title, website, balance and entries; its sign-in hint stays off the phone copy (the
         // file lives on Google Drive)
         const accounts = [];
@@ -367,9 +372,22 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
         if (a.records) section(`Records (${a.records.rows.length})`, true, el => records(el, a.records.columns, a.records.rows));
     }
 
+    /** Like the app's (pets/js/views/pet.js): red with no future appointment, yellow within 2 weeks, else green. */
+    function appointmentBanner(rows) {
+        const s = appointmentStatus(rows);
+        const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+        const what = r => `${esc(showDate(r.Date))}${r.Time ? ` at ${esc(r.Time)}` : ''}${r.Description ? ` — ${esc(r.Description)}` : ''}`;
+        main.insertAdjacentHTML('beforeend', s.level === 'none' ? '<div class="banner bad"><b>No future appointment</b></div>'
+            : `<div class="banner ${s.level === 'soon' ? 'soon' : 'ok'}"><b>${s.level === 'soon' ? 'Coming up' : 'Next appointment'} ${inDays(s.days)}:</b> ${what(s.next)}</div>`);
+    }
+
     function drawHealth(h) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(h.label)}</h1>`);
-        if (!h.accounts) return section(`Entries (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
+        if (h.appointments) {
+            appointmentBanner(h.appointments.rows);
+            section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
+        }
+        if (!h.accounts) return section(`${h.appointments ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
         if (!h.accounts.length) main.insertAdjacentHTML('beforeend', '<p class="muted">No accounts yet.</p>');
         for (const a of h.accounts) {
             const b = a.balance;
@@ -383,11 +401,7 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
     function drawPet(p) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(p.name)}</h1>`);
         const appts = p.appointments?.rows || [];
-        const s = appointmentStatus(appts);
-        const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
-        const what = r => `${esc(showDate(r.Date))}${r.Time ? ` at ${esc(r.Time)}` : ''}${r.Description ? ` — ${esc(r.Description)}` : ''}`;
-        main.insertAdjacentHTML('beforeend', s.level === 'none' ? '<div class="banner bad"><b>No future appointment</b></div>'
-            : `<div class="banner ${s.level === 'soon' ? 'soon' : 'ok'}"><b>${s.level === 'soon' ? 'Coming up' : 'Next appointment'} ${inDays(s.days)}:</b> ${what(s.next)}</div>`);
+        appointmentBanner(appts);
         const info = p.info.flatMap(f => (/birth/i.test(f.label) && f.value && ageText(f.value) ? [f, { label: 'Age', value: ageText(f.value) }] : [f]));
         section('General information', true, infoList(info));
         if (p.photos?.length) section(`Photos (${p.photos.length})`, false, gallery(p.photos));

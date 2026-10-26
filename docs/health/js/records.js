@@ -7,6 +7,15 @@ export const HEALTH_DIR = 'inputs/health';
 export const LOCATIONS_PATH = `${HEALTH_DIR}/locations.json`;
 const DEFAULT_LOCATIONS = ['Head', 'Lips', 'Stomach', 'Arm', 'Leg', 'Penis'];
 
+// Future appointments (General Health), like a pet's: Pets' columns, with Health's "Additional Notes".
+const APPOINTMENT_COLUMNS = [
+    { name: 'Date', kind: 'date' },
+    { name: 'Time', kind: 'suggest' },
+    { name: 'Location', kind: 'suggest' }, // where it is (offers the ones used before), not General Health's body locations
+    { name: 'Description', kind: 'text' },
+    { name: 'Additional Notes', kind: 'text' },
+];
+
 // Column kinds are the shared record table's (shared/js/recordtable.js).
 export const SECTIONS = [
     { id: 'general', label: 'General Health', path: `${HEALTH_DIR}/general_health.csv`, columns: [
@@ -14,7 +23,7 @@ export const SECTIONS = [
         { name: 'Location', kind: 'choice' },
         { name: 'Description', kind: 'text' },
         { name: 'Additional Notes', kind: 'text' },
-    ] },
+    ], appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`, columns: [
         { name: 'Date', kind: 'date' },
         { name: 'Description', kind: 'text' },
@@ -106,6 +115,9 @@ export function newAccount(section, list, title) {
     for (let n = 2; list.some(a => a.id === id); n++) id = `${base}-${n}`;
     return { id, title, file: `${section.id}-${id}.csv` };
 }
+
+/** A section's future appointments as a table of their own (loadRecords / saveRecords take it like a section). */
+export const appointmentsSection = section => ({ ...section, ...section.appointments });
 
 /** The section as one account's table: same columns, that account's file. */
 export const accountSection = (section, account) => ({ ...section, path: `${HEALTH_DIR}/${account.file}` });
