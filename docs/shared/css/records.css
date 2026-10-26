@@ -45,6 +45,12 @@ td.move .move-btns { margin-right: 0; }
 /* Health → HSA: the account's title, sign-in hint (like a Loan/CC card's notes) and link, above the table in its box */
 .acct-box { margin-bottom: 16px; }
 .acct-hint { color: var(--muted); margin: -4px 0 0; overflow-wrap: anywhere; }
-.info-link .acct-hint { margin: -6px 0 12px; } /* Health: the sign-in hint under General information's heading */
-.info-link > h2 { margin-top: 4px; } /* its ✎ Link form */
+/* Health: the links on General information's heading, their sign-in hints under it, and ✎ Links' list */
+.info-head { flex-wrap: wrap; }
+.info-hints { margin: -6px 0 12px; }
+.info-hints .acct-hint { margin: 0; }
+.info-hints .acct-hint + .acct-hint { margin-top: 2px; }
+.links-editor { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.links-edit td.move + td { width: 22%; }
+.links-edit td:nth-child(3) { width: 36%; }
 .balance-cards { grid-template-columns: minmax(220px, 320px); margin-bottom: 16px; }

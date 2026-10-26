@@ -128,9 +128,10 @@ export const appointmentsSection = section => ({ ...section, ...section.appointm
 export const accountSection = (section, account) => ({ ...section, path: `${HEALTH_DIR}/${account.file}` });
 
 /**
- * Every section's General information: { sections: { section id: [{ label, value }] }, links: { section id: { linkText,
- * url, hint } } }. A section not saved yet starts with its `info` fields, blank. links: a website next to the box's
- * heading with its sign-in hint, like a Loan/CC card's (kept in inputs/, never in the code: the site is public).
+ * Every section's General information: { sections: { section id: [{ label, value }] }, links: { section id: [{ linkText,
+ * url, hint }] } }. A section not saved yet starts with its `info` fields, blank. links: websites next to the box's
+ * heading with their sign-in hints, like a Loan/CC card's (kept in inputs/, never in the code: the site is public); a
+ * section saved when it had one link holds { linkText, url, hint }, read as a list of one.
  * track: false for read-only use (the phone copy).
  */
 export async function loadInfo(track = true) {
@@ -140,7 +141,7 @@ export async function loadInfo(track = true) {
     return {
         sections: Object.fromEntries(SECTIONS.filter(s => s.info).map(s => [s.id,
             Array.isArray(sections[s.id]) ? sections[s.id] : s.info.map(label => ({ label, value: '' }))])),
-        links: saved.links || {},
+        links: Object.fromEntries(Object.entries(saved.links || {}).map(([id, l]) => [id, Array.isArray(l) ? l : [l]])),
     };
 }
 

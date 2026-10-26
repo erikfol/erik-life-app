@@ -116,9 +116,10 @@ export async function collectData(progress = () => {}) {
     for (const s of SECTIONS) {
         if (!s.accounts) {
             const appts = s.appointments && appointmentsSection(s); // future appointments (General Health, Dental, Eye)
-            const link = healthInfo.links[s.id]; // its website; the sign-in hint stays off the phone copy, like the HSA's
+            // its websites; the sign-in hints stay off the phone copy, like the HSA's
+            const links = (healthInfo.links[s.id] || []).filter(l => l.url).map(l => ({ linkText: l.linkText || '', url: l.url }));
             health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo.sections[s.id] || null,
-                link: link?.url ? { linkText: link.linkText || '', url: link.url } : null,
+                links,
                 appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
             continue;
         }
@@ -387,8 +388,8 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
     function drawHealth(h) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(h.label)}</h1>`);
         if (h.appointments) appointmentBanner(h.appointments.rows);
-        if (h.info) section('General information', true, (/^https?:\/\//i.test(h.link?.url || '')
-            ? `<p><a href="${esc(h.link.url)}" target="_blank" rel="noopener">${esc(h.link.linkText || 'Website')} ↗</a></p>` : '') + infoList(h.info));
+        if (h.info) section('General information', true, (h.links || []).filter(l => /^https?:\/\//i.test(l.url)).map(l =>
+            `<p class="info-link"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.linkText || 'Website')} ↗</a></p>`).join('') + infoList(h.info));
         if (h.appointments) section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
         if (!h.accounts) return section(`${h.appointments || h.info ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
         if (!h.accounts.length) main.insertAdjacentHTML('beforeend', '<p class="muted">No accounts yet.</p>');
@@ -432,6 +433,7 @@ h1 { font-size:1.35em; margin:6px 0 2px; }
 .info { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px 16px; }
 .info dt { font-size:.72em; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
 .info dd { overflow-wrap:anywhere; white-space:pre-wrap; }
+.info-link { margin:0 0 8px; } .info-link + .info { margin-top:12px; }
 .tools { display:flex; gap:8px; margin-bottom:10px; }
 .tools input { flex:1; min-width:0; }
 input, select { font:inherit; font-size:15px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
