@@ -121,26 +121,79 @@ function infoLink(head, area, link, save) {
     return { hasUnsavedEdits: () => changed() };
 }
 
-/** Every account's box, then ＋ Add account. */
+// Like Bills Etc → Loan/CC → Credit Cards: an account whose newest entry, or the last time it was marked checked, is
+// STALE_DAYS or more ago gets a yellow banner (red from VERY_STALE_DAYS), so you know to look at its activity.
+const STALE_DAYS = 20, VERY_STALE_DAYS = 40;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const pad = n => String(n).padStart(2, '0');
+const isoToday = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const daysSince = iso => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const t = new Date();
+    return Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / 86400000);
+};
+
+/** The yellow / red "Activity not updated" banners; entries: { account id: rows }. */
+function staleBanners(list, entries) {
+    const stale = list.map(a => {
+        const lastEntry = (entries[a.id] || []).map(r => r.Date).filter(d => ISO.test(d || '')).sort().at(-1) || null;
+        const checked = ISO.test(a.activityChecked || '') ? a.activityChecked : null;
+        const last = [lastEntry, checked].filter(Boolean).sort().at(-1);
+        return { a, lastEntry, checked, days: last ? daysSince(last) : Infinity };
+    }).filter(x => x.days >= STALE_DAYS).sort((x, y) => y.days - x.days);
+    const item = x => `<div class="row" style="gap:8px;margin-top:4px">
+            <span><strong>${esc(x.a.title)}</strong>: ${[
+                x.lastEntry ? `last entry ${esc(showDate(x.lastEntry))}` : 'no entries yet',
+                x.checked ? `checked ${esc(showDate(x.checked))}` : '',
+            ].filter(Boolean).join(', ')}${Number.isFinite(x.days) ? ` <span class="muted">(${x.days} days)</span>` : ''}</span>
+            <button type="button" class="small" data-activity-checked="${esc(x.a.id)}" title="You looked at the account and there's nothing new to add. Saves today's date on the account; no entry is added.">✓ Checked – no new activity</button>
+        </div>`;
+    const banner = (l, level, head) => (l.length ? `<div class="banner updated-${level}"><strong>${head}</strong>${l.map(item).join('')}</div>` : '');
+    return banner(stale.filter(x => x.days >= VERY_STALE_DAYS), 'stale', `Activity not updated in ${VERY_STALE_DAYS}+ days`)
+        + banner(stale.filter(x => x.days < VERY_STALE_DAYS), 'aging', `Activity not updated in ${STALE_DAYS}+ days`);
+}
+
+/** The activity banners, every account's box, then ＋ Add account. */
 async function renderAccounts(el, section) {
     const list = await loadAccounts(section);
     const rows = await Promise.all(list.map(a => loadRecords(accountSection(section, a))));
     el.innerHTML = `
         <h1 class="page">${esc(section.label)}</h1>
+        <div data-stale></div>
         <p class="lead">Saved in <code>${esc(HEALTH_DIR)}/</code> in your folder: the accounts in <code>${esc(section.accounts.split('/').pop())}</code>,
             and each one's entries in a file of its own (its ✎ Edit says which).</p>
         <div data-accounts></div>
         <div class="row" data-add-row><button type="button" data-add-account>＋ Add account</button></div>`;
     const boxes = el.querySelector('[data-accounts]');
     const addRow = el.querySelector('[data-add-row]');
+    const entries = Object.fromEntries(list.map((a, i) => [a.id, rows[i]])); // kept up to date as tables are saved
+    const staleEl = el.querySelector('[data-stale]');
+    const drawStale = () => { staleEl.innerHTML = staleBanners(list, entries); };
     const ctx = {
         list,
-        save: async next => { await saveAccounts(section, next); list.splice(0, list.length, ...next); },
+        save: async next => { await saveAccounts(section, next); list.splice(0, list.length, ...next); drawStale(); },
+        entriesSaved: (id, r) => { entries[id] = r; drawStale(); },
     };
-    const addBox = (account, entries) => {
+    staleEl.onclick = async e => {
+        const b = e.target.closest('[data-activity-checked]');
+        if (!b) return;
+        const account = list.find(a => a.id === b.dataset.activityChecked);
+        b.disabled = true;
+        try {
+            await ctx.save(list.map(a => (a.id === account.id ? { ...a, activityChecked: isoToday() } : a)));
+            toast(`${account.title}: marked checked today`, 'ok');
+        } catch (err) {
+            b.disabled = false;
+            toast(`Couldn't save it: ${err.message}`, 'bad');
+        }
+    };
+    drawStale();
+    const addBox = (account, accountEntries) => {
+        entries[account.id] = accountEntries;
         const box = document.createElement('section');
         boxes.appendChild(box);
-        accountBox(box, section, account, entries, ctx);
+        accountBox(box, section, account, accountEntries, ctx);
+        drawStale();
     };
     list.forEach((a, i) => addBox(a, rows[i]));
     if (!list.length) boxes.innerHTML = '<p class="muted" data-none>No accounts yet. Press ＋ Add account.</p>';
@@ -200,7 +253,8 @@ function accountBox(box, section, account, rows, ctx) {
             onChange: f => { changed = f; },
             onCancel: show,
             onSave: async v => {
-                const updated = { id: account.id, file: account.file, ...v };
+                const { activityChecked } = ctx.list.find(x => x.id === account.id) || account; // set by the activity banner
+                const updated = { id: account.id, file: account.file, ...(activityChecked ? { activityChecked } : {}), ...v };
                 await ctx.save(ctx.list.map(x => (x.id === account.id ? updated : x)));
                 account = updated;
                 toast('Saved', 'ok');
@@ -221,7 +275,7 @@ function accountBox(box, section, account, rows, ctx) {
     const table = recordTable(box.querySelector('[data-records]'), {
         columns: section.columns,
         rows,
-        save: async rows => { await saveRecords(sec, rows); showBalance(rows); },
+        save: async rows => { await saveRecords(sec, rows); showBalance(rows); ctx.entriesSaved(account.id, rows); },
     });
     checks.push(() => !gone && (changed() || table.hasUnsavedEdits()));
 }
