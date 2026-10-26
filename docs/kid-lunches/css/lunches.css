@@ -117,7 +117,9 @@
 .dp .school-load .btn { flex: 0 0 auto; }
 
 .dp #no-kids { margin-bottom: 12px; }
-.dp #day-dialog { width: min(640px, calc(100vw - 32px)); }
+/* The day dialog puts the kids side by side (one under the other when the window is too narrow for that). */
+.dp #day-dialog { width: min(1240px, calc(100vw - 32px)); }
+.dp #kid-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; align-items: start; }
 .dp .day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .dp #day-form > .hint { margin-top: -6px; }
 .dp fieldset.kid-field { border-left: 4px solid var(--kid); display: flex; flex-direction: column; gap: 8px; }
