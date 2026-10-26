@@ -1,6 +1,6 @@
 // Health: General Health / Dental / Eye / HSA pages (#general, #dental, #eye, #hsa). Uses the same folder as Bills Etc
-// (the browser remembers it for the whole site); the records live in inputs/health/. General Health also has future
-// appointments, and its name in the menu is red while none is booked.
+// (the browser remembers it for the whole site); the records live in inputs/health/. General Health, Dental and Eye also
+// have future appointments, and their names in the menu are red while none is booked.
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
 import { SECTIONS, loadRecords, appointmentsSection } from './records.js';

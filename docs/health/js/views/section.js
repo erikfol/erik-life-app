@@ -1,5 +1,5 @@
 // One Health section (General Health, Dental, Eye, HSA): the shared record table over the section's CSV. A section with
-// appointments (General Health) has a future appointments table above it and a banner like a pet's. A section with
+// appointments (General Health, Dental, Eye) has a future appointments table above it and a banner like a pet's. A section with
 // accounts (the HSA: FLORES, WealthCare…) has a box per account instead, like a Loan/CC card: the account's title,
 // sign-in hint, website and total balance above its own table of entries.
 import { esc, toast, money } from '../../../bills-etc/js/util.js';
@@ -51,8 +51,11 @@ export async function renderSection(el, section) {
     if (appts) {
         const drawBanner = r => { el.querySelector('#appt-banner').innerHTML = appointmentBanner(r); };
         drawBanner(apptRows);
+        // Where it is: Dental's and Eye's offer the offices in their records too (General Health's records hold body locations).
+        const offices = section.columns.some(c => c.name === 'Location' && c.kind === 'suggest')
+            ? [...new Set(rows.map(r => (r.Location || '').trim()).filter(Boolean))] : [];
         const apptTable = recordTable(el.querySelector('#appointments'), {
-            columns: appts.columns,
+            columns: appts.columns.map(c => (c.name === 'Location' ? { ...c, suggestions: offices } : c)),
             rows: apptRows,
             save: async r => { await saveRecords(appts, r); drawBanner(r); },
         });

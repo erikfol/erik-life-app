@@ -7,7 +7,7 @@ export const HEALTH_DIR = 'inputs/health';
 export const LOCATIONS_PATH = `${HEALTH_DIR}/locations.json`;
 const DEFAULT_LOCATIONS = ['Head', 'Lips', 'Stomach', 'Arm', 'Leg', 'Penis'];
 
-// Future appointments (General Health), like a pet's: Pets' columns, with Health's "Additional Notes".
+// Future appointments (General Health, Dental, Eye), like a pet's: Pets' columns, with Health's "Additional Notes".
 const APPOINTMENT_COLUMNS = [
     { name: 'Date', kind: 'date' },
     { name: 'Time', kind: 'suggest' },
@@ -31,7 +31,7 @@ export const SECTIONS = [
         { name: 'Total Cost', kind: 'money' },
         { name: 'Out of Pocket', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
-    ] },
+    ], appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`, columns: [
         { name: 'Date', kind: 'date' },
         { name: 'Description', kind: 'text' },
@@ -39,7 +39,7 @@ export const SECTIONS = [
         { name: 'Total Cost', kind: 'money' },
         { name: 'Out of Pocket', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
-    ] },
+    ], appointments: { path: `${HEALTH_DIR}/eye_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     // Several accounts (FLORES, WealthCare…), each with its own entries file; see loadAccounts.
     { id: 'hsa', label: 'Health Savings Account (HSA)', accounts: `${HEALTH_DIR}/hsa.json`, balance: accountBalance, columns: [
         { name: 'Date', kind: 'date' },

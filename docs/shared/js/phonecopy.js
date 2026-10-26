@@ -1,7 +1,7 @@
 // "📱 Phone copy" (Vehicles, House, Health and Pets top bars): writes one self-contained, read-only page — every vehicle
 // (information, current mileage for cars, service places, maintenance, photos, guides, notes), every house
 // (information, service companies, photos, and per area information, photos, maintenance with its due banners, records; Updates; Projects), every
-// Health section (General Health with its future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
+// Health section (General Health, Dental and Eye with their future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
 // e.g. in Google Drive so it syncs to your phone. Photos are shrunk and embedded, so the page is a single file that
 // opens offline (Android hands Chrome a single file, so a page can't load anything from next to itself).
 import * as fs from '../../bills-etc/js/fs.js';
@@ -114,7 +114,7 @@ export async function collectData(progress = () => {}) {
     const health = [];
     for (const s of SECTIONS) {
         if (!s.accounts) {
-            const appts = s.appointments && appointmentsSection(s); // General Health's future appointments
+            const appts = s.appointments && appointmentsSection(s); // future appointments (General Health, Dental, Eye)
             health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false),
                 appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
             continue;
