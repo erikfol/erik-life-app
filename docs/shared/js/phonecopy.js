@@ -116,7 +116,9 @@ export async function collectData(progress = () => {}) {
     for (const s of SECTIONS) {
         if (!s.accounts) {
             const appts = s.appointments && appointmentsSection(s); // future appointments (General Health, Dental, Eye)
-            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo[s.id] || null,
+            const link = healthInfo.links[s.id]; // its website; the sign-in hint stays off the phone copy, like the HSA's
+            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo.sections[s.id] || null,
+                link: link?.url ? { linkText: link.linkText || '', url: link.url } : null,
                 appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
             continue;
         }
@@ -385,7 +387,8 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
     function drawHealth(h) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(h.label)}</h1>`);
         if (h.appointments) appointmentBanner(h.appointments.rows);
-        if (h.info) section('General information', true, infoList(h.info));
+        if (h.info) section('General information', true, (/^https?:\/\//i.test(h.link?.url || '')
+            ? `<p><a href="${esc(h.link.url)}" target="_blank" rel="noopener">${esc(h.link.linkText || 'Website')} ↗</a></p>` : '') + infoList(h.info));
         if (h.appointments) section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
         if (!h.accounts) return section(`${h.appointments || h.info ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
         if (!h.accounts.length) main.insertAdjacentHTML('beforeend', '<p class="muted">No accounts yet.</p>');

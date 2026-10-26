@@ -45,4 +45,6 @@ td.move .move-btns { margin-right: 0; }
 /* Health → HSA: the account's title, sign-in hint (like a Loan/CC card's notes) and link, above the table in its box */
 .acct-box { margin-bottom: 16px; }
 .acct-hint { color: var(--muted); margin: -4px 0 0; overflow-wrap: anywhere; }
+.info-link .acct-hint { margin: -6px 0 12px; } /* Health: the sign-in hint under General information's heading */
+.info-link > h2 { margin-top: 4px; } /* its ✎ Link form */
 .balance-cards { grid-template-columns: minmax(220px, 320px); margin-bottom: 16px; }

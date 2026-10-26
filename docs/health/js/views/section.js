@@ -45,19 +45,24 @@ export async function renderSection(el, section) {
         <h1 class="page">${esc(section.label)}</h1>
         ${appts ? '<div id="appt-banner"></div>' : ''}
         <p class="lead">${where} in your folder.</p>
-        ${section.info ? box('info', 'General information') : ''}
+        ${section.info ? '<section><h2 id="info-head"></h2><div class="info-link" id="info-link"></div><div id="info"></div></section>' : ''}
         ${appts ? box('appointments', 'Future appointments') : ''}
         ${section.info || appts ? box('records', 'Records') : '<section id="records"></section>'}`;
     if (section.info) {
+        // Re-read the file before each save, so another section's box or link saved since this page loaded stays.
+        const changeInfo = async change => {
+            const latest = await loadInfo();
+            change(latest);
+            await saveInfo(latest);
+            Object.assign(allInfo, latest);
+        };
         const info = infoBox(el.querySelector('#info'), {
-            info: allInfo[section.id],
-            save: async newInfo => {
-                const latest = await loadInfo(); // the other sections' boxes as saved
-                await saveInfo({ ...latest, [section.id]: newInfo });
-                allInfo[section.id] = newInfo;
-            },
+            info: allInfo.sections[section.id],
+            save: newInfo => changeInfo(d => { d.sections[section.id] = newInfo; }),
         });
-        checks.push(() => info.hasUnsavedEdits());
+        const link = infoLink(el.querySelector('#info-head'), el.querySelector('#info-link'), allInfo.links[section.id],
+            v => changeInfo(d => { if (v) d.links[section.id] = v; else delete d.links[section.id]; }));
+        checks.push(() => info.hasUnsavedEdits() || link.hasUnsavedEdits());
     }
     if (appts) {
         const drawBanner = r => { el.querySelector('#appt-banner').innerHTML = appointmentBanner(r); };
@@ -80,6 +85,40 @@ export async function renderSection(el, section) {
         choices: { Location: location },
     });
     checks.push(() => table.hasUnsavedEdits());
+}
+
+const LINK_FIELDS = [
+    { key: 'linkText', label: 'Link text', placeholder: 'e.g. My-DH' },
+    { key: 'url', label: 'Link', placeholder: 'https://…' },
+    { key: 'hint', label: 'Hint', placeholder: 'optional: e.g. UN: … PW: …' },
+];
+
+/**
+ * A website on the right of the General information heading with its sign-in hint under it, like a Loan/CC card's
+ * (Bills Etc), and ✎ Link to set, change or remove it. save(link or null) writes it. Returns { hasUnsavedEdits() }.
+ */
+function infoLink(head, area, link, save) {
+    let changed = () => false;
+    const show = () => {
+        changed = () => false;
+        head.innerHTML = `General information<span class="spacer"></span>
+            ${link?.url ? `<a class="ext-link" href="${esc(link.url)}" target="_blank" rel="noopener" title="${esc(link.url)}">${esc(link.linkText || 'Website')} ↗</a>` : ''}
+            <button type="button" class="small" data-link-edit title="${link ? 'Change or remove the link and its sign-in hint' : 'Add a website and its sign-in hint'}">${link ? '✎ Link' : '＋ Link'}</button>`;
+        area.innerHTML = link?.hint ? `<p class="acct-hint">${esc(link.hint)}</p>` : '';
+        head.querySelector('[data-link-edit]').onclick = () => accountForm(area, link || {}, {
+            heading: 'Link',
+            fields: LINK_FIELDS,
+            require: ['url', 'Add the link (the website’s address)'],
+            saveLabel: 'Save link',
+            onChange: f => { changed = f; },
+            onCancel: show,
+            onSave: async v => { await save(v); link = v; toast('Saved', 'ok'); show(); },
+            onRemove: link ? async () => { await save(null); link = null; toast('Link removed', 'ok'); show(); } : null,
+            removeLabel: 'Remove link',
+        });
+    };
+    show();
+    return { hasUnsavedEdits: () => changed() };
 }
 
 /** Every account's box, then ＋ Add account. */
@@ -203,32 +242,36 @@ const ACCOUNT_FIELDS = [
 ];
 
 /**
- * The account fields in `el` (filled from `values`). onSave gets the fields that aren't blank, the link made a full
- * web address; onRemove (if given) adds a Remove account button; onChange gets a "changed since it opened?" check.
+ * The account fields (or `fields`) in `el` (filled from `values`). onSave gets the fields that aren't blank, the link
+ * made a full web address; `require` [field key, message] must be filled in; onRemove (if given) adds a Remove button
+ * (`removeLabel`); onChange gets a "changed since it opened?" check.
  */
-function accountForm(el, values, { heading, note = '', saveLabel = 'Save', onSave, onCancel, onRemove, onChange }) {
+function accountForm(el, values, {
+    heading, note = '', saveLabel = 'Save', onSave, onCancel, onRemove, onChange,
+    fields = ACCOUNT_FIELDS, require = ['title', 'Give the account a title'], removeLabel = 'Remove account',
+}) {
     el.innerHTML = `
         <h2>${esc(heading)}</h2>
-        <div class="add-grid">${ACCOUNT_FIELDS.map(f => `<label class="field">${f.label}<input type="text" name="${f.key}"
+        <div class="add-grid">${fields.map(f => `<label class="field">${f.label}<input type="text" name="${f.key}"
             value="${esc(values[f.key] || '')}" placeholder="${esc(f.placeholder)}"${f.key === 'url' ? ' inputmode="url"' : ''}></label>`).join('')}</div>
         ${note ? `<p class="muted" style="margin-bottom:10px">${note}</p>` : ''}
-        <div class="row">${onRemove ? '<button type="button" class="danger" data-remove>Remove account</button>' : ''}
+        <div class="row">${onRemove ? `<button type="button" class="danger" data-remove>${esc(removeLabel)}</button>` : ''}
             <span class="spacer"></span>
             <button type="button" data-cancel>Cancel</button>
             <button type="button" class="primary" data-save>${esc(saveLabel)}</button></div>`;
-    const read = () => Object.fromEntries(ACCOUNT_FIELDS.map(f => [f.key, el.querySelector(`[name=${f.key}]`).value.trim()]));
+    const read = () => Object.fromEntries(fields.map(f => [f.key, el.querySelector(`[name=${f.key}]`).value.trim()]));
     const before = JSON.stringify(read());
     onChange(() => JSON.stringify(read()) !== before);
     el.querySelector('[data-cancel]').onclick = onCancel;
     if (onRemove) el.querySelector('[data-remove]').onclick = () => onRemove().catch(err => toast(`Couldn't save: ${err.message}`, 'bad'));
     el.querySelector('[data-save]').onclick = async () => {
         const v = read();
-        if (!v.title) return toast('Give the account a title', 'bad');
-        const url = cleanUrl(v.url);
+        if (!v[require[0]]) return toast(require[1], 'bad');
+        const url = cleanUrl(v.url || '');
         if (url === null) return toast('The link should be a web address, like https://…', 'bad');
         try {
             await onSave(Object.fromEntries(Object.entries({ ...v, url }).filter(([, x]) => x))); // blank fields left out
         } catch (err) { toast(`Couldn't save: ${err.message}`, 'bad'); }
     };
-    el.querySelector('[name=title]').focus();
+    el.querySelector('input').focus();
 }

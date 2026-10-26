@@ -128,18 +128,24 @@ export const appointmentsSection = section => ({ ...section, ...section.appointm
 export const accountSection = (section, account) => ({ ...section, path: `${HEALTH_DIR}/${account.file}` });
 
 /**
- * Every section's General information, { section id: [{ label, value }] }; a section not saved yet starts with its
- * `info` fields, blank. track: false for read-only use (the phone copy).
+ * Every section's General information: { sections: { section id: [{ label, value }] }, links: { section id: { linkText,
+ * url, hint } } }. A section not saved yet starts with its `info` fields, blank. links: a website next to the box's
+ * heading with its sign-in hint, like a Loan/CC card's (kept in inputs/, never in the code: the site is public).
+ * track: false for read-only use (the phone copy).
  */
 export async function loadInfo(track = true) {
     const text = track ? await readTracked(INFO_PATH) : await fs.readText(INFO_PATH);
-    const saved = text === null ? {} : JSON.parse(text).sections || {};
-    return Object.fromEntries(SECTIONS.filter(s => s.info).map(s => [s.id,
-        Array.isArray(saved[s.id]) ? saved[s.id] : s.info.map(label => ({ label, value: '' }))]));
+    const saved = text === null ? {} : JSON.parse(text);
+    const sections = saved.sections || {};
+    return {
+        sections: Object.fromEntries(SECTIONS.filter(s => s.info).map(s => [s.id,
+            Array.isArray(sections[s.id]) ? sections[s.id] : s.info.map(label => ({ label, value: '' }))])),
+        links: saved.links || {},
+    };
 }
 
-export async function saveInfo(all) {
-    await writeTracked(INFO_PATH, JSON.stringify({ sections: all }, null, 2) + '\n');
+export async function saveInfo(data) {
+    await writeTracked(INFO_PATH, JSON.stringify({ sections: data.sections, links: data.links }, null, 2) + '\n');
     window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
