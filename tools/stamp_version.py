@@ -21,7 +21,7 @@ SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatabl
 APPS = {
     'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/fileguard.js', 'shared/js/infobox.js',
                                        'shared/js/recordtable.js']),  # Forgettable Subs uses the Home sections' table
-    'health': ('health-version', SHARED),
+    'health': ('health-version', SHARED + ['vehicles/css/vehicles.css']),  # the General information box's styles
     'vehicles': ('vehicles-version', SHARED),
     'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
                                          'vehicles/js/views/places.js', 'vehicles/js/views/guides.js']),  # Vehicles' views (+ guide text formatting)

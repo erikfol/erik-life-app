@@ -1,7 +1,7 @@
 // "📱 Phone copy" (Vehicles, House, Health and Pets top bars): writes one self-contained, read-only page — every vehicle
 // (information, current mileage for cars, service places, maintenance, photos, guides, notes), every house
 // (information, service companies, photos, and per area information, photos, maintenance with its due banners, records; Updates; Projects), every
-// Health section (General Health, Dental and Eye with their future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
+// Health section (General Health, Dental and Eye with their information and future appointments) and every pet (information, future appointments, photos, records) — into a folder you pick once,
 // e.g. in Google Drive so it syncs to your phone. Photos are shrunk and embedded, so the page is a single file that
 // opens offline (Android hands Chrome a single file, so a page can't load anything from next to itself).
 import * as fs from '../../bills-etc/js/fs.js';
@@ -10,7 +10,7 @@ import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
     latestMileage, mileageRate, mileageRateColumns,
 } from '../../vehicles/js/vehicles.js';
-import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection } from '../../health/js/records.js';
+import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, loadInfo as loadHealthInfo } from '../../health/js/records.js';
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
@@ -112,10 +112,11 @@ export async function collectData(progress = () => {}) {
         houses.push({ name: h.name, info: h.info || [], places: h.places || [], photos: await images(house.photosDir(h), tick), areas });
     }
     const health = [];
+    const healthInfo = await loadHealthInfo(false);
     for (const s of SECTIONS) {
         if (!s.accounts) {
             const appts = s.appointments && appointmentsSection(s); // future appointments (General Health, Dental, Eye)
-            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false),
+            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo[s.id] || null,
                 appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
             continue;
         }
@@ -383,11 +384,10 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
 
     function drawHealth(h) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(h.label)}</h1>`);
-        if (h.appointments) {
-            appointmentBanner(h.appointments.rows);
-            section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
-        }
-        if (!h.accounts) return section(`${h.appointments ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
+        if (h.appointments) appointmentBanner(h.appointments.rows);
+        if (h.info) section('General information', true, infoList(h.info));
+        if (h.appointments) section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
+        if (!h.accounts) return section(`${h.appointments || h.info ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
         if (!h.accounts.length) main.insertAdjacentHTML('beforeend', '<p class="muted">No accounts yet.</p>');
         for (const a of h.accounts) {
             const b = a.balance;

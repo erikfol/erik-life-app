@@ -1,13 +1,15 @@
-// One Health section (General Health, Dental, Eye, HSA): the shared record table over the section's CSV. A section with
-// appointments (General Health, Dental, Eye) has a future appointments table above it and a banner like a pet's. A section with
+// One Health section (General Health, Dental, Eye, HSA): the shared record table over the section's CSV. General Health,
+// Dental and Eye also have a General information box (shared/js/infobox.js, like a pet's) and future appointments with a
+// banner like a pet's above it. A section with
 // accounts (the HSA: FLORES, WealthCare…) has a box per account instead, like a Loan/CC card: the account's title,
 // sign-in hint, website and total balance above its own table of entries.
 import { esc, toast, money } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
+import { infoBox } from '../../../shared/js/infobox.js';
 import { appointmentStatus } from '../../../pets/js/pets.js';
 import {
-    HEALTH_DIR, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount, accountSection,
-    appointmentsSection,
+    HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
+    accountSection, appointmentsSection, loadInfo, saveInfo,
 } from '../records.js';
 
 let checks = []; // one "has unsaved edits?" per table and account box on the page
@@ -32,22 +34,31 @@ export async function renderSection(el, section) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     if (section.accounts) return renderAccounts(el, section);
     const appts = section.appointments && appointmentsSection(section);
-    const [rows, locations, apptRows] = await Promise.all([loadRecords(section), loadLocations(), appts ? loadRecords(appts) : null]);
-    el.innerHTML = appts ? `
+    const [rows, locations, apptRows, allInfo] = await Promise.all([loadRecords(section), loadLocations(),
+        appts ? loadRecords(appts) : null, section.info ? loadInfo() : null]);
+    // "Information in …, appointments in …, records in … in your folder." (just "Saved in …" with only records)
+    const files = [section.info && ['information', INFO_PATH], appts && ['appointments', appts.path], ['records', section.path]].filter(Boolean);
+    const where = files.length === 1 ? `Saved in <code>${esc(section.path)}</code>`
+        : files.map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ').replace(/^./, c => c.toUpperCase());
+    const box = (id, title) => `<section><h2>${title}</h2><div id="${id}"></div></section>`;
+    el.innerHTML = `
         <h1 class="page">${esc(section.label)}</h1>
-        <div id="appt-banner"></div>
-        <p class="lead">Appointments in <code>${esc(appts.path)}</code>, records in <code>${esc(section.path)}</code> in your folder.</p>
-        <section>
-            <h2>Future appointments</h2>
-            <div id="appointments"></div>
-        </section>
-        <section>
-            <h2>Records</h2>
-            <div id="records"></div>
-        </section>` : `
-        <h1 class="page">${esc(section.label)}</h1>
-        <p class="lead">Saved in <code>${esc(section.path)}</code> in your folder.</p>
-        <section id="records"></section>`;
+        ${appts ? '<div id="appt-banner"></div>' : ''}
+        <p class="lead">${where} in your folder.</p>
+        ${section.info ? box('info', 'General information') : ''}
+        ${appts ? box('appointments', 'Future appointments') : ''}
+        ${section.info || appts ? box('records', 'Records') : '<section id="records"></section>'}`;
+    if (section.info) {
+        const info = infoBox(el.querySelector('#info'), {
+            info: allInfo[section.id],
+            save: async newInfo => {
+                const latest = await loadInfo(); // the other sections' boxes as saved
+                await saveInfo({ ...latest, [section.id]: newInfo });
+                allInfo[section.id] = newInfo;
+            },
+        });
+        checks.push(() => info.hasUnsavedEdits());
+    }
     if (appts) {
         const drawBanner = r => { el.querySelector('#appt-banner').innerHTML = appointmentBanner(r); };
         drawBanner(apptRows);

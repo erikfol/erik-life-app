@@ -5,6 +5,7 @@ import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const HEALTH_DIR = 'inputs/health';
 export const LOCATIONS_PATH = `${HEALTH_DIR}/locations.json`;
+export const INFO_PATH = `${HEALTH_DIR}/info.json`; // the General information box of each section that has one
 const DEFAULT_LOCATIONS = ['Head', 'Lips', 'Stomach', 'Arm', 'Leg', 'Penis'];
 
 // Future appointments (General Health, Dental, Eye), like a pet's: Pets' columns, with Health's "Additional Notes".
@@ -16,15 +17,18 @@ const APPOINTMENT_COLUMNS = [
     { name: 'Additional Notes', kind: 'text' },
 ];
 
-// Column kinds are the shared record table's (shared/js/recordtable.js).
+// Column kinds are the shared record table's (shared/js/recordtable.js). `info`: the General information fields a
+// section starts with (any can be renamed or removed).
 export const SECTIONS = [
-    { id: 'general', label: 'General Health', path: `${HEALTH_DIR}/general_health.csv`, columns: [
+    { id: 'general', label: 'General Health', path: `${HEALTH_DIR}/general_health.csv`,
+        info: ['Doctor', 'Practice', 'Phone', 'Address', 'Website', 'Blood Type', 'Allergies', 'Medications', 'Notes'], columns: [
         { name: 'Date', kind: 'date' },
         { name: 'Location', kind: 'choice' },
         { name: 'Description', kind: 'text' },
         { name: 'Additional Notes', kind: 'text' },
     ], appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
-    { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`, columns: [
+    { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,
+        info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: [
         { name: 'Date', kind: 'date' },
         { name: 'Description', kind: 'text' },
         { name: 'Location', kind: 'suggest' }, // the dental office (offers the ones used before), not General Health's body locations
@@ -32,7 +36,8 @@ export const SECTIONS = [
         { name: 'Out of Pocket', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
     ], appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
-    { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`, columns: [
+    { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`,
+        info: ['Eye Doctor', 'Office', 'Phone', 'Address', 'Website', 'Prescription', 'Notes'], columns: [
         { name: 'Date', kind: 'date' },
         { name: 'Description', kind: 'text' },
         { name: 'Location', kind: 'suggest' }, // the eye doctor's office, like Dental's
@@ -121,6 +126,22 @@ export const appointmentsSection = section => ({ ...section, ...section.appointm
 
 /** The section as one account's table: same columns, that account's file. */
 export const accountSection = (section, account) => ({ ...section, path: `${HEALTH_DIR}/${account.file}` });
+
+/**
+ * Every section's General information, { section id: [{ label, value }] }; a section not saved yet starts with its
+ * `info` fields, blank. track: false for read-only use (the phone copy).
+ */
+export async function loadInfo(track = true) {
+    const text = track ? await readTracked(INFO_PATH) : await fs.readText(INFO_PATH);
+    const saved = text === null ? {} : JSON.parse(text).sections || {};
+    return Object.fromEntries(SECTIONS.filter(s => s.info).map(s => [s.id,
+        Array.isArray(saved[s.id]) ? saved[s.id] : s.info.map(label => ({ label, value: '' }))]));
+}
+
+export async function saveInfo(all) {
+    await writeTracked(INFO_PATH, JSON.stringify({ sections: all }, null, 2) + '\n');
+    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
+}
 
 export async function loadLocations() {
     const text = await readTracked(LOCATIONS_PATH);
