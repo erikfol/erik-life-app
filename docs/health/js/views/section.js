@@ -130,7 +130,7 @@ async function renderAccounts(el, section) {
         <p class="lead">Saved in <code>${esc(HEALTH_DIR)}/</code> in your folder: the accounts in <code>${esc(section.accounts.split('/').pop())}</code>,
             and each one's entries in a file of its own (its ✎ Edit says which).</p>
         <div data-accounts></div>
-        <div class="row" data-add-row><button type="button" data-add>＋ Add account</button></div>`;
+        <div class="row" data-add-row><button type="button" data-add-account>＋ Add account</button></div>`;
     const boxes = el.querySelector('[data-accounts]');
     const addRow = el.querySelector('[data-add-row]');
     const ctx = {
@@ -145,7 +145,8 @@ async function renderAccounts(el, section) {
     list.forEach((a, i) => addBox(a, rows[i]));
     if (!list.length) boxes.innerHTML = '<p class="muted" data-none>No accounts yet. Press ＋ Add account.</p>';
 
-    el.querySelector('[data-add]').onclick = () => {
+    // Its own name: each account's table has a ＋ Add entry button called data-add, and the first of those comes before this one.
+    el.querySelector('[data-add-account]').onclick = () => {
         addRow.hidden = true;
         const box = document.createElement('section');
         boxes.appendChild(box);
