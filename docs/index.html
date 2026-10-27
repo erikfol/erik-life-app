@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Erik's Life App</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon-192.png">
+    <meta name="theme-color" content="#1a1a2e">
     <script>
         // Links saved before Bills Etc moved to its own page (…/#month, …/#utilities/water) still open that page.
         if (location.hash.length > 1) location.replace('bills-etc/' + location.hash);
@@ -107,12 +110,13 @@
     <script type="module">
         // On a tablet or phone (no local folders) the sections use your Dropbox: sign in here, or sign out.
         import * as dbx from './shared/js/dropbox.js';
+        import { isSupported } from './bills-etc/js/fs.js';
         const el = document.getElementById('dropbox');
         const draw = () => {
             if (dbx.signedIn()) {
                 el.innerHTML = `Dropbox: signed in on this device (${dbx.FOLDER_LABEL}). <button type="button">Sign out</button>`;
                 el.querySelector('button').onclick = async () => { await dbx.signOut(); draw(); };
-            } else if (typeof window.showDirectoryPicker !== 'function') {
+            } else if (!isSupported()) {
                 el.innerHTML = 'This device can’t open a folder, so the sections use your Dropbox. <button type="button" class="primary">Sign in with Dropbox</button>';
                 el.querySelector('button').onclick = () => dbx.signIn().catch(e => { el.textContent = e.message; });
             } else {

@@ -7,7 +7,8 @@ import * as dbx from '../../shared/js/dropbox.js';
 const DROPBOX = { name: 'Dropbox', kind: 'dropbox' };
 let root = dbx.signedIn() ? DROPBOX : null;
 
-export const isSupported = () => typeof window.showDirectoryPicker === 'function';
+// Chrome on Android may offer folder access too, but the data isn't on the tablet or phone: there it's Dropbox.
+export const isSupported = () => typeof window.showDirectoryPicker === 'function' && !/Android/i.test(navigator.userAgent);
 export const folder = () => root;
 export const isCloud = () => root === DROPBOX;
 
