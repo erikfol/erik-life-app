@@ -1,0 +1,30 @@
+/* Gifts, Bday, Anniversary: the status badges, a person's Coming up boxes and Christmas's By person table; the tables
+   and the information box use the shared styles (records.css, vehicles.css). */
+.cat-badge.st-idea { background: #f3e8ff; color: var(--purple); }
+.cat-badge.st-todo { background: var(--head); color: var(--blue-text); }
+.cat-badge.st-waiting { background: #fff8e1; color: #8a5a00; }
+.cat-badge.st-got { background: #e8f8ef; color: #1e7a46; }
+
+/* Coming up: a box per date (and Christmas) — its gifts this time, the totals, and what was given before */
+.occasion .occ-when { color: var(--muted); margin-top: 0; }
+.occ-gifts { list-style: none; margin: 10px 0 6px; font-size: 0.9em; }
+.occ-gifts li { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.occ-gifts li:last-child { border-bottom: 0; }
+.occ-gifts .g-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.occ-gifts .g-price { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.place p.occ-total { font-weight: 600; }
+.occ-past { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line-strong); }
+.occ-past-h { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+.place .occ-past p { margin: 3px 0; color: #555; }
+
+/* Christmas: the year pills under the heading; By person */
+h1.page + .pillnav { margin-top: 10px; }
+.by-person td.text { white-space: normal; min-width: 170px; }
+.by-person tr.missing td { color: var(--muted); }
+
+@media (max-width: 640px) {
+    /* Christmas's Total / Bought / Still to buy side by side instead of a screenful */
+    .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .cards .card { padding: 12px; }
+    .cards .card .value { font-size: 1.1em; overflow-wrap: anywhere; }
+}

@@ -33,7 +33,8 @@ const numberOf = v => {
  *            'suggest' (free text offering values already used + c.suggestions), 'text' (multi-line),
  *            'link' (a web address, shown as a link to it);
  *            c.calc(row) → a worked-out value: shown in the read-only view (and in a money Total), never edited or saved;
- *            c.total: false leaves a money column out of the Total line
+ *            c.total: false leaves a money column out of the Total line; c.default: what a new entry starts with (a
+ *            string, or a function giving one); c.badge(value) → a class: shown as a coloured badge (e.g. a status)
  *   rows:    [{ [name]: string }]
  *   save:    async rows => void (rows already trimmed and without blank entries)
  *   choices: { [name]: { list: string[], noun: 'location', add: async name => void } } for 'choice' columns
@@ -101,9 +102,14 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             ...base, value: get, text: v => (isLink(v) ? linkText(v) : String(v)),
             cell: r => { const v = get(r); return isLink(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener" title="${esc(v)}">${esc(linkText(v))} ↗</a>` : esc(v); },
         };
+        if (c.badge) return {
+            ...base, value: get,
+            cell: r => { const v = get(r); return v ? `<span class="cat-badge ${esc(c.badge(v))}">${esc(v)}</span>` : ''; },
+        };
         return { ...base, value: get, tdClass: () => 'text' };
     };
     const firstDate = cols.find(c => c.kind === 'date');
+    const startValue = c => String((typeof c.default === 'function' ? c.default() : c.default) ?? '');
 
     const showRead = () => {
         state.draft = null;
@@ -236,7 +242,7 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     });
 
     container.querySelector('[data-add]').onclick = () => {
-        const row = { ...Object.fromEntries(editCols.map(c => [c.name, ''])), _from: null };
+        const row = { ...Object.fromEntries(editCols.map(c => [c.name, startValue(c)])), _from: null };
         if (firstDate) state.draft.unshift(row); else state.draft.push(row); // dated tables keep the newest at the top
         drawEdit();
         (firstDate ? tbl.tBodies[0].firstElementChild : tbl.tBodies[0].lastElementChild).querySelector('[data-k]')?.focus();
@@ -246,9 +252,10 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         showRead();
     };
     container.querySelector('[data-save]').onclick = async () => {
-        const blank = r => editCols.every(c => !String(r[c.name]).trim());
+        // An entry left as it started (blank, or just its starting values) isn't saved.
+        const blank = r => editCols.every(c => !String(r[c.name]).trim() || (c.default != null && r[c.name] === startValue(c)));
         const rows = state.draft.filter(r => !blank(r)).map(r => Object.fromEntries(editCols.map(c => [c.name, String(r[c.name]).trim()])));
-        const label = r => `“${r.Description || r.Action || 'An entry'}”`;
+        const label = r => `“${r.Description || r.Action || r.Gift || 'An entry'}”`;
         const start = firstDate?.name, end = cols.find(c => c.kind === 'end')?.name;
         const backwards = end && rows.find(r => r[start] && r[end] && r[end] < r[start]);
         if (backwards) return toast(`${label(backwards)} ends before it starts — fix the dates, then Save.`, 'bad');
