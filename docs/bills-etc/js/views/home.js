@@ -1,4 +1,5 @@
 import * as fs from '../fs.js';
+import { FOLDER_LABEL } from '../../../shared/js/dropbox.js';
 import { ollamaSettings, pingOllama, aiEnabled, setAiEnabled } from '../ollama.js';
 import { PATHS, readTable, readBankCsv, keyOf } from '../data.js';
 import { parseCSV } from '../csv.js';
@@ -19,16 +20,15 @@ const rangeLabel = yms => !yms.length ? '—' : yms.length === 1 ? monthLabel(ym
 async function folderStatus() {
     const master = await readTable(PATHS.master);
     const keys = new Set((master?.rows || []).map(keyOf));
-    const past = [];
-    for (const name of await fs.listFiles(PATHS.pastMonths)) {
+    // All files at once: from Dropbox (on a tablet) each read is a download.
+    const past = await Promise.all((await fs.listFiles(PATHS.pastMonths)).map(async name => {
         const bank = await readBankCsv(`${PATHS.pastMonths}/${name}`);
-        past.push({ name, months: monthsOf(bank.rows), pending: bank.rows.filter(r => !keys.has(keyOf(r))).length });
-    }
-    const current = [];
-    for (const name of await fs.listFiles(PATHS.currentMonth)) {
+        return { name, months: monthsOf(bank.rows), pending: bank.rows.filter(r => !keys.has(keyOf(r))).length };
+    }));
+    const current = await Promise.all((await fs.listFiles(PATHS.currentMonth)).map(async name => {
         const bank = await readBankCsv(`${PATHS.currentMonth}/${name}`);
-        current.push({ name, months: monthsOf(bank.rows) });
-    }
+        return { name, months: monthsOf(bank.rows) };
+    }));
     return {
         master: master ? { rows: master.rows.length, months: monthsOf(master.rows) } : null,
         past, current,
@@ -101,20 +101,25 @@ const home = {
     async render(el) {
         const origin = location.origin;
         const supported = fs.isSupported();
+        const cloud = fs.isCloud();
         const ai = aiEnabled();
         el.innerHTML = `
             <h1 class="page">Setup</h1>
-            <p class="lead">Bills Etc runs entirely in your browser. Your bank files stay on your computer.</p>
-            ${supported ? '' : `<div class="banner bad">This browser can't open local folders. Use <strong>Chrome</strong> or <strong>Edge</strong> on desktop.</div>`}
+            <p class="lead">Bills Etc runs entirely in your browser. Your bank files stay in your own folder (on your computer, kept in your Dropbox).</p>
+            ${supported || cloud ? '' : `<div class="banner">This device can't open a folder. Sign in with Dropbox below to use your files from your Dropbox.</div>`}
 
             <section>
                 <h2>Your data folder</h2>
+                ${cloud ? `<p>On this device your files are read from and saved to your Dropbox (<code>${esc(FOLDER_LABEL)}</code>):
+                the same files your PC uses, kept in sync by Dropbox.</p>` : `
                 <p>Choose your <code>erik-life-app</code> folder, the one that contains <code>inputs/</code> and <code>config.json</code>.
-                The app reads and writes the same files as the Python scripts, so you can switch between them.</p>
+                The app reads and writes the same files as the Python scripts, so you can switch between them.</p>`}
                 <div class="row" style="margin:14px 0">
-                    <button id="pick" ${supported ? '' : 'disabled'}>Choose folder…</button>
+                    <button id="pick" ${supported && !cloud ? '' : 'hidden'}>Choose folder…</button>
                     <button class="primary" id="reconnect" hidden></button>
+                    <button id="dropbox-in" ${cloud ? 'hidden' : supported ? '' : 'class="primary"'}>Sign in with Dropbox</button>
                     <span id="folder-name" class="muted"></span>
+                    <button class="small" id="dropbox-out" ${cloud ? '' : 'hidden'}>Sign out of Dropbox</button>
                 </div>
                 <div class="banner bad" id="folder-moved" style="margin-bottom:14px" hidden></div>
                 <div id="folder-tools" hidden>
@@ -171,7 +176,7 @@ const home = {
 
         const showFolder = async () => {
             const root = fs.folder();
-            el.querySelector('#folder-name').textContent = root ? `Connected: ${root.name}` : '';
+            el.querySelector('#folder-name').textContent = !root ? '' : fs.isCloud() ? `Connected: Dropbox (${FOLDER_LABEL})` : `Connected: ${root.name}`;
             el.querySelector('#folder-tools').hidden = !root;
             el.querySelector('#pick').textContent = root ? 'Change folder…' : 'Choose folder…';
             el.querySelector('#pick').classList.toggle('primary', !root);
@@ -323,6 +328,12 @@ const home = {
             el.querySelector('#folder-moved').hidden = true;
             refreshStatus();
             showFolder();
+        };
+        el.querySelector('#dropbox-in').onclick = () => fs.useDropbox().catch(e => toast(e.message, 'bad'));
+        el.querySelector('#dropbox-out').onclick = async () => {
+            await fs.leaveDropbox();
+            toast('Signed out of Dropbox on this device', 'ok');
+            location.reload();
         };
 
         if (!fs.folder() && supported) {

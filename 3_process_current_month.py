@@ -1,14 +1,13 @@
 import pandas as pd
 import json
 import os
-from bills_config import category_settings, renamed, merchant_rules, apply_merchant_rules, rules_only
+from bills_config import CONFIG_FILE, category_settings, renamed, merchant_rules, apply_merchant_rules, rules_only
 import argparse
 from history_lookup import merchant_key, load_history
 import calendar
 from datetime import datetime, date
 
-CONFIG_FILE      = "config.json"
-MASTER_FILE      = "output_master_data/all_time_finances.csv"
+MASTER_FILE     = "output_master_data/all_time_finances.csv"
 INPUT_FOLDER     = "inputs/current_month"
 CACHE_FILE       = "output_master_data/categorized_cache.csv"
 PROCESSED_FILE   = "output_master_data/processed_current_month.csv"

@@ -3,6 +3,10 @@ inputs/
 output_master_data/
 reports/
 config.json
+# The same names as links into the Dropbox app folder, where the data lives so a tablet can use it
+/inputs
+/output_master_data
+/reports
 
 # --- Python ---
 __pycache__/

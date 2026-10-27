@@ -14,9 +14,10 @@ Personal spending tracker. Exports Come Citizens Bank transaction CSV, categoriz
 **https://erikfol.github.io/erik-life-app/bills-etc/**.
 `docs/health/` is the Health app (General Health, Dental, Eye, Health Savings Account (HSA) tables), which saves to `inputs/health/` in the same folder.
 `docs/vehicles/` is the Vehicles app (one page per vehicle: information + maintenance table), which saves to `inputs/vehicles/`.
-`docs/shared/` holds the editable record table and folder prompt that Health and Vehicles share. It's static HTML and JavaScript with no build step. Your data never leaves your computer:
+`docs/shared/` holds the editable record table and folder prompt that Health and Vehicles share. It's static HTML and JavaScript with no build step. Your data is never put on GitHub:
 
-- In **Chrome or Edge** you connect this folder on the Setup page. The app then reads and writes the same files as the scripts (`inputs/`, `output_master_data/`, `config.json`), so you can mix the GUI and the scripts.
+- In **Chrome or Edge** you connect the data folder on the Setup page. The app then reads and writes the same files as the scripts (`inputs/`, `output_master_data/`, `config.json`), so you can mix the GUI and the scripts.
+- The data lives in the Dropbox app folder `Dropbox\Apps\ErikLifeApp\`, so a **tablet or phone** can use it too: there the app signs in with Dropbox (`docs/shared/js/dropbox.js`, Dropbox app "ErikLifeApp", app-folder access only) and reads and writes the same files through Dropbox. On the PC, `inputs/`, `output_master_data/` and `reports/` in this repo are links (junctions) into that folder and `config.json` is found next to them, so the scripts work as before.
 - AI calls go straight from the browser to your local Ollama. Allow the page's origin once, then restart Ollama:
   `setx OLLAMA_ORIGINS "https://erikfol.github.io"`
 - Pages: **Setup** (add bank CSVs, optional AI for new merchants, close the month), **This Month** (projection), **Bills** (scheduled bills in `config.json` `scheduled_bills`: paid / due / late each month, 12-month grid, suggestions from history; transactions matching a bill's merchant count as scheduled, everything else as unscheduled), **Dashboard** (history report and AI analysis), **Finance Table** (fix the processed month or the master), **Config** (tabs: Income & Bills, Categories, Merchants — one table of merchant rules and the names that still need one).

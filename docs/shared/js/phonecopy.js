@@ -701,6 +701,8 @@ async function writeCopy(dir, progress = () => {}) {
 
 // ── The top-bar button, its panel and the "out of date" notice ──────────────────────────────────────────────────
 export function setupPhoneCopy(button) {
+    // It's written into a folder on this computer: not from a tablet or phone using Dropbox (the PC keeps it updated).
+    if (fs.isCloud() || !fs.isSupported()) { button.remove(); return; }
     const panel = document.createElement('div');
     panel.className = 'phone-panel';
     panel.hidden = true;

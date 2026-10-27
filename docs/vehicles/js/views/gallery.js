@@ -20,6 +20,13 @@ export function releaseGalleries() {
 const caption = name => name.replace(/\.[^.]+$/, '').replace(/^\d+[-_ ]*/, '').replace(/[-_]+/g, ' ');
 const stem = n => n.replace(/\.[^.]+$/, '');
 
+/** fn(item) for every item, `n` at a time; the results in the same order. */
+async function inBatches(items, n, fn) {
+    const out = [];
+    for (let i = 0; i < items.length; i += n) out.push(...await Promise.all(items.slice(i, i + n).map(fn)));
+    return out;
+}
+
 /** Image file names in `dir`, in order ('x.png' before 'x (2).png'). Missing folder → []. */
 export async function listImages(dir) {
     return (await fs.listFiles(dir, '')).filter(n => IMAGE.test(n))
@@ -34,13 +41,13 @@ export async function renderGallery(el, dir, { noun = 'photo', onChange, compact
     release(el);
     const names = await listImages(dir);
     const images = [], urls = [];
-    for (const name of names) {
-        const file = await fs.readFile(`${dir}/${name}`);
-        if (!file) continue;
+    const files = await inBatches(names, 8, name => fs.readImage(`${dir}/${name}`)); // from Dropbox: 8 downloads at once
+    files.forEach((file, i) => {
+        if (!file) return;
         const url = URL.createObjectURL(file);
         urls.push(url);
-        images.push({ name, url });
-    }
+        images.push({ name: names[i], url });
+    });
     open.set(el, urls);
     const n = images.length, plural = c => `${c} ${noun}${c === 1 ? '' : 's'}`;
     el.innerHTML = `

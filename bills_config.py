@@ -12,7 +12,9 @@ import json
 import os
 import re
 
-CONFIG_FILE = "config.json"
+# config.json sits next to inputs/. When inputs is a link into the Dropbox app folder (where the data lives so a
+# tablet can use it too), config.json is there as well.
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath("inputs")), "config.json")
 
 
 def renamed(renames, category):

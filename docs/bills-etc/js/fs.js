@@ -1,10 +1,28 @@
 // Access to the user's local erik-life-app folder via the File System Access API (Chrome / Edge).
 // The folder handle is remembered in IndexedDB so it can be reconnected after a reload.
+// Signed in to Dropbox on this device (a tablet or phone, which can't open a local folder): the same files are read
+// and written in the Dropbox app folder instead (shared/js/dropbox.js). Decided when the page loads.
+import * as dbx from '../../shared/js/dropbox.js';
 
-let root = null;
+const DROPBOX = { name: 'Dropbox', kind: 'dropbox' };
+let root = dbx.signedIn() ? DROPBOX : null;
 
 export const isSupported = () => typeof window.showDirectoryPicker === 'function';
 export const folder = () => root;
+export const isCloud = () => root === DROPBOX;
+
+/** Go to Dropbox to sign in; this page opens again afterwards, using Dropbox. */
+export const useDropbox = (returnTo = location.href) => dbx.signIn(returnTo);
+
+/** Sign this device out of Dropbox. */
+export async function leaveDropbox() {
+    await dbx.signOut();
+    if (isCloud()) root = null;
+}
+
+const FILE_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    heic: 'image/heic', bmp: 'image/bmp', pdf: 'application/pdf' };
+const typeOf = name => FILE_TYPES[name.split('.').pop().toLowerCase()] || '';
 
 /** Use an already-obtained directory handle (e.g. the browser-private OPFS root for testing). */
 export const useFolder = handle => { root = handle; };
@@ -57,6 +75,7 @@ async function checkFolder(e) {
 
 /** Returns {handle, granted, moved} for the remembered folder, or null. A moved folder is not connected. */
 export async function rememberedFolder() {
+    if (isCloud()) return null; // using Dropbox, not a folder on this computer
     let handle;
     try { handle = await idbOp('readonly', s => s.get('root')); } catch { return null; }
     if (!handle) return null;
@@ -98,6 +117,7 @@ function split(path) {
 
 /** File text, or null if it doesn't exist. */
 export async function readText(path) {
+    if (isCloud()) { const f = await dbx.download(path); return f && await f.blob.text(); }
     const [d, name] = split(path);
     try {
         const fh = await (await dir(d)).getFileHandle(name);
@@ -112,6 +132,10 @@ export async function readText(path) {
 /** The file itself (a File, e.g. for showing a photo), or null if it doesn't exist. */
 export async function readFile(path) {
     const [d, name] = split(path);
+    if (isCloud()) {
+        const f = await dbx.download(path);
+        return f && new File([f.blob], name, { type: typeOf(name), lastModified: Date.parse(f.meta.server_modified) || Date.now() });
+    }
     try {
         return await (await (await dir(d)).getFileHandle(name)).getFile();
     } catch (e) {
@@ -121,8 +145,16 @@ export async function readFile(path) {
     }
 }
 
+/** An image for showing on screen: the file itself, or from Dropbox a smaller copy (photos are camera-sized). */
+export async function readImage(path) {
+    if (!isCloud()) return readFile(path);
+    const small = await dbx.thumbnail(path).catch(() => null); // e.g. a type Dropbox can't shrink: use the file
+    return small ? new File([small], split(path)[1], { type: 'image/jpeg' }) : readFile(path);
+}
+
 /** When the file was last written, or null if it doesn't exist. */
 export async function modifiedAt(path) {
+    if (isCloud()) { const m = await dbx.metadata(path); return m?.['.tag'] === 'file' ? new Date(m.server_modified) : null; }
     const [d, name] = split(path);
     try {
         return new Date((await (await (await dir(d)).getFileHandle(name)).getFile()).lastModified);
@@ -134,6 +166,7 @@ export async function modifiedAt(path) {
 }
 
 export async function writeText(path, text) {
+    if (isCloud()) { await dbx.upload(path, text); return; }
     if (root && await isGone(root)) throw movedError(); // never write into a moved folder's old place
     const [d, name] = split(path);
     const fh = await (await dir(d, true)).getFileHandle(name, { create: true });
@@ -143,16 +176,22 @@ export async function writeText(path, text) {
 }
 
 export async function exists(path) {
+    if (isCloud()) return (await dbx.metadata(path))?.['.tag'] === 'file';
     return (await readText(path)) !== null;
 }
 
 export async function removeFile(path) {
+    if (isCloud()) { await dbx.remove(path); return; }
     const [d, name] = split(path);
     try { await (await dir(d)).removeEntry(name); } catch (e) { await checkFolder(e); throw e; }
 }
 
 /** Names of files in `path` ending with `ext` (case-insensitive), sorted. Missing folder → []. */
 export async function listFiles(path, ext = '.csv') {
+    if (isCloud()) {
+        return ((await dbx.list(path)) || []).filter(e => e['.tag'] === 'file' && e.name.toLowerCase().endsWith(ext))
+            .map(e => e.name).sort();
+    }
     let d;
     try { d = await dir(path); } catch (e) { await checkFolder(e); if (e.name === 'NotFoundError') return []; throw e; }
     const names = [];
