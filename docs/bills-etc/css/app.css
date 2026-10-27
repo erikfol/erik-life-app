@@ -270,9 +270,14 @@ th.filtered .fbtn::before { content: '⧩ '; font-size: 0.9em; }
 #toast div.ok { background: #1e7a46; }
 
 @media (max-width: 640px) {
-    .topbar { padding: 10px 16px; }
+    /* On a phone the menu wraps to several rows; pinned, it would cover a fifth of the screen. */
+    .topbar { padding: 10px 16px; gap: 6px 14px; position: static; }
+    #nav a { padding: 5px 9px; }
+    .merge-bar { top: 0; }
+    section.loan, .loan .edit-mode .chart-title { scroll-margin-top: 8px; }
     .status { margin-left: 0; }
     section { padding: 16px; }
+    section h2 { flex-wrap: wrap; } /* a link next to the heading goes under it */
     .kv-row { grid-template-columns: 1fr 100px 36px; }
 }
 
