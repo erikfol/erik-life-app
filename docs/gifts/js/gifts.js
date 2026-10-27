@@ -21,7 +21,10 @@ const RESERVED = ['christmas', 'new'];
 
 const thisYear = () => String(new Date().getFullYear());
 
-/** { people: [{ id, name, info }], christmasYears: ['2025', …] } (plus anything else in the file, kept as it is). */
+/**
+ * { people: [{ id, name, info }], christmasYears: ['2025', …], guides: [{ id, year, title, info }] } (plus anything else
+ * in the file, kept as it is). A guide is a Christmas year's buying guide (see GUIDE_* below).
+ */
 export async function loadData(track = true) {
     const text = track ? await readTracked(GIFTS_PATH) : await fs.readText(GIFTS_PATH);
     const data = text === null ? {} : JSON.parse(text);
@@ -29,6 +32,7 @@ export async function loadData(track = true) {
         ...data,
         people: Array.isArray(data.people) ? data.people : [],
         christmasYears: Array.isArray(data.christmasYears) ? data.christmasYears.map(String) : [thisYear()],
+        guides: Array.isArray(data.guides) ? data.guides : [],
     };
 }
 
@@ -184,3 +188,64 @@ export const saveChristmas = (year, rows) => writeRows(christmasPath(year), CHRI
 const same = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
 export const isFor = name => r => same(r.Person, name);
 export const forOccasion = (rows, label, year) => rows.filter(r => same(r.Occasion, label) && String(r.Year).trim() === String(year));
+
+// ── Buying guides ──────────────────────────────────────────────────────
+// A Christmas year can have buying guides (e.g. tablets for the kids): a summary box, the options compared, and a
+// price watch that says whether a price you've seen is worth buying at. Each guide's tables are two CSVs.
+
+// The summary fields a new guide starts with.
+export const GUIDE_FIELDS = ['For', 'Pick', 'Where to watch', 'Notes'];
+
+/** A new guide for Christmas `year` with a unique id made from its title. */
+export function newGuide(guides, year, title) {
+    const base = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guide'}-${year}`;
+    let id = base;
+    for (let n = 2; guides.some(g => g.id === id); n++) id = `${base}-${n}`;
+    return { id, year: String(year), title, info: GUIDE_FIELDS.map(label => ({ label, value: '' })) };
+}
+
+export const OPTION_COLUMNS = [
+    { name: 'Item', kind: 'suggest' },
+    { name: 'Details', kind: 'text' },
+    { name: 'Typical Price', kind: 'suggest' }, // a range like $110-$150, so not a number
+    { name: 'Pros', kind: 'text' },
+    { name: 'Cons', kind: 'text' },
+    { name: 'Link', kind: 'link' },
+];
+
+/** Price watch → Deal: a price seen at or under Buy Now At, Great Deal or Good Deal; Wait when it's above them all. */
+export function dealFor(r) {
+    const n = v => priceOf(v) || null;
+    const seen = n(r['Price Seen']);
+    if (!seen) return '';
+    if (n(r['Buy Now At']) && seen <= n(r['Buy Now At'])) return 'Buy now';
+    if (n(r['Great Deal']) && seen <= n(r['Great Deal'])) return 'Great deal';
+    if (n(r['Good Deal']) && seen <= n(r['Good Deal'])) return 'Good deal';
+    return 'Wait';
+}
+
+const DEAL_CLASS = { 'Buy now': 'deal-buy', 'Great deal': 'deal-great', 'Good deal': 'deal-good', Wait: 'deal-wait' };
+
+/** The price watch's columns (Deal next to Item, so it's in view on a narrow screen); `items` are offered in Item. */
+export const priceColumns = items => [
+    { name: 'Item', kind: 'suggest', suggestions: items },
+    { name: 'Deal', calc: dealFor, badge: v => DEAL_CLASS[v] || '' },
+    { name: 'Price Seen', kind: 'money', total: false },
+    { name: 'Where Seen', kind: 'suggest', suggestions: ['Amazon', 'Walmart', 'Best Buy', 'Target', 'Costco'] },
+    { name: 'Date Seen', kind: 'date' },
+    { name: 'Buy Now At', kind: 'money', total: false },
+    { name: 'Great Deal', kind: 'money', total: false },
+    { name: 'Good Deal', kind: 'money', total: false },
+    { name: 'Expected Sale', kind: 'suggest' }, // e.g. the Black Friday range
+];
+
+const OPTION_NAMES = OPTION_COLUMNS.map(c => c.name);
+const PRICE_NAMES = priceColumns([]).filter(c => !c.calc).map(c => c.name);
+
+export const optionsPath = g => `${GIFTS_DIR}/guide-${g.id}-options.csv`;
+export const pricesPath = g => `${GIFTS_DIR}/guide-${g.id}-prices.csv`;
+
+export const loadOptions = g => readRows(optionsPath(g), OPTION_NAMES, true);
+export const saveOptions = (g, rows) => writeRows(optionsPath(g), OPTION_NAMES, rows);
+export const loadPrices = g => readRows(pricesPath(g), PRICE_NAMES, true);
+export const savePrices = (g, rows) => writeRows(pricesPath(g), PRICE_NAMES, rows);

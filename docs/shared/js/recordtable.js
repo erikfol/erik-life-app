@@ -125,7 +125,7 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             columns: cols.map(column),
             rows: state.rows,
             empty: state.rows.length ? 'No entries match the filters' : 'No entries yet. Press Edit to add one.',
-            footer: cols.some(c => c.kind === 'money') ? totalRow : undefined,
+            footer: cols.some(c => c.kind === 'money' && c.total !== false) ? totalRow : undefined,
             onChange: visible => { state.shown = visible; },
         });
     };

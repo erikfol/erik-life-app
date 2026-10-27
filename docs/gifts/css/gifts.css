@@ -22,6 +22,14 @@ h1.page + .pillnav { margin-top: 10px; }
 .by-person td.text { white-space: normal; min-width: 170px; }
 .by-person tr.missing td { color: var(--muted); }
 
+/* Christmas → a buying guide: its summary, Options and Price watch; Deal's badge */
+.guide-h { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 22px 0 10px; }
+.guide-files { font-size: 0.85em; margin-top: 12px; }
+.cat-badge.deal-buy { background: var(--green); color: #fff; }
+.cat-badge.deal-great { background: #e8f8ef; color: #1e7a46; }
+.cat-badge.deal-good { background: var(--head); color: var(--blue-text); }
+.cat-badge.deal-wait { background: #f0f0f0; color: #888; }
+
 @media (max-width: 640px) {
     /* Christmas's Total / Bought / Still to buy side by side instead of a screenful */
     .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

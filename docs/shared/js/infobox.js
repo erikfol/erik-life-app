@@ -23,12 +23,13 @@ const LONG = /notes|summary/i;
 
 /**
  * Draw the box into `el`.
- *   info: [{ label, value }]; name: also edit this name (shown in the menu), or null; noun: 'vehicle', 'house', 'pet'
+ *   info: [{ label, value }]; name: also edit this name (shown in the menu), or null; nameLabel: what that box is called;
+ *   noun: 'vehicle', 'house', 'pet'
  *   save(info, name) writes it (throws to refuse); remove(): adds a "Remove this <noun>" button while editing
  *   extra(field): html to show after a field (e.g. a worked-out Age); mono: field labels shown in a fixed-width font
  * Returns { hasUnsavedEdits() }.
  */
-export function infoBox(el, { info, name = null, noun = 'item', save, remove = null, extra = () => '', mono = null }) {
+export function infoBox(el, { info, name = null, nameLabel = 'Name (shown in the menu)', noun = 'item', save, remove = null, extra = () => '', mono = null }) {
     let draft = null; // { json at start, read() } while editing
 
     const show = () => {
@@ -45,7 +46,7 @@ export function infoBox(el, { info, name = null, noun = 'item', save, remove = n
     const edit = () => {
         el.innerHTML = `
             <div class="row table-tools"><span class="muted edit-hint">Editing — nothing is written until you press Save. ↑ ↓ move a field.</span></div>
-            ${name === null ? '' : `<label class="field info-name">Name (shown in the menu)<input type="text" data-name value="${esc(name)}"></label>`}
+            ${name === null ? '' : `<label class="field info-name">${esc(nameLabel)}<input type="text" data-name value="${esc(name)}"></label>`}
             <div class="table-wrap"><table class="info-edit">
                 <thead><tr><th></th><th>Field</th><th>Value</th><th></th></tr></thead>
                 <tbody></tbody>
