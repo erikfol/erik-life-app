@@ -54,12 +54,13 @@ body {
 #nav a:hover { color: #fff; background: rgba(255,255,255,0.08); }
 #nav a.active { color: #fff; background: rgba(255,255,255,0.16); }
 /* Menu colours (shared/js/navcolors.js): red / yellow while that page has a red / yellow banner */
-#nav a.bad { color: #ffd5d0; background: rgba(231,76,60,0.2); }
-#nav a.bad:hover { background: rgba(231,76,60,0.3); }
-#nav a.bad.active { color: #fff; background: rgba(231,76,60,0.42); }
-#nav a.warn { color: #ffe8a3; background: rgba(245,197,24,0.18); }
-#nav a.warn:hover { background: rgba(245,197,24,0.28); }
-#nav a.warn.active { color: #fff; background: rgba(245,197,24,0.4); }
+#nav a.bad { color: #ffd5d0; background: rgba(231,76,60,0.25); }
+#nav a.bad:hover { background: rgba(231,76,60,0.35); }
+#nav a.warn { color: #ffdf6b; background: rgba(245,197,24,0.22); }
+#nav a.warn:hover { background: rgba(245,197,24,0.32); }
+/* the page you're on: solid, so the colour still shows (see-through yellow on navy looked olive) */
+#nav a.bad.active { color: #fff; background: #d63a2c; }
+#nav a.warn.active { color: #2b2200; background: #f5c518; }
 .status { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .pill {
     font-size: 0.78em;
