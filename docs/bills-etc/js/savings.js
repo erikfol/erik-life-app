@@ -6,8 +6,10 @@
 //   summary rows: Available In Account, Total deductions, Total oh sh!t money, Before changes…, Diff
 //   a transfer log: Transfer | Amount | Date | Confirmed | Description
 // Records are read with the CSV reader and written back field by field, so untouched parts stay byte-for-byte.
+// Each "Available In Account" saved with Update balances is also kept in available_history.csv (Date, Available) for
+// the page's graph.
 import * as fs from './fs.js';
-import { parseRecords } from './csv.js';
+import { parseRecords, parseCSV, toCSV } from './csv.js';
 import { parseBillDate, parseMoney } from './sheet.js';
 
 export const SAVINGS_PATH = 'inputs/savings/master_savings.csv';
@@ -155,3 +157,27 @@ export async function changeSavings(fn) {
 export const bucketCells = b => [b.name, sheetDollars(b.balance), b.updated ? longDate(b.updated) : '', Number.isFinite(b.perCheck) ? sheetDollars(b.perCheck) : ' n/a ', b.notes || ''];
 /** Cells for a transfer row. */
 export const transferCells = t => [t.kind, (t.approx ? '~' : '') + sheetDollars(t.amount).replace(/^ /, t.approx ? '' : ' '), t.date ? shortDate(t.date) : '', t.confirmed ? 'Yes' : 'No', t.description || ''];
+
+// ── "Available In Account" over time ─────────────────────────────────────────
+export const AVAILABLE_HISTORY_PATH = 'inputs/savings/available_history.csv';
+const AVAILABLE_COLUMNS = ['Date', 'Available'];
+
+/** The readings, oldest first: [{ Date: 'YYYY-MM-DD', Available: '11754.41' }] ([] before the first). */
+export async function loadAvailableHistory() {
+    const text = await fs.readText(AVAILABLE_HISTORY_PATH);
+    if (text == null) return [];
+    return parseCSV(text).rows.map(r => ({ Date: String(r.Date ?? '').trim(), Available: String(r.Available ?? '').trim() }))
+        .filter(r => r.Date || r.Available).sort((a, b) => a.Date.localeCompare(b.Date));
+}
+
+export async function saveAvailableHistory(rows) {
+    await fs.writeText(AVAILABLE_HISTORY_PATH, toCSV(AVAILABLE_COLUMNS, [...rows].sort((a, b) => a.Date.localeCompare(b.Date))));
+}
+
+/** Add a reading for `date`; one a day, so a second update the same day replaces the first. */
+export async function recordAvailable(date, value) {
+    const pad = n => String(n).padStart(2, '0');
+    const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const rows = (await loadAvailableHistory()).filter(r => r.Date !== day);
+    await saveAvailableHistory([...rows, { Date: day, Available: value.toFixed(2) }]);
+}

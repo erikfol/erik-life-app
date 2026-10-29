@@ -2,11 +2,13 @@
 // bucket, the "oh sh!t money" left over, what each paycheck adds, and the log of money moved out of savings.
 import {
     loadSavings, changeSavings, saveSeparate, bucketCells, transferCells, sheetDollars, longDate, SAVINGS_PATH,
+    loadAvailableHistory, saveAvailableHistory, recordAvailable, AVAILABLE_HISTORY_PATH,
 } from '../savings.js';
 import { PATHS, readTable } from '../data.js';
 import { normalizeMaster, monthlyBreakdown } from '../finance.js';
 import { yearMonth } from '../dates.js';
-import { drawBars } from '../charts.js';
+import { drawBars, drawLines } from '../charts.js';
+import { recordTable } from '../../../shared/js/recordtable.js';
 import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
 import { depositsDue, BALANCES_STALE_DAYS, PAYCHECK_EVERY } from '../alerts.js'; // shared with Setup and the Home page
@@ -47,7 +49,7 @@ export default {
             el.innerHTML = `<h1 class="page">Savings</h1><div class="banner">No savings sheet found. This page reads <code>${esc(SAVINGS_PATH)}</code> in your erik-life-app folder.</div>`;
             return;
         }
-        const spending = await averageSpending();
+        const [spending, history] = await Promise.all([averageSpending(), loadAvailableHistory()]);
         const { available, buckets, transfers, totals, separate } = data;
         const live = buckets.filter(b => b.group !== 'past');
         const counted = live.filter(b => !separate.has(b.name) && Number.isFinite(b.balance));
@@ -69,6 +71,14 @@ export default {
             <div id="status"></div>
             <form id="upd-form" class="add-bill" hidden style="margin-bottom:18px"></form>
             <div class="cards kpis sav-cards" id="cards"></div>
+            <section>
+                <h2>Available in account <span class="sub">a point each time you save Update balances with a new amount</span></h2>
+                <canvas id="c-available" style="display:block;width:100%;height:220px"></canvas>
+                <p class="muted" id="avail-empty" hidden>No readings yet. The next time you save Update balances with a new Available in account, it starts here.</p>
+                <details class="avail-history"><summary class="muted">All readings (${history.length})</summary>
+                    <p class="muted" style="font-size:0.85em;margin:6px 0">Kept in <code>${esc(AVAILABLE_HISTORY_PATH)}</code>. Edit to fix or remove one.</p>
+                    <div id="avail-table"></div></details>
+            </section>
             <section>
                 <h2>Insights</h2>
                 <ul class="insight-list" id="insights"></ul>
@@ -108,9 +118,11 @@ export default {
                 </form>
             </section>`;
         const $ = s => el.querySelector(s);
-        const save = async (fn, msg) => {
+        // after: something to save once the sheet is saved (e.g. the Available in account reading for the graph)
+        const save = async (fn, msg, after = null) => {
             try {
                 await changeSavings(fn);
+                if (after) await after();
                 editing = null;
                 toast(msg, 'ok');
                 const y = scrollY;
@@ -174,6 +186,35 @@ export default {
             card('Saved each paycheck', money(perCheck), `<span class="muted">every other week · about ${esc(money(perCheck * PAYCHECKS))} a year</span>`),
             heldApart.length ? card('Held separately', money(sum(heldApart.map(b => b.balance))), `<span class="muted">${heldApart.map(b => esc(b.name)).join(', ')}: not in the account total</span>`) : '',
         ].join('');
+
+        // ── Available in account over time: one point per reading (Update balances), oldest → newest ──
+        let readings = history;
+        const shortDay = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }).replace(/, (\d\d)$/, " '$1");
+        const drawA = () => {
+            const pts = readings.map(r => ({ date: dateOf(r.Date), value: numOf(r.Available) })).filter(p => p.date && Number.isFinite(p.value));
+            $('#c-available').hidden = !pts.length;
+            $('#avail-empty').hidden = !!pts.length;
+            if (!pts.length) return;
+            drawLines($('#c-available'), {
+                labels: pts.map(p => shortDay(p.date)),
+                series: [{ name: 'Available in account', values: pts.map(p => p.value), color: '#2b6cb0', width: 2.5, dots: true }],
+                fit: true, fmt: v => `$${Math.round(v).toLocaleString('en-US')}`, tipFmt: money,
+                tipHead: i => dLong(pts[i].date),
+            });
+        };
+        // The readings, editable (to fix or remove one), oldest first.
+        const drawReadings = () => recordTable($('#avail-table'), {
+            columns: [{ name: 'Date', kind: 'date' }, { name: 'Available', kind: 'money', total: false }],
+            rows: readings,
+            save: async rows => {
+                await saveAvailableHistory(rows);
+                readings = [...rows].sort((a, b) => a.Date.localeCompare(b.Date));
+                $('.avail-history summary').textContent = `All readings (${readings.length})`;
+                drawA();
+                setTimeout(drawReadings); // in date order again, once the table has finished saving
+            },
+        });
+        drawReadings();
 
         // ── Insights ──
         const tips = [];
@@ -316,7 +357,8 @@ export default {
             await save(R => {
                 if (availChanged) { R[available.rec][1] = sheetDollars(avail); R[available.rec][2] = longDate(now); }
                 for (const x of edits) { R[x.rec][1] = Number.isFinite(x.value) ? sheetDollars(x.value) : ' n/a '; R[x.rec][2] = longDate(now); }
-            }, `Updated ${edits.length + (availChanged ? 1 : 0)} balance${edits.length + (availChanged ? 1 : 0) === 1 ? '' : 's'}`);
+            }, `Updated ${edits.length + (availChanged ? 1 : 0)} balance${edits.length + (availChanged ? 1 : 0) === 1 ? '' : 's'}`,
+            availChanged ? () => recordAvailable(now, avail) : null); // a new point on the Available in account graph
         };
 
         // ── Edit buckets: name, balance, per paycheck, date, notes, held separately; add or remove buckets ──
@@ -446,8 +488,9 @@ export default {
             }
         });
 
-        setResize(drawT);
-        requestAnimationFrame(drawT);
+        const drawCharts = () => { drawA(); drawT(); };
+        setResize(drawCharts);
+        requestAnimationFrame(drawCharts);
     },
 
     canLeave(unloading) {

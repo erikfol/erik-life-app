@@ -28,7 +28,7 @@ const niceMax = v => niceStep(v / 4) * 4;
 
 const kFmt = v => '$' + (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : v.toFixed(0));
 
-function yGrid(ctx, pad, chartW, chartH, maxVal) {
+function yGrid(ctx, pad, chartW, chartH, maxVal, minVal = 0, fmt = kFmt) {
     ctx.font = `11px ${FONT}`;
     for (let i = 0; i <= 4; i++) {
         const y = pad.top + chartH * (1 - i / 4);
@@ -37,7 +37,7 @@ function yGrid(ctx, pad, chartW, chartH, maxVal) {
         ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + chartW, y); ctx.stroke();
         ctx.fillStyle = '#aaa';
         ctx.textAlign = 'right';
-        ctx.fillText(kFmt(maxVal * i / 4), pad.left - 6, y + 4);
+        ctx.fillText(fmt(minVal + (maxVal - minVal) * i / 4), pad.left - 6, y + 4);
     }
 }
 
@@ -276,7 +276,11 @@ function bindTip(canvas) {
  * markIndex draws a dashed "Today" line at that label. Hover shows every series' value at the nearest label
  * (tipFmt(value), tipHead(i) → title).
  */
-export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today' }) {
+/**
+ * Lines over shared labels. fit: the y axis spans the values (at least 10% of the largest, so small changes stay small)
+ * instead of starting at 0, labelled with fmt.
+ */
+export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false }) {
     const s = setup(canvas);
     const n = labels.length;
     canvas._tip = null;
@@ -285,16 +289,25 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     const pad = { top: 18, right: 16, bottom: 30, left: 64 };
     const chartW = W - pad.left - pad.right, chartH = H - pad.top - pad.bottom;
     const all = series.flatMap(x => x.values.filter(Number.isFinite));
-    const maxVal = niceMax(Math.max(1, ...all) * 1.05);
-    yGrid(ctx, pad, chartW, chartH, maxVal);
+    let minVal = 0, maxVal = niceMax(Math.max(1, ...all) * 1.05);
+    if (fit && all.length) {
+        const lo = Math.min(...all), hi = Math.max(...all), span = Math.max(hi - lo, Math.abs(hi) * 0.1, 1);
+        const raw = span * 1.4 / 4, mag = 10 ** Math.floor(Math.log10(raw));
+        const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(x => x >= raw);
+        minVal = Math.max(0, Math.floor(((lo + hi) / 2 - 2 * step) / step) * step);
+        maxVal = minVal + 4 * step;
+        while (maxVal < hi) { minVal += step; maxVal += step; }
+    }
+    yGrid(ctx, pad, chartW, chartH, maxVal, minVal, fit ? fmt : kFmt);
     const xOf = i => pad.left + (n === 1 ? chartW / 2 : i * chartW / (n - 1));
-    const yOf = v => pad.top + chartH - (Math.max(0, v) / maxVal) * chartH;
+    const yOf = v => pad.top + chartH - ((Math.max(minVal, v) - minVal) / (maxVal - minVal)) * chartH;
 
     ctx.font = `11px ${FONT}`;
     ctx.fillStyle = '#888';
     ctx.textAlign = 'center';
     const every = Math.ceil(n / Math.max(1, Math.floor(chartW / 64)));
-    labels.forEach((l, i) => { if (i % every === 0 || i === n - 1) ctx.fillText(l, xOf(i), pad.top + chartH + 18); });
+    // (a label that would run off the right edge is moved in just enough to fit)
+    labels.forEach((l, i) => { if (i % every === 0 || i === n - 1) ctx.fillText(l, Math.min(xOf(i), W - 2 - ctx.measureText(l).width / 2), pad.top + chartH + 18); });
 
     if (markIndex >= 0 && markIndex < n) {
         ctx.save();
@@ -320,6 +333,11 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
             on = true;
         });
         ctx.stroke();
+        if (ser.dots) { // a dot on each value (e.g. readings taken now and then)
+            ctx.setLineDash([]);
+            ctx.fillStyle = ser.color;
+            ser.values.forEach((v, i) => { if (Number.isFinite(v)) { ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3.5, 0, 2 * Math.PI); ctx.fill(); } });
+        }
         ctx.restore();
     }
 
