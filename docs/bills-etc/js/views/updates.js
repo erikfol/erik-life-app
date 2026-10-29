@@ -10,7 +10,7 @@ import { loadAccounts, loadPayments, loadActivity, ledger, updateAccount } from 
 import { esc, money, sum, toast } from '../util.js';
 import { dLong, addMonths, today } from './utilcommon.js';
 import { depositsDue, BALANCES_STALE_DAYS } from './savings.js';
-import { amountDue, staleCards, VERY_STALE_DAYS } from './loans.js';
+import { amountDue, staleCards, notPaidBack, VERY_STALE_DAYS } from './loans.js';
 import { portalLink as electricPortal, electricDetailsOn } from './utilities.js';
 import { portalLink as waterPortal } from './water.js';
 import { portalLink as taxPortal, taxDetailsOn } from './taxes.js';
@@ -116,6 +116,11 @@ async function cardItems(t0) {
     for (const x of staleCards(all, t0)) {
         out.push({ level: x.days >= VERY_STALE_DAYS ? 'stale' : 'aging', where, href, checkId: x.account.id,
             text: `<strong>${esc(x.account.title)}: activity not updated</strong> · ${x.lastEntry ? `last entry ${esc(dLong(x.lastEntry))}` : 'no activity yet'}${x.checked ? `, checked ${esc(dLong(x.checked))}` : ''}${Number.isFinite(x.days) ? ` (${days(x.days)})` : ''}` });
+    }
+    // Activity not paid back yet (red, as Home Heating's)
+    for (const { account, a } of notPaidBack(all)) {
+        out.push({ level: 'stale', where, href,
+            text: `<strong>${esc(account.title)}: not paid back yet</strong> · ${a.date ? esc(dLong(a.date)) : 'no date'} ${esc(a.description || a.type)} ${esc(money(a.amount))}${a.paidBack === 'Not yet' ? '' : ` (${esc(a.paidBack)})`}` });
     }
     return out;
 }

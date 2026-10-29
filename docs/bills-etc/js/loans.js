@@ -2,7 +2,8 @@
 // ({id, title, description, type, url, openingBalance, openingDate, file, activityFile}). Each account has two CSVs
 // next to it so they open in Excel too:
 //   payments  <id>.csv           Date, Min Payment, Payment, Before, After, Payment Made, Notes
-//   activity  <id>-activity.csv  Date, Description, Type, Amount, Notes   (charges, interest, fees, credits)
+//   activity  <id>-activity.csv  Date, Description, Type, Amount, Paid Back?, Notes   (charges, interest, fees, credits;
+//             Paid Back? is only on credit cards: Not yet / Yes / NA, like Home Heating's Paid CC Back?)
 // The balance is a running ledger: opening balance + activity − payments made, in date order. Before / After are
 // worked out from it (and written to the payments CSV so Excel shows them too).
 // Loans (type 'Loan') also keep their terms (original amount, first payment, term, rate, monthly payment, escrow,
@@ -15,11 +16,25 @@ import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
 export const LOANS_DIR = 'inputs/loans_cc';
 const INDEX = `${LOANS_DIR}/accounts.json`;
 export const PAYMENT_COLS = ['Date', 'Min Payment', 'Payment', 'Before', 'After', 'Payment Made', 'Notes'];
-export const ACTIVITY_COLS = ['Date', 'Description', 'Type', 'Amount', 'Notes'];
+export const ACTIVITY_COLS = ['Date', 'Description', 'Type', 'Amount', 'Paid Back?', 'Notes'];
+const LOAN_ACTIVITY_COLS = ACTIVITY_COLS.filter(c => c !== 'Paid Back?');
 export const LOAN_PAYMENT_COLS = ['Date', 'Payment', 'Interest', 'Escrow', 'Principal', 'Before', 'After', 'Payment Made', 'Notes'];
 export const ACCOUNT_TYPES = ['Loan', 'Credit card', 'Other'];
 export const LOAN_KINDS = ['Mortgage', 'Auto', 'Personal', 'Student', 'Timeshare', 'Solar / energy', 'Home equity', 'Other'];
 export const isLoan = a => a?.type === 'Loan';
+export const isCard = a => a?.type === 'Credit card';
+/** "Paid back?" choices on credit card activity. A blank (entries from before the column) is left alone. */
+export const PAID_BACK = ['Not yet', 'Yes', 'NA'];
+/** 'y' / 'yes' → 'Yes', 'n/a' → 'NA', 'no' / 'not yet' → 'Not yet'; anything else as typed. */
+export function cleanPaidBack(v) {
+    const s = String(v ?? '').trim();
+    if (/^y(es)?$/i.test(s)) return 'Yes';
+    if (/^n\/?a$/i.test(s)) return 'NA';
+    if (/^(n|no|not ?yet)$/i.test(s)) return 'Not yet';
+    return s;
+}
+/** Still to pay back: anything filled in other than Yes or NA. */
+export const owesBack = a => !!a.paidBack && a.paidBack !== 'Yes' && a.paidBack !== 'NA';
 // Loan details kept in accounts.json (numbers > 0, or null).
 const LOAN_NUMBERS = ['originalAmount', 'termMonths', 'payment', 'escrow', 'dueDay'];
 /** Activity types; `sign` is how each one moves the balance. */
@@ -82,7 +97,7 @@ export async function addAccount({ title, description, type, url, openingBalance
     };
     if (loan) Object.assign(account, cleanLoan(loan));
     if ((await fs.readText(account.file)) == null) await fs.writeText(account.file, toCSV(isLoan(account) ? LOAN_PAYMENT_COLS : PAYMENT_COLS, []));
-    if ((await fs.readText(account.activityFile)) == null) await fs.writeText(account.activityFile, toCSV(ACTIVITY_COLS, []));
+    if ((await fs.readText(account.activityFile)) == null) await fs.writeText(account.activityFile, toCSV(isCard(account) ? ACTIVITY_COLS : LOAN_ACTIVITY_COLS, []));
     accounts.push(account);
     await saveAccounts(accounts);
     return account;
@@ -152,13 +167,14 @@ export async function loadPayments(account) {
     })).sort(byDate);
 }
 
-/** Activity, oldest first: {date, description, type, amount, notes}. */
+/** Activity, oldest first: {date, description, type, amount, paidBack, notes}. */
 export async function loadActivity(account) {
     return (await readRows(account.activityFile)).map(get => ({
         date: parseBillDate(get('Date')),
         description: String(get('Description')).trim(),
         type: String(get('Type')).trim() || 'Charge',
         amount: parseMoney(get('Amount')),
+        paidBack: cleanPaidBack(get('Paid Back?') || get('Paid Back')),
         notes: String(get('Notes')).trim(),
     })).sort(byDate);
 }
@@ -252,16 +268,32 @@ export async function savePayments(account, payments) {
     await fs.writeText(account.file, toCSV(PAYMENT_COLS, rows));
 }
 
-/** Write an account's whole activity table, oldest first. */
+/** Write an account's whole activity table, oldest first. Paid Back? is written for cards (and kept if a loan has one). */
 export async function saveActivity(account, activity) {
     const rows = [...activity].sort(byDate).map(a => ({
         Date: a.date ? sheetDate(a.date, false) : '',
         Description: String(a.description || '').replace(/[\r\n]+/g, ' ').trim(),
         Type: a.type || 'Charge',
         Amount: moneyCell(a.amount),
+        'Paid Back?': cleanPaidBack(a.paidBack),
         Notes: String(a.notes || '').replace(/[\r\n]+/g, ' ').trim(),
     }));
-    await fs.writeText(account.activityFile, toCSV(ACTIVITY_COLS, rows));
+    const paidCol = isCard(account) || rows.some(r => r['Paid Back?']);
+    await fs.writeText(account.activityFile, toCSV(paidCol ? ACTIVITY_COLS : LOAN_ACTIVITY_COLS, rows));
+}
+
+/**
+ * Set "Paid back?" on one activity entry to `value`. The entry is found again in the file by its date, type, amount,
+ * description, notes and current Paid back?. Only the activity file is written.
+ */
+export async function setActivityPaidBack(account, entry, value) {
+    const activity = await loadActivity(account);
+    const same = a => (a.date?.getTime() ?? null) === (entry.date?.getTime() ?? null) && a.type === entry.type
+        && Object.is(a.amount, entry.amount) && a.description === entry.description && a.notes === entry.notes;
+    const a = activity.find(x => same(x) && x.paidBack === entry.paidBack) || activity.find(same);
+    if (!a) throw new Error(`That entry is no longer in ${account.activityFile}`);
+    a.paidBack = value;
+    await saveActivity(account, activity);
 }
 
 /**

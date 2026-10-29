@@ -3,6 +3,7 @@ import {
     loadAccounts, addAccount, updateAccount, removeAccount, moveAccount, loadPayments, loadActivity, ledger, saveLedger, estimatePayoff,
     interestModel, simulate, paymentFor, minimumOf, nextPaymentDate, plusMonths,
     ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate,
+    isCard, PAID_BACK, owesBack, setActivityPaidBack,
 } from '../loans.js';
 import { drawBars, drawLines } from '../charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
@@ -40,6 +41,12 @@ const statusBadge = p => {
     const st = statusOf(p);
     return `<span class="badge ${st === 'Made' ? 'badge-ok' : st === 'Planned' ? 'badge-plan' : 'badge-over'}">${st}</span>`;
 };
+/** Card activity's "Paid back?": Yes green, NA grey, Not yet (or anything else typed) red; blank shows nothing. */
+const paidBackBadge = v => (!v ? '' : `<span class="badge ${v === 'Yes' ? 'badge-ok' : v === 'NA' ? 'badge-neutral' : 'badge-over'}">${esc(v)}</span>`);
+/** What a new entry starts as: a charge isn't paid back yet; interest, fees and credits are NA. */
+const paidBackFor = type => (type === 'Charge' ? 'Not yet' : 'NA');
+/** Card activity still to pay back, as {account, a}. Setup's "Things to update" lists the same. */
+export const notPaidBack = all => all.flatMap(({ account, rawActivity }) => rawActivity.filter(owesBack).map(a => ({ account, a })));
 const MON_LONG = d => `${MON[d.getMonth()]} ${d.getFullYear()}`;
 /** 38 → '3 years 2 months' */
 const duration = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} year${y === 1 ? '' : 's'}` : '', r ? `${r} month${r === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ') || '0 months'; };
@@ -257,6 +264,26 @@ export default {
             + (soon.length ? `<div class="banner"><strong>Coming up:</strong> ${soon.map(item).join(' · ')}</div>` : '')
             + (!late.length && !soon.length && all.some(x => x.payments.length) ? '<div class="banner ok">✓ <strong>No payments due.</strong> Nothing is past due or due in the next two weeks.</div>' : '')
             + (tab.id === 'cards' ? staleActivityBanners(all, t0) : '');
+        // ── Activity not paid back yet (like Home Heating's), each with Mark paid back ──
+        const unpaid = notPaidBack(all);
+        if (unpaid.length) $('#due').insertAdjacentHTML('beforeend', `<div class="banner bad unpaid-list"><strong>Not paid back yet${unpaid.length > 1 ? ` (${esc(money(sum(unpaid.map(x => x.a.amount).filter(Number.isFinite))))})` : ''}:</strong>
+            ${unpaid.map(({ account, a }, k) => `<span class="nowrap">${esc(account.title)}: ${a.date ? esc(dLong(a.date)) : 'no date'} ${esc(a.description || a.type)} (${esc(money(a.amount))}${a.paidBack === 'Not yet' ? '' : `, ${esc(a.paidBack)}`})
+                <button type="button" class="small primary" data-unpaid="${k}">Mark paid back</button></span>`).join(' ')}</div>`);
+        el.querySelectorAll('[data-unpaid]').forEach(b => b.onclick = async () => {
+            const { account, a } = unpaid[+b.dataset.unpaid];
+            if (editing.size && !confirm('You have unsaved edits on a loan or card. Mark this paid back and lose them?')) return;
+            b.disabled = true;
+            try {
+                await setActivityPaidBack(account, a, 'Yes');
+                toast(`${account.title}: ${a.description || a.type} marked paid back`, 'ok');
+                const y = scrollY;
+                await this.render(el);
+                scrollTo(0, y);
+            } catch (err) {
+                b.disabled = false;
+                toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+            }
+        });
         el.querySelectorAll('[data-activity-checked]').forEach(b => b.onclick = async () => {
             const account = accounts.find(a => a.id === b.dataset.activityChecked);
             b.disabled = true;
@@ -440,6 +467,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
     const used = limit > 0 ? Math.max(0, L.balanceNow) / limit : NaN;
     const notCard = account.type !== 'Credit card';
     const loan = isLoan(account), T = loan ? loanTerms(account) : null;
+    // Cards have a "Paid back?" column on their activity (kept on a loan only if one was filled in).
+    const showPaid = isCard(account) || rawActivity.some(a => a.paidBack);
     // A loan's progress counts from the original amount when you entered it, else from the opening balance.
     const startAmount = loan && Number.isFinite(T.original) ? T.original : L.opening;
     const paidOff = Number.isFinite(startAmount) && startAmount > 0 ? (startAmount - L.balanceNow) / startAmount : NaN;
@@ -565,6 +594,10 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                             <label class="field" style="grid-column:span 2">Description<input type="text" name="description" placeholder="e.g. Hotel stay, monthly interest"></label>
                             <label class="field">Notes<input type="text" name="notes" placeholder="optional"></label>
                         </div>
+                        ${showPaid ? `<div class="add-grid">
+                            <label class="field">Paid back?<select name="paidBack">${PAID_BACK.map(v => `<option>${v}</option>`).join('')}</select></label>
+                            <span></span><span></span>
+                        </div>` : ''}
                         <div class="row"><button type="submit" class="primary">Save activity</button><button type="button" data-act-cancel>Cancel</button></div>
                     </form>
                 </div>
@@ -629,11 +662,30 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
             { id: 'amount', label: 'Amount', num: true, value: a => a.signed, text: v => (v < 0 ? '−' : '+') + money(Math.abs(v)),
                 tdClass: a => `nowrap ${a.signed < 0 ? 'income-amt' : 'expense-amt'}` },
             moneyCol('balance', 'Balance', a => a.balance),
+            ...(showPaid ? [{ id: 'paid', label: 'Paid back?', value: a => a.paidBack, tdClass: () => 'nowrap',
+                cell: a => `${paidBackBadge(a.paidBack)}${owesBack(a) ? ` <button type="button" class="small primary" data-paid-back="${activity.indexOf(a)}">Mark paid</button>` : ''}` }] : []),
             { id: 'notes', label: 'Notes', value: a => a.notes, tdClass: () => 'note-text' },
         ],
         rows: activity,
         sort: { col: 'date', dir: 'desc' },
         empty: 'No activity yet',
+    });
+    // Mark paid: sets that entry's Paid back? to Yes (Edit can change it back).
+    $('.t-act').addEventListener('click', async e => {
+        const b = e.target.closest('[data-paid-back]');
+        if (!b) return;
+        const a = activity[+b.dataset.paidBack];
+        b.disabled = true;
+        try {
+            await setActivityPaidBack(account, a, 'Yes');
+            toast(`${account.title}: ${a.description || a.type} marked paid back`, 'ok');
+            const y = scrollY;
+            await rerender();
+            scrollTo(0, y);
+        } catch (err) {
+            b.disabled = false;
+            toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+        }
     });
 
     // ── Chart: the balance after each event ──
@@ -712,9 +764,15 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
 
     // ── Add activity ──
     const af = $('.act-form');
+    // Paid back? follows the type (Charge → Not yet, else NA) until you pick it yourself.
+    if (af.paidBack) {
+        af.type.addEventListener('change', () => { if (!af.paidBack.dataset.picked) af.paidBack.value = paidBackFor(af.type.value); });
+        af.paidBack.addEventListener('change', () => { af.paidBack.dataset.picked = '1'; });
+    }
     $('[data-act-open]').onclick = () => {
         af.reset();
         af.date.value = isoDate(new Date());
+        if (af.paidBack) { af.paidBack.value = paidBackFor(af.type.value); delete af.paidBack.dataset.picked; }
         af.hidden = false;
         $('[data-act-open]').hidden = true;
         af.amount.focus();
@@ -726,7 +784,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         if (!date || !Number.isFinite(amount)) { toast('Enter the date and the amount', 'bad'); return; }
         if (rawActivity.some(a => sameDay(a.date, date) && sameAmount(a.amount, Math.abs(amount)))) { toast(dupText(date, Math.abs(amount), 'activity on'), 'bad'); return; }
         try {
-            await save(strip(rawPayments), [...strip(rawActivity), { date, type: af.type.value, amount: Math.abs(amount), description: af.description.value, notes: af.notes.value }]);
+            await save(strip(rawPayments), [...strip(rawActivity), { date, type: af.type.value, amount: Math.abs(amount), description: af.description.value,
+                paidBack: af.paidBack ? af.paidBack.value : '', notes: af.notes.value }]);
             toast(`Added ${af.type.value.toLowerCase()} of ${money(Math.abs(amount))} to ${account.title}`, 'ok');
         } catch (err) {
             toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
@@ -796,6 +855,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         <td><input type="text" data-k="description" value="${esc(a.description || '')}"></td>
         <td><select data-k="type">${ACTIVITY_TYPES.map(t => `<option${t.type === a.type ? ' selected' : ''}>${t.type}</option>`).join('')}</select></td>
         <td><input type="number" step="0.01" min="0" data-k="amount" value="${Number.isFinite(a.amount) ? a.amount : ''}"></td>
+        ${showPaid ? `<td><select data-k="paidBack">${[...(PAID_BACK.includes(a.paidBack || '') ? [] : [a.paidBack || '']), ...PAID_BACK]
+            .map(v => `<option value="${esc(v)}"${v === (a.paidBack || '') ? ' selected' : ''}>${esc(v || '–')}</option>`).join('')}</select></td>` : ''}
         <td><input type="text" data-k="notes" value="${esc(a.notes || '')}"></td>
         <td><button type="button" class="small danger" data-del title="Remove this row">✕</button></td>
     </tr>`;
@@ -838,7 +899,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
             <div class="row" style="margin:8px 0 16px"><button type="button" class="small" data-add-pay-row>+ Add payment row</button></div>
             <h3 class="chart-title">${loan ? 'Fees &amp; adjustments' : 'Activity'}</h3>
             <div class="table-wrap loan-grid"><table class="sheet-table act-grid">
-                <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th>${showPaid ? '<th>Paid back?</th>' : ''}<th>Notes</th><th></th></tr></thead>
                 <tbody>${rawActivity.map(actRow).join('')}</tbody>
             </table></div>
             <div class="row" style="margin-top:8px">
@@ -869,7 +930,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 ? { date: d ? (account.dueDay ? nextDueDate(account, d) : addMonths(d, 1)) : nextDue || new Date(), payment: numOf(v('payment')) || monthlyDue }
                 : { date: d ? addMonths(d, 1) : new Date(), minPayment: numOf(v('minPayment')), payment: numOf(v('payment')) }));
         } else if (e.target.closest('[data-add-act-row]')) {
-            ed.querySelector('.act-grid tbody').insertAdjacentHTML('beforeend', actRow({ date: new Date(), type: 'Charge' }));
+            ed.querySelector('.act-grid tbody').insertAdjacentHTML('beforeend', actRow({ date: new Date(), type: 'Charge', paidBack: paidBackFor('Charge') }));
         } else if (e.target.closest('[data-del]')) {
             e.target.closest('tr').remove();
         } else if (e.target.closest('[data-cancel]')) {
@@ -892,7 +953,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
             })).filter(p => p.date || Number.isFinite(p.payment) || Number.isFinite(p.minPayment) || p.notes);
             const acts = [...ed.querySelectorAll('.act-grid tbody tr')].map(tr => ({
                 date: dateOf(cells(tr, 'date')), description: cells(tr, 'description'), type: cells(tr, 'type'),
-                amount: Math.abs(numOf(cells(tr, 'amount'))), notes: cells(tr, 'notes'),
+                amount: Math.abs(numOf(cells(tr, 'amount'))), paidBack: tr.querySelector('[data-k="paidBack"]')?.value ?? '', notes: cells(tr, 'notes'),
             })).filter(a => a.date || Number.isFinite(a.amount) || a.description || a.notes);
             const title = ed.querySelector('[name=title]').value.trim();
             if (!title) { toast('The account needs a title', 'bad'); return; }
