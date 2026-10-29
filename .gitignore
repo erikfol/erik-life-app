@@ -7,6 +7,8 @@ config.json
 /inputs
 /output_master_data
 /reports
+# Copies made by the Home page's 💾 Back up now
+/backup
 
 # --- Python ---
 __pycache__/
