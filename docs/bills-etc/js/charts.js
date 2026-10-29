@@ -28,16 +28,16 @@ const niceMax = v => niceStep(v / 4) * 4;
 
 const kFmt = v => '$' + (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : v.toFixed(0));
 
-function yGrid(ctx, pad, chartW, chartH, maxVal, minVal = 0, fmt = kFmt) {
+function yGrid(ctx, pad, chartW, chartH, maxVal, minVal = 0, fmt = kFmt, ticks = 4) {
     ctx.font = `11px ${FONT}`;
-    for (let i = 0; i <= 4; i++) {
-        const y = pad.top + chartH * (1 - i / 4);
+    for (let i = 0; i <= ticks; i++) {
+        const y = pad.top + chartH * (1 - i / ticks);
         ctx.strokeStyle = '#f0f0f0';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + chartW, y); ctx.stroke();
         ctx.fillStyle = '#aaa';
         ctx.textAlign = 'right';
-        ctx.fillText(fmt(minVal + (maxVal - minVal) * i / 4), pad.left - 6, y + 4);
+        ctx.fillText(fmt(minVal + (maxVal - minVal) * i / ticks), pad.left - 6, y + 4);
     }
 }
 
@@ -278,9 +278,10 @@ function bindTip(canvas) {
  */
 /**
  * Lines over shared labels. fit: the y axis spans the values (at least 10% of the largest, so small changes stay small)
- * instead of starting at 0, labelled with fmt.
+ * instead of starting at 0, labelled with fmt. hlines: [{ value, label, color }] dashed lines across the chart (e.g. a
+ * level to stay above), each labelled at its right end; the axis makes room for them.
  */
-export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false }) {
+export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false, hlines = [] }) {
     const s = setup(canvas);
     const n = labels.length;
     canvas._tip = null;
@@ -288,17 +289,26 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     const { ctx, W, H } = s;
     const pad = { top: 18, right: 16, bottom: 30, left: 64 };
     const chartW = W - pad.left - pad.right, chartH = H - pad.top - pad.bottom;
-    const all = series.flatMap(x => x.values.filter(Number.isFinite));
-    let minVal = 0, maxVal = niceMax(Math.max(1, ...all) * 1.05);
+    const lines = hlines.filter(h => Number.isFinite(h.value));
+    const all = [...series.flatMap(x => x.values.filter(Number.isFinite)), ...lines.map(h => h.value)];
+    let minVal = 0, maxVal = niceMax(Math.max(1, ...all) * 1.05), ticks = 4;
     if (fit && all.length) {
-        const lo = Math.min(...all), hi = Math.max(...all), span = Math.max(hi - lo, Math.abs(hi) * 0.1, 1);
-        const raw = span * 1.4 / 4, mag = 10 ** Math.floor(Math.log10(raw));
-        const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(x => x >= raw);
-        minVal = Math.max(0, Math.floor(((lo + hi) / 2 - 2 * step) / step) * step);
-        maxVal = minVal + 4 * step;
-        while (maxVal < hi) { minVal += step; maxVal += step; }
+        // The values, widened to at least 10% of the largest, with a little room above and below; then the tidiest axis
+        // (4 to 6 gridlines on round steps) that holds it all.
+        let lo = Math.min(...all), hi = Math.max(...all);
+        const least = Math.max(Math.abs(hi) * 0.1, 1);
+        if (hi - lo < least) { const mid = (lo + hi) / 2; lo = mid - least / 2; hi = mid + least / 2; }
+        const room = (hi - lo) * 0.08;
+        const a = Math.min(...all) >= 0 ? Math.max(0, lo - room) : lo - room, b = hi + room;
+        const mag = 10 ** Math.floor(Math.log10((b - a) / 4));
+        let best = null;
+        for (const m of [mag / 10, mag, mag * 10]) for (const k of [1, 2, 2.5, 5]) for (const n of [4, 5, 6]) {
+            const step = k * m, from = Math.floor(a / step) * step, to = from + n * step;
+            if (to >= b && (!best || to - from < best.to - best.from)) best = { from, to, n };
+        }
+        if (best) ({ from: minVal, to: maxVal, n: ticks } = best);
     }
-    yGrid(ctx, pad, chartW, chartH, maxVal, minVal, fit ? fmt : kFmt);
+    yGrid(ctx, pad, chartW, chartH, maxVal, minVal, fit ? fmt : kFmt, ticks);
     const xOf = i => pad.left + (n === 1 ? chartW / 2 : i * chartW / (n - 1));
     const yOf = v => pad.top + chartH - ((Math.max(minVal, v) - minVal) / (maxVal - minVal)) * chartH;
 
@@ -318,6 +328,22 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
         ctx.restore();
         ctx.fillStyle = '#555';
         ctx.fillText(markText, xOf(markIndex), pad.top - 6);
+    }
+
+    for (const h of lines) { // e.g. Oh sh!t money: a dashed level line, labelled at its right end
+        const y = yOf(h.value);
+        ctx.save();
+        ctx.strokeStyle = h.color || '#888';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + chartW, y); ctx.stroke();
+        if (h.label) {
+            ctx.fillStyle = h.color || '#888';
+            ctx.font = `600 11px ${FONT}`;
+            ctx.textAlign = 'right';
+            ctx.fillText(h.label, pad.left + chartW - 4, y - 6);
+        }
+        ctx.restore();
     }
 
     for (const ser of series) {

@@ -94,7 +94,7 @@ export default {
                     </div>
                     <div class="row"><button type="submit" class="primary">Save</button><button type="button" id="opening-cancel">Cancel</button></div>
                 </form>
-                <div id="activity"></div>
+                <div id="activity" class="short-table"></div>
             </section>
             <section>
                 <h2>Insights</h2>
@@ -231,6 +231,7 @@ export default {
                 labels: pts.map(p => shortDay(p.date)),
                 series: [{ name: 'Available in account', values: pts.map(p => p.value), color: '#2b6cb0', width: 2.5, dots: true }],
                 fit: true, fmt: v => `$${Math.round(v).toLocaleString('en-US')}`, tipFmt: money,
+                hlines: [{ value: cushion, label: `Oh sh!t money ${money(cushion)}`, color: '#1e8449' }], // what's left after the buckets, now
                 tipHead: i => (i === 0 && L.days[0].date === opening.date ? `${dLong(pts[0].date)} · starting balance` : dLong(pts[i].date)),
             });
         };
