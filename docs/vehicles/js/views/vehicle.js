@@ -12,7 +12,7 @@ import {
     TYPES, VEHICLES_PATH, saveVehicles, photosDir, newVehicle, maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance,
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
-    lastText, SOON_MILES, SOON_DAYS,
+    lastText, soonOf, SOON_DAYS,
 } from '../vehicles.js';
 
 let table = null;
@@ -47,13 +47,15 @@ function renderSchedule(el, v, rows, get) {
         el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner bad"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
             + (yellow.length ? `<div class="banner"><strong>Due soon:</strong> ${yellow.map(item).join(' · ')}</div>` : '')
             + (saved.length && !red.length && !yellow.length ? '<div class="banner ok">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
-        el.querySelector('.sched-note').innerHTML = `Worked out from ${now ? `the latest mileage, <strong>${now.miles.toLocaleString('en-US')} miles</strong>
-            (${esc(now.date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}),` : 'the mileage (none logged yet)'} and the
-            Maintenance log below. An item counts from the newest entry whose Action is its name (or one of its Also counts names,
-            comma-separated); never logged, it counts from the purchase (by First, where that's filled in). Due soon: within
-            ${SOON_MILES.toLocaleString('en-US')} miles or ${SOON_DAYS} days. Log work with the item's name as the Action and it turns green.`;
+        const meter = (v.meter || 'Mileage').toLowerCase(), unit = meter === 'engine hours' ? 'hours' : 'miles';
+        el.querySelector('.sched-note').innerHTML = `Worked out from ${now ? `the latest ${esc(meter)}, <strong>${now.miles.toLocaleString('en-US')} ${unit}</strong>
+            (${esc(now.date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}),` : `the ${esc(meter)} (none logged yet, so only the dates count)`}
+            and the Maintenance log below. An item counts from the newest entry whose Action is its name (or one of its Also counts
+            names, comma-separated); never logged, it counts from the purchase (by First, where that's filled in). With Due by (month)
+            it's due by the 1st of that month once a year. Due soon: within ${soonOf(v).toLocaleString('en-US')} ${unit} or ${SOON_DAYS} days.
+            Log work with the item's name as the Action and it turns green.`;
         if (schedule?.hasUnsavedEdits()) return; // don't throw away edits in progress
-        const cols = scheduleColumns([...new Set(log.map(r => String(r.Action || '').trim()).filter(Boolean))]);
+        const cols = scheduleColumns(v, [...new Set(log.map(r => String(r.Action || '').trim()).filter(Boolean))]);
         schedule = recordTable(el.querySelector('.sched'), {
             columns: [cols[0], cols[1],
                 { name: 'Status', kind: 'text', calc: r => STATUS[status(r).level] || '—', badge: x => STATUS_CLASS[x] || '' },

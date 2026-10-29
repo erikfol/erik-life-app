@@ -127,10 +127,14 @@ function parseDay(text) {
     return text && !Number.isNaN(d.getTime()) ? d : null;
 }
 
-/** When it was bought and at what mileage ({ date, miles }; 0 miles: bought new), or null without a Purchase Date. */
+/**
+ * When it was bought and at what reading ({ date, miles }), or null without a Purchase Date. A car without a Purchase
+ * Mileage was bought new (0); a boat's engine hours at purchase are unknown (NaN) unless Purchase Engine Hours says.
+ */
 function purchaseOf(v) {
     const date = parseDay(infoValue(v, 'Purchase Date'));
-    return date ? { date, miles: milesOf(infoValue(v, 'Purchase Mileage')) || 0 } : null;
+    const hours = v.meter === 'Engine Hours', at = milesOf(infoValue(v, hours ? 'Purchase Engine Hours' : 'Purchase Mileage'));
+    return date ? { date, miles: Number.isFinite(at) ? at : hours ? NaN : 0 } : null;
 }
 
 /** The purchase as a reading ({ day, miles, from: 'bought new, Sep 5, 2018' }), or null without a Purchase Date. */
@@ -185,34 +189,45 @@ export const mileageRateColumns = (v, rows) => {
     ];
 };
 
-// ── Maintenance schedule (cars) ─────────────────────────────────────────────────────────────────────────────────────
-// What's due every so many miles and/or months (for the Accord, Honda's Maintenance Minder items, with typical
-// intervals). An item counts from the newest Maintenance entry whose Action is its name, or one of its "Also counts"
+// ── Maintenance schedule (cars and boats) ───────────────────────────────────────────────────────────────────────────
+// What's due every so many miles (engine hours, for a boat) and/or months, or by a month of the year for seasonal jobs
+// (for the Accord, Honda's Maintenance Minder items with typical intervals; for the boat, winterizing, oil, sterndrive
+// and the like). An item counts from the newest Maintenance entry whose Action is its name, or one of its "Also counts"
 // names; never logged, it counts from the purchase (by First, where that's filled in, instead of Every).
-export const hasSchedule = v => hasMileageLog(v);
+export const hasSchedule = v => v.type === 'car' || v.type === 'boat';
 export const schedulePath = v => `${VEHICLES_DIR}/${v.id}-schedule.csv`;
-/** actions: the Actions in the Maintenance log, offered as Item names. */
-export const scheduleColumns = (actions = []) => [
+/** What the schedule counts in: 'miles', or 'hours' for a boat's engine hours. */
+const unitOf = v => (v.meter === 'Engine Hours' ? 'hours' : 'miles');
+/** actions: the Actions in the Maintenance log, offered as Item names. A car's second column is Honda's code; a boat's, the area. */
+export const scheduleColumns = (v, actions = []) => [
     { name: 'Item', kind: 'suggest', suggestions: actions },
-    { name: 'Code', kind: 'suggest' },
-    { name: 'Every (miles)', kind: 'number' },
+    { name: v.type === 'boat' ? 'Area' : 'Code', kind: 'suggest' },
+    { name: `Every (${unitOf(v)})`, kind: 'number' },
     { name: 'Every (months)', kind: 'number' },
-    { name: 'First (miles)', kind: 'number' },
+    { name: `First (${unitOf(v)})`, kind: 'number' },
     { name: 'First (months)', kind: 'number' },
+    { name: 'Due by (month)', kind: 'suggest', suggestions: MONTHS },
     { name: 'Also counts', kind: 'suggest', suggestions: actions },
     { name: 'Notes', kind: 'text' },
 ];
-export const loadSchedule = (v, track = true) => loadRows(schedulePath(v), scheduleColumns(), track);
-export const saveSchedule = (v, rows) => saveRows(schedulePath(v), scheduleColumns(), rows);
+export const loadSchedule = (v, track = true) => loadRows(schedulePath(v), scheduleColumns(v), track);
+export const saveSchedule = (v, rows) => saveRows(schedulePath(v), scheduleColumns(v), rows);
 
-/** An item turns yellow this many miles, or days, before it's due (and red once it is). */
-export const SOON_MILES = 2000, SOON_DAYS = 30;
+/** An item turns yellow this many miles, engine hours or days before it's due (and red once it is). */
+export const SOON_MILES = 2000, SOON_HOURS = 10, SOON_DAYS = 30;
+export const soonOf = v => (unitOf(v) === 'hours' ? SOON_HOURS : SOON_MILES);
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** 'Nov', 'November' or '11' → 11; 0 if blank or not a month. */
+const monthOf = x => {
+    const s = String(x ?? '').trim().toLowerCase(), n = Number(s);
+    return n >= 1 && n <= 12 && Number.isInteger(n) ? n : MONTHS.findIndex(m => s.length >= 3 && m.toLowerCase().startsWith(s)) + 1;
+};
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const dayOf = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
 const plusMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n,
     Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate()));
 
-/** The newest dated mileage in the mileage log or the maintenance log: { date (a Date), miles }, or null. */
+/** The newest dated reading (mileage, or engine hours) in the mileage log or the maintenance log: { date (a Date), miles }, or null. */
 export function currentReading(v, log, readings) {
     const meter = v.meter || 'Mileage';
     const best = [...readings.map(r => ({ day: r.Date, miles: milesOf(r.Mileage) })), ...log.map(r => ({ day: r.Date, miles: milesOf(r[meter]) }))]
@@ -223,43 +238,49 @@ export function currentReading(v, log, readings) {
 
 /**
  * Where schedule item `item` stands, from the Maintenance `log` and `now` (currentReading): { last (the entry it counts
- * from, or null), dueMiles (NaN if none), dueDate (or null), level }. level: 'red' once it's due, 'yellow' within
- * SOON_MILES / SOON_DAYS of it, 'ok', or null with nothing to count from (no Every, or a last entry without its mileage).
+ * from, or null), dueMiles (miles or engine hours; NaN if none), dueDate (or null), unit ('mi' / 'hrs'), level }.
+ * With Due by (month) it's due by the 1st of that month, a year (or Every (months) ÷ 12 years) after the year it last
+ * counts from. level: 'red' once it's due, 'yellow' within soonOf(v) / SOON_DAYS of it, 'ok', or null with nothing to
+ * count from (no Every or Due by, or a last entry without its mileage).
  */
 export function scheduleStatus(v, item, log, now, today = new Date()) {
-    const meter = v.meter || 'Mileage';
+    const meter = v.meter || 'Mileage', unit = unitOf(v);
     const names = [item.Item, ...String(item['Also counts'] || '').split(',')].map(s => s.trim().toLowerCase()).filter(Boolean);
     const last = log.filter(r => ISO_DAY.test(r.Date || '') && names.includes(String(r.Action || '').trim().toLowerCase()))
         .sort((a, b) => b.Date.localeCompare(a.Date) || (milesOf(b[meter]) || 0) - (milesOf(a[meter]) || 0))[0] || null;
     const num = k => { const n = milesOf(item[k]); return n > 0 ? n : NaN; };
-    let everyMiles = num('Every (miles)'), everyMonths = num('Every (months)'), base;
+    let everyMiles = num(`Every (${unit})`), everyMonths = num('Every (months)'), base;
     if (last) base = { miles: milesOf(last[meter]), date: dayOf(last.Date) };
     else {
         const p = purchaseOf(v);
         base = { miles: p ? p.miles : 0, date: p ? p.date : null };
-        everyMiles = num('First (miles)') || everyMiles;
+        everyMiles = num(`First (${unit})`) || everyMiles;
         everyMonths = num('First (months)') || everyMonths;
     }
+    const byMonth = monthOf(item['Due by (month)']);
     const dueMiles = Number.isFinite(base.miles) && everyMiles > 0 ? base.miles + everyMiles : NaN;
-    const dueDate = base.date && everyMonths > 0 ? plusMonths(base.date, everyMonths) : null;
-    if (!Number.isFinite(dueMiles) && !dueDate) return { last, dueMiles, dueDate, level: null };
+    const dueDate = byMonth
+        ? new Date((base.date ? base.date.getFullYear() : today.getFullYear() - 1) + Math.max(1, Math.round((everyMonths || 12) / 12)), byMonth - 1, 1)
+        : base.date && everyMonths > 0 ? plusMonths(base.date, everyMonths) : null;
+    const short = unit === 'hours' ? 'hrs' : 'mi';
+    if (!Number.isFinite(dueMiles) && !dueDate) return { last, dueMiles, dueDate, unit: short, level: null };
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const byMiles = Number.isFinite(dueMiles) && Number.isFinite(now?.miles);
     const due = (byMiles && now.miles >= dueMiles) || (dueDate && day >= dueDate);
-    const soon = (byMiles && now.miles >= dueMiles - SOON_MILES)
+    const soon = (byMiles && now.miles >= dueMiles - soonOf(v))
         || (dueDate && day >= new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() - SOON_DAYS));
-    return { last, dueMiles, dueDate, level: due ? 'red' : soon ? 'yellow' : 'ok' };
+    return { last, dueMiles, dueDate, unit: short, level: due ? 'red' : soon ? 'yellow' : 'ok' };
 }
 
 const showDay = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const mi = n => `${Math.round(n).toLocaleString('en-US')} mi`;
+const amount = (n, unit) => `${Math.round(n).toLocaleString('en-US')} ${unit}`;
 
 /** '81,884 mi or Dec 11, 2026' — when a status (scheduleStatus) is due; '' without either. */
-export const dueText = s => [Number.isFinite(s.dueMiles) ? mi(s.dueMiles) : '', s.dueDate ? showDay(s.dueDate) : ''].filter(Boolean).join(' or ');
+export const dueText = s => [Number.isFinite(s.dueMiles) ? amount(s.dueMiles, s.unit) : '', s.dueDate ? showDay(s.dueDate) : ''].filter(Boolean).join(' or ');
 
 /** About when the car reaches `miles` at its average rate ('May 2027'), or '' (already there, or no rate). */
 function aboutWhen(v, readings, now, miles) {
-    const rate = mileageRate(v, readings);
+    const rate = hasMileageLog(v) && mileageRate(v, readings);
     if (!now || !rate?.perYear || !(miles > now.miles)) return '';
     const d = new Date(now.date.getTime() + (miles - now.miles) / rate.perYear * 365.25 * 864e5);
     return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
@@ -268,7 +289,7 @@ function aboutWhen(v, readings, now, miles) {
 /** '81,884 mi (≈ Dec 2026) or Dec 11, 2026': dueText, with about when the car gets to the mileage (if it's still ahead). */
 export function nextDueText(v, readings, now, s) {
     const when = Number.isFinite(s.dueMiles) ? aboutWhen(v, readings, now, s.dueMiles) : '';
-    return [Number.isFinite(s.dueMiles) ? mi(s.dueMiles) + (when ? ` (≈ ${when})` : '') : '', s.dueDate ? showDay(s.dueDate) : '']
+    return [Number.isFinite(s.dueMiles) ? amount(s.dueMiles, s.unit) + (when ? ` (≈ ${when})` : '') : '', s.dueDate ? showDay(s.dueDate) : '']
         .filter(Boolean).join(' or ');
 }
 
@@ -276,6 +297,6 @@ export function nextDueText(v, readings, now, s) {
 export function lastText(v, s, item) {
     if (!s.last) return '';
     const miles = milesOf(s.last[v.meter || 'Mileage']), action = String(s.last.Action || '').trim();
-    return [showDay(dayOf(s.last.Date)), Number.isFinite(miles) ? mi(miles) : ''].filter(Boolean).join(' · ')
+    return [showDay(dayOf(s.last.Date)), Number.isFinite(miles) ? amount(miles, s.unit) : ''].filter(Boolean).join(' · ')
         + (action.toLowerCase() !== String(item.Item || '').trim().toLowerCase() ? ` (${action})` : '');
 }
