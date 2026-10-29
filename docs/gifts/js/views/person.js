@@ -9,8 +9,7 @@ import {
     GIFTS_PATH, saveData, newPerson, giftsPath, giftColumns, loadGifts, saveGifts, loadChristmas, readDate, nextDate,
     milestone, upcomingDates, christmas, comingChristmas, showDay, inDays, statusGroup, tally, isFor, forOccasion,
 } from '../gifts.js';
-
-const SOON_DAYS = 30; // a date this close with nothing planned turns the banner red
+import { dateLevel, DATE_SOON_DAYS } from '../alerts.js'; // the banner's colour, shared with the Home page
 
 let table = null;
 let info = null; // the information box
@@ -46,22 +45,23 @@ const nextItem = f => {
     return `<div class="info-item"><dt>Next ${esc(f.label)}</dt><dd>${esc(showDay(n.date))}<br><span class="muted">${inDays(n.days)}${m ? ` · ${esc(m)}` : ''}</span></dd></div>`;
 };
 
-/** Red: the next date is within 30 days and nothing's planned for it; yellow: some still to buy; green otherwise. */
+/** Red: the next date is within 30 days and nothing's planned for it; yellow: some still to buy; green otherwise (dateLevel). */
 function dateBanner(next, gifts) {
     if (!next) return '';
     const year = next.date.getFullYear();
     const t = tally(forOccasion(gifts, next.label, year));
     const m = milestone(next.label, next.years);
     const when = `${esc(next.label)} ${inDays(next.days)} (${esc(showDay(next.date))}${m ? `, ${esc(m)}` : ''})`;
-    if (next.days > SOON_DAYS) return `<div class="banner ok"><strong>Next: ${when}.</strong>${t.count || t.ideas ? ` ${tallyText(t)}.` : ''}</div>`;
-    if (!t.count) {
+    const level = dateLevel(next, gifts);
+    if (level === 'red') {
         return `<div class="banner bad"><strong>${when}</strong> — nothing planned yet. Add a gift below with Year ${year} and Occasion “${esc(next.label)}”${
             t.ideas ? ` (there ${t.ideas === 1 ? 'is 1 idea' : `are ${t.ideas} ideas`})` : ''}.</div>`;
     }
-    if (t.todo) {
+    if (level === 'yellow') {
         return `<div class="banner"><strong>${when}:</strong> ${t.todo === t.count ? `${plural(t.count, 'gift')} planned, none bought yet`
             : `${t.todo} of ${t.count} gifts still to buy`}.</div>`;
     }
+    if (next.days > DATE_SOON_DAYS) return `<div class="banner ok"><strong>Next: ${when}.</strong>${t.count || t.ideas ? ` ${tallyText(t)}.` : ''}</div>`;
     return `<div class="banner ok"><strong>${when}:</strong> ${t.count === 1 ? 'the gift is' : `all ${t.count} gifts are`} bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
 }
 

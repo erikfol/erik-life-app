@@ -7,6 +7,7 @@ import { esc, toast, money } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox, moveButtons, moveItem } from '../../../shared/js/infobox.js';
 import { appointmentStatus } from '../../../pets/js/pets.js';
+import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
     accountSection, appointmentsSection, loadInfo, saveInfo,
@@ -169,26 +170,12 @@ function infoLinks(head, area, links, save) {
     return { hasUnsavedEdits: () => !!draft && draft.read() !== draft.start };
 }
 
-// Like Bills Etc → Loan/CC → Credit Cards: an account whose newest entry, or the last time it was marked checked, is
-// STALE_DAYS or more ago gets a yellow banner (red from VERY_STALE_DAYS), so you know to look at its activity.
-const STALE_DAYS = 20, VERY_STALE_DAYS = 40;
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const pad = n => String(n).padStart(2, '0');
 const isoToday = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const daysSince = iso => {
-    const [y, m, d] = iso.split('-').map(Number);
-    const t = new Date();
-    return Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / 86400000);
-};
 
-/** The yellow / red "Activity not updated" banners; entries: { account id: rows }. */
+/** The yellow / red "Activity not updated" banners (staleAccounts, shared with the Home page); entries: { account id: rows }. */
 function staleBanners(list, entries) {
-    const stale = list.map(a => {
-        const lastEntry = (entries[a.id] || []).map(r => r.Date).filter(d => ISO.test(d || '')).sort().at(-1) || null;
-        const checked = ISO.test(a.activityChecked || '') ? a.activityChecked : null;
-        const last = [lastEntry, checked].filter(Boolean).sort().at(-1);
-        return { a, lastEntry, checked, days: last ? daysSince(last) : Infinity };
-    }).filter(x => x.days >= STALE_DAYS).sort((x, y) => y.days - x.days);
+    const stale = staleAccounts(list, entries);
     const item = x => `<div class="row" style="gap:8px;margin-top:4px">
             <span><strong>${esc(x.a.title)}</strong>: ${[
                 x.lastEntry ? `last entry ${esc(showDate(x.lastEntry))}` : 'no entries yet',

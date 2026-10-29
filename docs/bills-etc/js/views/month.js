@@ -1,4 +1,3 @@
-import * as fs from '../fs.js';
 import { PATHS, readTable, loadConfig, parseConfig, keyOf } from '../data.js';
 import { computeProjection, statusBadge } from '../finance.js';
 import { parseBills, hasBills, billMatcher, schedColumn, paymentsByMonth, billMonth, firstPaid, allTransactions, STATUS } from '../bills.js';
@@ -7,6 +6,7 @@ import { lastSources } from '../workflow.js';
 import { MONTH_NAMES, parseDate, yearMonth } from '../dates.js';
 import { esc, money, toast } from '../util.js';
 import { requireFolder } from '../app.js';
+import { lastBankUpdate, updatedLevel } from '../alerts.js'; // shared with Setup and the Home page
 import { notesText } from '../celledit.js';
 import { dataTable, dateColumn, moneyColumn, categoryColumn, closeFilterMenu } from '../datatable.js';
 
@@ -42,9 +42,7 @@ async function loadProjection() {
     }
     const proj = computeProjection({ config: parseConfig(cfg), rows: processed.rows, masterRows: master?.rows, today, exclude, fixedTotal });
     const plan = bills ? leftToSpend({ cfg, rows: all, ym: yearMonth(today), bills, match, dataThrough: latest, today: now, ended }) : null;
-    // Last update = when this month's bank export was added on Setup (edits in Finance Table don't count).
-    const [bankFile] = await fs.listFiles(PATHS.currentMonth);
-    const updated = (bankFile && await fs.modifiedAt(`${PATHS.currentMonth}/${bankFile}`)) || await fs.modifiedAt(PATHS.processed);
+    const updated = await lastBankUpdate();
     return { ...proj, ended, bills, match, plan, dataThrough: latest, updated };
 }
 
@@ -77,12 +75,10 @@ function billsSummary(p) {
     ].filter(Boolean).join(' · ');
 }
 
-/** Green 0–3 days old, yellow 4–10, orange 11–20, red 21+. */
+/** Green 0–3 days old, yellow 4–10, orange 11–20, red 21+ (updatedLevel). */
 function updatedBanner(p) {
     if (!p.updated) return '';
-    const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const age = Math.max(0, Math.round((day(new Date()) - day(p.updated)) / 86400000));
-    const level = age <= 3 ? 'fresh' : age <= 10 ? 'aging' : age <= 20 ? 'old' : 'stale';
+    const { age, level } = updatedLevel(p.updated);
     const ago = age === 0 ? 'today' : age === 1 ? 'yesterday' : `${age} days ago`;
     const when = p.updated.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     return `<div class="banner updated-${level}"><strong>Last updated ${ago}</strong> · ${esc(when)}${p.dataThrough ? ` · bank data through ${esc(shortDay(p.dataThrough))}` : ''}

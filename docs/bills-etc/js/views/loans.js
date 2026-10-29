@@ -9,6 +9,7 @@ import { drawBars, drawLines } from '../charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
 import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
+import { amountDue, staleCards, notPaidBack, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
 import { dataTable, closeFilterMenu } from '../datatable.js';
 import {
     MON, dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize,
@@ -45,8 +46,6 @@ const statusBadge = p => {
 const paidBackBadge = v => (!v ? '' : `<span class="badge ${v === 'Yes' ? 'badge-ok' : v === 'NA' ? 'badge-neutral' : 'badge-over'}">${esc(v)}</span>`);
 /** What a new entry starts as: a charge isn't paid back yet; interest, fees and credits are NA. */
 const paidBackFor = type => (type === 'Charge' ? 'Not yet' : 'NA');
-/** Card activity still to pay back, as {account, a}. Setup's "Things to update" lists the same. */
-export const notPaidBack = all => all.flatMap(({ account, rawActivity }) => rawActivity.filter(owesBack).map(a => ({ account, a })));
 const MON_LONG = d => `${MON[d.getMonth()]} ${d.getFullYear()}`;
 /** 38 → '3 years 2 months' */
 const duration = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} year${y === 1 ? '' : 's'}` : '', r ? `${r} month${r === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ') || '0 months'; };
@@ -57,8 +56,6 @@ const typeIcon = t => (t === 'Credit card' ? '💳' : t === 'Loan' ? '🏦' : '�
 const DAY = 864e5;
 /** '1234 5678 9012 4421' → '•••• 4421' */
 const maskNumber = n => { const digits = String(n).replace(/\s+/g, ''); return digits.length > 4 ? `•••• ${digits.slice(-4)}` : digits; };
-/** What a payment that isn't made yet will take: the planned payment, or else the minimum. */
-export const amountDue = p => (Number.isFinite(p.payment) ? p.payment : p.minPayment);
 
 /** The loan setup fields, filled from `a` (an account, or {} for a new loan). Used by Add and Edit. */
 function loanFields(a = {}, tab = TABS[1]) {
@@ -332,23 +329,7 @@ export default {
     },
 };
 
-/** Days without a new activity entry (or a "checked") before a card gets flagged (yellow), and before it turns red. */
-export const STALE_DAYS = 20, VERY_STALE_DAYS = 40;
-
-/**
- * Cards whose newest activity entry, or the last time you marked them checked (with neither, the opening date),
- * is STALE_DAYS or more ago, so you know to look at the statement. Each has a button to mark it checked today.
- */
-export function staleCards(all, t0) {
-    return all.map(({ account, rawActivity }) => {
-        const dates = rawActivity.map(a => a.date).filter(Boolean);
-        const lastEntry = dates.length ? new Date(Math.max(...dates)) : null;
-        const checked = parseBillDate(account.activityChecked);
-        const last = [lastEntry, checked].filter(Boolean).sort((a, b) => b - a)[0] || parseBillDate(account.openingDate);
-        return { account, lastEntry, checked, days: last ? Math.floor((t0 - last) / DAY) : Infinity };
-    }).filter(x => x.days >= STALE_DAYS).sort((a, b) => b.days - a.days);
-}
-
+/** Cards whose activity hasn't been updated in a while (staleCards), each with a button to mark it checked today. */
 function staleActivityBanners(all, t0) {
     const stale = staleCards(all, t0);
     const ago = x => (Number.isFinite(x.days) ? ` <span class="muted">(${x.days} days)</span>` : '');

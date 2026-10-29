@@ -9,23 +9,20 @@ import { yearMonth } from '../dates.js';
 import { drawBars } from '../charts.js';
 import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
+import { depositsDue, BALANCES_STALE_DAYS, PAYCHECK_EVERY } from '../alerts.js'; // shared with Setup and the Home page
 import { dataTable, closeFilterMenu } from '../datatable.js';
 import { dLong, today, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize, axisMoney, sameDay, sameAmount, dupText } from './utilcommon.js';
 
 const DAY = 864e5;
 /** Paid every other week: 26 paychecks a year. */
-const PAYCHECKS = 26, EVERY = 14;
+const PAYCHECKS = 26, EVERY = PAYCHECK_EVERY;
 const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-/** Deposits a bucket is behind: one for every two weeks since its last update. */
-export const depositsDue = b => (b.group === 'active' && b.perCheck > 0 && b.updated ? Math.max(0, Math.floor((today() - b.updated) / DAY / EVERY)) : 0);
 const GROUPS = [
     { id: 'active', title: 'Buckets', sub: 'filled from each paycheck' },
     { id: 'setup', title: 'Need to set up', sub: 'no money or deposit yet' },
     { id: 'other', title: 'Not in the paycheck total', sub: 'deposits listed but not counted in the per-paycheck total' },
     { id: 'past', title: 'One-time money', sub: 'stimulus, escrow, tax returns and other money that came and went' },
 ];
-/** Days after which "Available in account" needs checking again. */
-export const BALANCES_STALE_DAYS = 45;
 let editing = null; // 'buckets' | 'transfers' | 'balances' while a form has possible unsaved changes
 const daysAgo = d => Math.round((today() - d) / DAY);
 const amountText = v => (Number.isFinite(v) ? money(v) : '–');

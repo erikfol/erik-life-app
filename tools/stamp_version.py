@@ -1,4 +1,4 @@
-"""Stamp each app's index.html (docs/bills-etc/, docs/health/, docs/vehicles/, docs/house/, docs/pets/, docs/insurance/, docs/dinner-planner/, docs/kid-lunches/, docs/career/, docs/gifts/) with a new version and the list of its files.
+"""Stamp each app's index.html (docs/bills-etc/, docs/health/, docs/vehicles/, docs/house/, docs/pets/, docs/insurance/, docs/dinner-planner/, docs/kid-lunches/, docs/career/, docs/gifts/) and the Home page (docs/index.html) with a new version and the list of its files.
 
 GitHub Pages lets browsers cache files for up to 10 minutes, so right after an update a browser can get the new
 index.html but old JavaScript. index.html compares this version with the one the browser last ran; when it changed,
@@ -9,6 +9,7 @@ Run before committing changes to docs/:  python tools/stamp_version.py
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import posixpath
 import re
 
 DOCS = Path(__file__).resolve().parent.parent / 'docs'
@@ -45,12 +46,25 @@ def own_files(app_dir):
     return sorted(p.relative_to(app_dir).as_posix() for p in list(app_dir.glob('js/**/*.js')) + list(app_dir.glob('css/*.css')))
 
 
-version = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
-for app, (key, shared) in APPS.items():
-    app_dir = DOCS / app
-    index = app_dir / 'index.html'
-    files = own_files(app_dir) + ['../' + f for f in shared]
-    block = (
+# `import … from './x.js'`, `import './x.js'`, `export … from './x.js'` and `import('./x.js')`
+IMPORT = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(?\s*)['"](\.{1,2}/[^'"]+\.js)['"]""")
+
+
+def module_graph(entry):
+    """`entry` (relative to docs/) and every module it imports, directly or not, relative to docs/."""
+    seen, todo = set(), [entry]
+    while todo:
+        f = todo.pop()
+        if f in seen or not (DOCS / f).is_file():
+            continue
+        seen.add(f)
+        for m in IMPORT.finditer((DOCS / f).read_text(encoding='utf-8')):
+            todo.append(posixpath.normpath(posixpath.join(posixpath.dirname(f), m.group(1))))
+    return sorted(seen)
+
+
+def version_block(key, files, entry):
+    return (
         '<!-- app-version:start (written by tools/stamp_version.py) -->\n'
         '    <script type="module">\n'
         f'        const VERSION = {json.dumps(version)};\n'
@@ -63,14 +77,29 @@ for app, (key, shared) in APPS.items():
         "                document.querySelectorAll('link[rel=stylesheet]').forEach(l => { l.href = l.getAttribute('href') + '?v=' + VERSION; });\n"
         '            }\n'
         '        } catch { /* storage blocked: just start */ }\n'
-        "        await import('./js/app.js');\n"
+        f"        await import({json.dumps(entry)});\n"
         '    </script>\n'
         '    <!-- app-version:end -->'
     )
+
+
+def stamp(index, block):
     html = index.read_text(encoding='utf-8')
     if '<!-- app-version:start' in html:
         html = re.sub(r'<!-- app-version:start.*?<!-- app-version:end -->', lambda m: block, html, flags=re.S)
     else:
         html = html.replace('<script type="module" src="js/app.js"></script>', block)
     index.write_text(html, encoding='utf-8', newline='\n')
+
+
+version = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
+for app, (key, shared) in APPS.items():
+    app_dir = DOCS / app
+    files = own_files(app_dir) + ['../' + f for f in shared]
+    stamp(app_dir / 'index.html', version_block(key, files, './js/app.js'))
     print(f'{app}: version {version}, {len(files)} files')
+
+# The Home page: its script and every module it brings in (each section's alerts.js and what those use).
+home_files = module_graph('shared/js/home.js')
+stamp(DOCS / 'index.html', version_block('home-version', home_files, './shared/js/home.js'))
+print(f'home: version {version}, {len(home_files)} files')

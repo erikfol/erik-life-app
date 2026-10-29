@@ -141,7 +141,7 @@ const home = {
             </section>
 
             <section id="updates-wrap" hidden>
-                <h2>Things to update <span class="sub">due, or yellow/red, on Savings, Utilities and Credit Cards</span></h2>
+                <h2>Things to update <span class="sub">due, or yellow/red, on Savings, This Month, Utilities and Loan/CC</span></h2>
                 <div id="updates"></div>
             </section>
 

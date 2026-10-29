@@ -9,9 +9,7 @@ import {
     newGuide, OPTION_COLUMNS, priceColumns, optionsPath, pricesPath, loadOptions, saveOptions, loadPrices, savePrices,
 } from '../gifts.js';
 import { tallyText } from './person.js';
-
-const SOON_DAYS = 14; // this close to Christmas with gifts still to buy, the banner turns red
-const BANNER_DAYS = 90; // a Christmas further off than this gets no banner (the cards say where it stands)
+import { christmasLevel } from '../alerts.js'; // the banner's colour, shared with the Home page
 
 let checks = []; // one "has unsaved edits?" per table or box on the page
 
@@ -28,14 +26,16 @@ const names = rows => {
     return [...seen.values()];
 };
 
+/** Within 90 days of Christmas: yellow with nothing on the list or gifts still to buy (red from 14 days), else green (christmasLevel). */
 function banner(year, rows) {
+    const level = christmasLevel(year, rows);
+    if (!level) return '';
     const { date, days } = christmas(year);
-    if (days < 0 || days > BANNER_DAYS) return '';
     const t = tally(rows);
     const when = `Christmas ${inDays(days)} (${esc(showDay(date))})`;
     if (!t.count) return `<div class="banner"><strong>${when}</strong> — nothing on the ${esc(year)} list yet.</div>`;
     if (t.todo) {
-        return `<div class="banner${days <= SOON_DAYS ? ' bad' : ''}"><strong>${when}:</strong> ${t.todo} of ${t.count} gift${t.count === 1 ? '' : 's'} still to buy (${esc(money(t.toBuy))})${
+        return `<div class="banner${level === 'red' ? ' bad' : ''}"><strong>${when}:</strong> ${t.todo} of ${t.count} gift${t.count === 1 ? '' : 's'} still to buy (${esc(money(t.toBuy))})${
             t.waiting ? `, ${t.waiting} on the way` : ''}.</div>`;
     }
     return `<div class="banner ok"><strong>${when}:</strong> everything's bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
