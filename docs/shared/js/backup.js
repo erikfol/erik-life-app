@@ -10,6 +10,8 @@ const DATA = ['config.json', 'inputs', 'output_master_data', 'reports', 'backups
 const LOG_PATH = 'backups.json';
 const DEST_KEY = 'backup'; // the backup folder, remembered in this browser
 const DAY = 864e5;
+/** The Backup line turns yellow after this many days without a backup, and red after this many (or with none yet). */
+export const BACKUP_YELLOW_DAYS = 15, BACKUP_RED_DAYS = 30;
 
 const pad = n => String(n).padStart(2, '0');
 const stamp = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -86,26 +88,34 @@ export function backupPanel(el) {
     const pc = fs.isSupported();
     let busy = false;
 
-    const lastText = log => {
+    /** { level ('ok', 'yellow' over BACKUP_YELLOW_DAYS, 'red' over BACKUP_RED_DAYS or none yet), html } */
+    const status = log => {
         const last = log.at(-1);
-        if (!last) return 'No manual backup yet.';
+        if (!last) return { level: 'red', html: '<strong>No manual backup yet.</strong>' };
         const [y, m, d] = last.date.slice(0, 10).split('-').map(Number);
         const t = new Date(), days = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / DAY);
-        const ago = days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
-        return `Last manual backup: <strong>${ago}</strong> <span class="muted">(${esc(longDay(new Date(y, m - 1, d)))}${last.to ? `, to “${esc(last.to)}”` : ''})</span>`;
+        const when = `<span class="muted">(${esc(longDay(new Date(y, m - 1, d)))}${last.to ? `, to “${esc(last.to)}”` : ''})</span>`;
+        return {
+            level: days > BACKUP_RED_DAYS ? 'red' : days > BACKUP_YELLOW_DAYS ? 'yellow' : 'ok',
+            html: days === 0 ? `Your last backup was <strong>today</strong> ${when}`
+                : `It's been <strong>${days} day${days === 1 ? '' : 's'}</strong> since your last backup ${when}`,
+        };
     };
 
     async function draw(message = '') {
         if (!fs.folder() || (pc && fs.isCloud())) {
             el.innerHTML = pc ? `<strong>Backup</strong> <span class="muted">${fs.isCloud() ? 'Backups are made from your folder: sign out of Dropbox on this PC first.'
                 : 'Reconnect your folder above to back up.'}</span>` : '';
+            el.className = 'backup';
             el.hidden = !pc;
             return;
         }
         let log = [];
         try { log = await loadLog(); } catch (e) { message ||= `<span class="bad">Couldn't read ${LOG_PATH}: ${esc(e.message)}</span>`; }
         const dest = pc ? await fs.rememberedHandle(DEST_KEY) : null;
-        el.innerHTML = `<strong>Backup</strong> ${lastText(log)}
+        const s = status(log);
+        el.className = `backup ${s.level}`;
+        el.innerHTML = `<strong>Backup</strong> ${s.html}
             ${pc ? `<button type="button" class="primary" data-backup>💾 Back up now</button>
                 <button type="button" data-choose>${dest ? 'Change backup folder…' : 'Choose backup folder…'}</button>
                 <span class="muted">${dest ? `Goes to “${esc(dest.name)}” on this PC` : 'Pick a folder on this PC, outside Dropbox'}${log.at(-1)?.bytes ? ` · about ${mb(log.at(-1).bytes)}` : ''}</span>`
