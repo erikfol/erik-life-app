@@ -64,3 +64,4 @@ td.move .move-btns { margin-right: 0; }
 .file-chip.new { border-style: dashed; background: #eef6ff; }
 .file-chip button { border: 0; background: none; padding: 0 4px; font-size: 0.95em; line-height: 1; cursor: pointer; color: #888; }
 .file-chip button:hover { color: #c0392b; }
+.record-table td.row-actions { white-space: nowrap; width: 1%; } /* an entry's buttons (rowActions), e.g. → Records */

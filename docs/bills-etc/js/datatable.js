@@ -12,6 +12,7 @@ import { parseDate } from './dates.js';
  *   num?: true                       right-aligned, numeric sort
  *   sortKey?: value => comparable    custom sort order (e.g. dates)
  *   tdClass?: row => string
+ *   plain?: true                     no sort or filter (e.g. a column of buttons)
  *   sortLabels?: [asc, desc]
  * }
  */
@@ -45,8 +46,8 @@ export function dataTable(container, opts) {
         <div class="dt-bar" hidden><span class="dt-info"></span><button class="small" data-clear>Clear filters</button></div>
         <div class="table-wrap"><table class="filter-table">
             <thead><tr>${columns.map(c => `
-                <th data-col="${c.id}"${c.num ? ' class="num"' : ''}>
-                    <span class="th-inner"><span class="th-label" title="Click to sort">${esc(c.label)}<span class="sort-ind"></span></span><button class="fbtn" aria-label="Sort and filter ${esc(c.label)}" title="Sort and filter">▾</button></span>
+                <th data-col="${c.id}"${c.num ? ' class="num"' : ''}>${c.plain ? esc(c.label) : `
+                    <span class="th-inner"><span class="th-label" title="Click to sort">${esc(c.label)}<span class="sort-ind"></span></span><button class="fbtn" aria-label="Sort and filter ${esc(c.label)}" title="Sort and filter">▾</button></span>`}
                 </th>`).join('')}</tr></thead>
             <tbody></tbody><tfoot></tfoot>
         </table></div>`;
@@ -82,7 +83,8 @@ export function dataTable(container, opts) {
         container.querySelectorAll('th[data-col]').forEach(th => {
             const id = th.dataset.col;
             th.classList.toggle('filtered', filters.has(id));
-            th.querySelector('.sort-ind').textContent = sort?.col === id ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+            const ind = th.querySelector('.sort-ind'); // none on a plain column
+            if (ind) ind.textContent = sort?.col === id ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
         });
         const bar = container.querySelector('.dt-bar');
         bar.hidden = !filters.size;
@@ -93,6 +95,7 @@ export function dataTable(container, opts) {
     container.querySelector('[data-clear]').onclick = () => { filters.clear(); draw(); };
     container.querySelectorAll('th[data-col]').forEach(th => {
         const col = COL[th.dataset.col];
+        if (col.plain) return;
         th.querySelector('.th-label').onclick = () => {
             sort = { col: col.id, dir: sort?.col === col.id && sort.dir === 'asc' ? 'desc' : 'asc' };
             draw();

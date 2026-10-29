@@ -59,11 +59,13 @@ const numberOf = v => {
  *   choices: { [name]: { list: string[], noun: 'location', add: async name => void } } for 'choice' columns
  *            (without add the list is fixed: no "＋ New …" option)
  *   filesDir: the folder for 'files' columns without their own dir
+ *   rowActions: [{ label, title, run: async row => void }] — a button for each entry in the read-only view (e.g. move
+ *            an appointment to the records); run gets the entry as saved
  * Rows are shown in the order they're saved in. Editing starts in the order the read-only view shows (so a column sort
  * can be kept), ↑ ↓ move a row, and a new entry goes at the top of a table with dates (the bottom of one without).
  * Returns { hasUnsavedEdits() }.
  */
-export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '' }) {
+export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '', rowActions = [] }) {
     const tableNo = ++tableCount;
     const editCols = cols.filter(c => !c.calc); // the columns that are typed in and saved
     const valueOf = (c, r) => (c.calc ? c.calc(r) : r[c.name]);
@@ -145,6 +147,16 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     };
     const firstDate = cols.find(c => c.kind === 'date');
 
+    // An entry's button (rowActions).
+    readEl.addEventListener('click', async e => {
+        const b = e.target.closest('[data-row-action]');
+        if (!b) return;
+        const row = state.rows[+b.dataset.row];
+        if (!row) return;
+        b.disabled = true;
+        try { await rowActions[+b.dataset.rowAction].run(row); } finally { b.disabled = false; }
+    });
+
     // A 'files' cell's files, large (images, and PDFs in a frame).
     readEl.addEventListener('click', async e => {
         const b = e.target.closest('[data-files]');
@@ -170,8 +182,12 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             <span class="muted edit-hint">Click a column name to sort, or ▾ to sort and filter. Turn on editing to add,
                 change, remove or reorder entries — it starts in the order shown, and Save keeps that order.</span>`;
         tools.querySelector('[data-edit]').onclick = startEdit;
+        // a last column with each entry's buttons (rowActions)
+        const actionCol = rowActions.length ? [{ id: '_actions', label: '', plain: true, value: () => '', tdClass: () => 'row-actions',
+            cell: r => rowActions.map((a, k) => `<button type="button" class="small" data-row-action="${k}" data-row="${state.rows.indexOf(r)}"
+                title="${esc(a.title || '')}">${esc(a.label)}</button>`).join(' ') }] : [];
         dataTable(readEl, {
-            columns: cols.map(column),
+            columns: [...cols.map(column), ...actionCol],
             rows: state.rows,
             empty: state.rows.length ? 'No entries match the filters' : 'No entries yet. Press Edit to add one.',
             footer: cols.some(c => c.kind === 'money' && c.total !== false) ? totalRow : undefined,

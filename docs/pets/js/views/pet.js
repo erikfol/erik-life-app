@@ -90,10 +90,28 @@ export async function renderPet(el, list, p, onListChanged) {
     // Location (in both tables) offers what's been typed before plus every pet's Vet.
     const vets = [...new Set(list.flatMap(x => (x.info || []).filter(f => /\bvet\b/i.test(f.label) && f.value.trim()).map(f => f.value.trim())))];
     const withVets = cols => cols.map(c => (c.name === 'Location' ? { ...c, suggestions: vets } : c));
+    // "→ Records": the appointment becomes a record (the columns they share; Cost and the rest left blank) at the top of
+    // Records, and leaves Future appointments.
+    const moveToRecords = async appt => {
+        if (hasUnsavedEdits()) return toast('Save or cancel the edits on this page first', 'bad');
+        if (!confirm(`Move the ${showDate(appt.Date) || 'undated'} appointment${appt.Description ? ` (${appt.Description})` : ''} to Records?`)) return;
+        const record = Object.fromEntries(RECORD_COLUMNS.map(c => [c.name, appt[c.name] ?? '']));
+        try {
+            await saveRecords(p, [record, ...await loadRecords(p)]);
+            const left = await loadAppointments(p);
+            const i = left.findIndex(r => APPOINTMENT_COLUMNS.every(c => (r[c.name] || '') === (appt[c.name] || '')));
+            if (i >= 0) left.splice(i, 1);
+            await saveAppointments(p, left);
+            toast('Moved to Records: fill in anything left blank with ✎ Edit', 'ok');
+            forget();
+            renderPet(el, list, p, onListChanged);
+        } catch (err) { toast(`Couldn't move it: ${err.message}`, 'bad'); }
+    };
     appts = recordTable(el.querySelector('#appointments'), {
         columns: withVets(APPOINTMENT_COLUMNS),
         rows: apptRows,
         save: async r => { await saveAppointments(p, r); drawBanner(r); },
+        rowActions: [{ label: '→ Records', title: 'Move this appointment down to Records: the columns Records has are filled in from it, the rest is left blank to fill in', run: moveToRecords }],
     });
     table = recordTable(el.querySelector('#records'), {
         columns: withVets(RECORD_COLUMNS),

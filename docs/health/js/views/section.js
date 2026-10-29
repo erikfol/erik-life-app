@@ -71,10 +71,29 @@ export async function renderSection(el, section) {
         // Where it is: Dental's and Eye's offer the offices in their records too (General Health's records hold body locations).
         const offices = section.columns.some(c => c.name === 'Location' && c.kind === 'suggest')
             ? [...new Set(rows.map(r => (r.Location || '').trim()).filter(Boolean))] : [];
+        // "→ Records": the appointment becomes a record — the columns they share (General Health's record Location is a
+        // body location, so it's left blank) — at the top of Records, and leaves Future appointments.
+        const moveToRecords = async appt => {
+            if (hasUnsavedEdits()) return toast('Save or cancel the edits on this page first', 'bad');
+            if (!confirm(`Move the ${showDate(appt.Date) || 'undated'} appointment${appt.Description ? ` (${appt.Description})` : ''} to Records?`)) return;
+            const skip = section.columns.some(c => c.name === 'Location' && c.kind === 'choice') ? ['Location'] : [];
+            const record = Object.fromEntries(section.columns.map(c => [c.name, !skip.includes(c.name) && appt[c.name] != null ? appt[c.name] : '']));
+            try {
+                await saveRecords(section, [record, ...await loadRecords(section)]);
+                const left = await loadRecords(appts);
+                const i = left.findIndex(r => appts.columns.every(c => (r[c.name] || '') === (appt[c.name] || '')));
+                if (i >= 0) left.splice(i, 1);
+                await saveRecords(appts, left);
+                toast('Moved to Records: fill in anything left blank with ✎ Edit', 'ok');
+                forget();
+                renderSection(el, section);
+            } catch (err) { toast(`Couldn't move it: ${err.message}`, 'bad'); }
+        };
         const apptTable = recordTable(el.querySelector('#appointments'), {
             columns: appts.columns.map(c => (c.name === 'Location' ? { ...c, suggestions: offices } : c)),
             rows: apptRows,
             save: async r => { await saveRecords(appts, r); drawBanner(r); },
+            rowActions: [{ label: '→ Records', title: 'Move this appointment down to Records: the columns Records has are filled in from it, the rest is left blank to fill in', run: moveToRecords }],
         });
         checks.push(() => apptTable.hasUnsavedEdits());
     }
