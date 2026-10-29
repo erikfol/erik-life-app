@@ -83,7 +83,7 @@ export function cleanUrl(url) {
 }
 
 /** Add an account and create its empty payments and activity files. Returns the new account. */
-export async function addAccount({ title, description, type, url, openingBalance, openingDate, apr, accountNumber, creditLimit, loan = null }) {
+export async function addAccount({ title, description, type, url, openingBalance, openingDate, apr, aprEstimate, accountNumber, creditLimit, loan = null }) {
     const accounts = await loadAccounts();
     const id = slug(title, new Set(accounts.map(a => a.id)));
     const account = {
@@ -91,6 +91,7 @@ export async function addAccount({ title, description, type, url, openingBalance
         openingBalance: Number.isFinite(openingBalance) ? round2(openingBalance) : 0,
         openingDate: openingDate ? sheetDate(openingDate, false) : '',
         apr: Number.isFinite(apr) && apr > 0 ? apr : null,
+        aprEstimate: !!aprEstimate && Number.isFinite(apr) && apr > 0, // a guess, not from a statement: shown as ~27.74%
         accountNumber: String(accountNumber || '').trim(),
         creditLimit: Number.isFinite(creditLimit) && creditLimit > 0 ? round2(creditLimit) : null,
         file: `${LOANS_DIR}/${id}.csv`, activityFile: `${LOANS_DIR}/${id}-activity.csv`,
@@ -122,6 +123,7 @@ export async function updateAccount(id, changes) {
     if ('openingBalance' in changes) a.openingBalance = Number.isFinite(changes.openingBalance) ? round2(changes.openingBalance) : 0;
     if ('openingDate' in changes) a.openingDate = changes.openingDate ? sheetDate(changes.openingDate, false) : '';
     for (const k of ['apr', 'planPayment', 'creditLimit']) if (k in changes) a[k] = Number.isFinite(changes[k]) && changes[k] > 0 ? changes[k] : null;
+    if ('aprEstimate' in changes) a.aprEstimate = !!changes.aprEstimate && Number(a.apr) > 0;
     if (changes.accountNumber != null) a.accountNumber = String(changes.accountNumber).trim();
     // the day you looked at the statement and found nothing new to add (resets the "activity not updated" banner)
     if ('activityChecked' in changes) a.activityChecked = changes.activityChecked ? sheetDate(changes.activityChecked, false) : '';
@@ -316,10 +318,24 @@ export async function saveLedger(account, payments, activity) {
 const plusMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n,
     Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate()));
 
+/** '27.74%', or '~27.74%' when the account's APR is marked as an estimate (a guess, not from a statement). */
+export const aprText = (account, apr = Number(account.apr)) => `${account.aprEstimate ? '~' : ''}${apr}%`;
+
+/**
+ * For an account with no APR entered: the rate its interest charges of the last 3 months work out to (interest ÷
+ * balance now × 12), rounded to 0.1%, or NaN without any (shown as ~16% — calculated, not from a statement).
+ */
+export function impliedApr(account, L, now = new Date()) {
+    if (Number(account.apr) > 0 || !(L.balanceNow > 0.005)) return NaN;
+    const since = plusMonths(now, -3);
+    const interest = L.activity.filter(a => a.date && a.date >= since && /^interest$/i.test(a.type) && Number.isFinite(a.amount)).reduce((t, a) => t + a.amount, 0);
+    return interest > 0 ? Math.round(interest / 3 * 12 / L.balanceNow * 1000) / 10 : NaN;
+}
+
 /** How interest is charged: an APR (monthly rate on the balance) or, without one, a flat $ per month from recent activity. */
 export function interestModel(account, L, now = new Date()) {
     const apr = Number(account.apr);
-    if (apr > 0) return { rate: apr / 100 / 12, flat: 0, text: `${apr}% APR` };
+    if (apr > 0) return { rate: apr / 100 / 12, flat: 0, text: `${aprText(account, apr)} APR` };
     const since = plusMonths(now, -3);
     const recent = L.activity.filter(a => a.date && a.date >= since && /^(interest|fee)$/i.test(a.type) && Number.isFinite(a.amount));
     const flat = recent.reduce((t, a) => t + a.amount, 0) / 3;

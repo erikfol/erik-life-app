@@ -2,7 +2,7 @@
 import {
     loadAccounts, addAccount, updateAccount, removeAccount, moveAccount, loadPayments, loadActivity, ledger, saveLedger, estimatePayoff,
     interestModel, simulate, paymentFor, minimumOf, nextPaymentDate, plusMonths,
-    ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate,
+    ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate, aprText, impliedApr,
     isCard, PAID_BACK, owesBack, setActivityPaidBack,
 } from '../loans.js';
 import { drawBars, drawLines } from '../charts.js';
@@ -57,6 +57,10 @@ const DAY = 864e5;
 /** '1234 5678 9012 4421' → '•••• 4421' */
 const maskNumber = n => { const digits = String(n).replace(/\s+/g, ''); return digits.length > 4 ? `•••• ${digits.slice(-4)}` : digits; };
 
+/** The "Estimate" tick under an APR: ticked, the APR is a guess and shows as ~27.74%. */
+const aprEstimateBox = (a = {}) => `<label class="check" style="font-size:0.85em;margin-top:4px" title="Tick if the APR is a guess or worked out, not from a statement: it shows with a ~">
+    <input type="checkbox" name="aprEstimate"${a.aprEstimate ? ' checked' : ''}> Estimate (shows ~)</label>`;
+
 /** The loan setup fields, filled from `a` (an account, or {} for a new loan). Used by Add and Edit. */
 function loanFields(a = {}, tab = TABS[1]) {
     const v = (k, f = x => x) => (Number(a[k]) > 0 ? f(Number(a[k])) : '');
@@ -76,7 +80,8 @@ function loanFields(a = {}, tab = TABS[1]) {
             <label class="field">Length<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="number" min="1" step="1" name="term" style="width:90px" value="${years ? a.termMonths / 12 : v('termMonths')}"><select name="termUnit"><option value="12"${years || !a.termMonths ? ' selected' : ''}>years</option><option value="1"${a.termMonths && !years ? ' selected' : ''}>months</option></select></span></label>
         </div>
         <div class="add-grid">
-            <label class="field">Interest rate (APR %)<input type="number" step="0.001" min="0" name="apr" value="${v('apr')}"></label>
+            <div><label class="field">Interest rate (APR %)<input type="number" step="0.001" min="0" name="apr" value="${v('apr')}"></label>
+                ${aprEstimateBox(a)}</div>
             <label class="field">Monthly payment ($)<input type="number" step="0.01" min="0" name="payment" value="${v('payment')}" placeholder="principal + interest">
                 <span class="muted calc-pay" style="font-size:0.8em"></span></label>
             <label class="field">Escrow ($ / month)<input type="number" step="0.01" min="0" name="escrow" value="${v('escrow')}" placeholder="optional: taxes, insurance">
@@ -106,7 +111,7 @@ function readLoanFields(root) {
     const term = numOf(f('term').value) * (+f('termUnit').value || 1);
     return {
         title: f('title').value.trim(), description: f('description').value, url: f('url').value, accountNumber: f('accountNumber').value,
-        apr: numOf(f('apr').value), openingBalance: numOf(f('openingBalance').value), openingDate: dateOf(f('openingDate').value),
+        apr: numOf(f('apr').value), aprEstimate: !!f('aprEstimate')?.checked, openingBalance: numOf(f('openingBalance').value), openingDate: dateOf(f('openingDate').value),
         loan: {
             lender: f('lender').value, kind: f('kind').value, originalAmount: numOf(f('originalAmount').value),
             firstPayment: dateOf(f('firstPayment').value), termMonths: term, payment: numOf(f('payment').value),
@@ -199,7 +204,8 @@ export default {
                 <div class="add-grid">
                     <label class="field">Opening balance ($)<input type="number" step="0.01" name="openingBalance" placeholder="0.00"></label>
                     <label class="field">As of<input type="date" name="openingDate"></label>
-                    <label class="field">APR (%)<input type="number" step="0.01" min="0" name="apr" placeholder="optional, for the payoff date"></label>
+                    <div><label class="field">APR (%)<input type="number" step="0.01" min="0" name="apr" placeholder="optional, for the payoff date"></label>
+                        ${aprEstimateBox()}</div>
                 </div>
                 <div class="add-grid">
                     <label class="field">Account number<input type="text" name="accountNumber" autocomplete="off" placeholder="optional: the last 4 digits are enough"></label>
@@ -243,7 +249,7 @@ export default {
             if (acctForm.url.value.trim() && !cleanUrl(acctForm.url.value)) { toast('The payment website should start with https://', 'bad'); return; }
             try {
                 await addAccount({ title, description: acctForm.description.value, type: acctForm.type.value, url: acctForm.url.value,
-                    openingBalance: numOf(acctForm.openingBalance.value), openingDate: dateOf(acctForm.openingDate.value) || new Date(), apr: numOf(acctForm.apr.value),
+                    openingBalance: numOf(acctForm.openingBalance.value), openingDate: dateOf(acctForm.openingDate.value) || new Date(), apr: numOf(acctForm.apr.value), aprEstimate: acctForm.aprEstimate.checked,
                     accountNumber: acctForm.accountNumber.value, creditLimit: acctForm.creditLimit ? numOf(acctForm.creditLimit.value) : NaN });
                 toast(`Added ${title}`, 'ok');
                 this.render(el);
@@ -357,7 +363,7 @@ function renderTotals(el, all, tab) {
         const limit = Number(account.creditLimit) > 0 ? Number(account.creditLimit) : NaN;
         const paid = sum(L.payments.filter(p => p.made && Number.isFinite(p.payment)).map(p => p.payment));
         const start = isLoan(account) && Number(account.originalAmount) > 0 ? Number(account.originalAmount) : L.opening;
-        return { account, L, P, balance: L.balanceNow, limit, paid, start, apr: Number(account.apr) > 0 ? Number(account.apr) : NaN };
+        return { account, L, P, balance: L.balanceNow, limit, paid, start, apr: Number(account.apr) > 0 ? Number(account.apr) : NaN, implied: impliedApr(account, L) };
     });
     if (!rows.length) { el.hidden = true; return; }
     const owing = rows.filter(r => r.balance > 0.005);
@@ -377,7 +383,7 @@ function renderTotals(el, all, tab) {
     const usedClass = used >= 0.7 ? 'delta-bad' : used >= 0.3 ? 'badge-warn' : 'delta-good';
     const byApr = owing.filter(r => Number.isFinite(r.apr)).sort((a, b) => b.apr - a.apr);
     const tips = [];
-    if (byApr.length >= 2) tips.push(`<strong>Pay-off order:</strong> after the minimums, put any extra toward <strong>${esc(byApr[0].account.title)}</strong> (${byApr[0].apr}% APR) first, then ${byApr.slice(1).map(r => `${esc(r.account.title)} (${r.apr}%)`).join(', then ')}. Paying the highest rate first saves the most interest.`);
+    if (byApr.length >= 2) tips.push(`<strong>Pay-off order:</strong> after the minimums, put any extra toward <strong>${esc(byApr[0].account.title)}</strong> (${esc(aprText(byApr[0].account, byApr[0].apr))} APR) first, then ${byApr.slice(1).map(r => `${esc(r.account.title)} (${esc(aprText(r.account, r.apr))})`).join(', then ')}. Paying the highest rate first saves the most interest.`);
     const noApr = owing.filter(r => !Number.isFinite(r.apr));
     if (noApr.length) tips.push(`<span class="muted">No APR set for ${noApr.map(r => esc(r.account.title)).join(', ')}: add it in Edit for better estimates${byApr.length ? ' and to place it in the pay-off order' : ''}.</span>`);
     if (unsure.length) tips.push(`<span class="muted">${unsure.map(r => esc(r.account.title)).join(', ')} ${unsure.length === 1 ? "doesn't" : "don't"} have a payoff date yet (no payment planned, or the payment doesn't cover the interest), so the debt-free date leaves ${unsure.length === 1 ? 'it' : 'them'} out.</span>`);
@@ -399,7 +405,8 @@ function renderTotals(el, all, tab) {
             <tbody>${rows.map(r => `<tr class="totals-row" data-open="${esc(r.account.id)}">
                 <td>${typeIcon(r.account.type)} <strong>${esc(r.account.title)}</strong></td>
                 <td class="amt">${esc(money(r.balance))}</td>
-                <td class="amt">${Number.isFinite(r.apr) ? `${r.apr}%` : '<span class="muted">–</span>'}</td>
+                <td class="amt">${Number.isFinite(r.apr) ? `<span${r.account.aprEstimate ? ' title="An estimate, not from a statement"' : ''}>${esc(aprText(r.account, r.apr))}</span>`
+                    : Number.isFinite(r.implied) ? `<span class="muted" title="No APR entered: worked out from the interest charged in the last 3 months">~${r.implied}%</span>` : '<span class="muted">–</span>'}</td>
                 <td class="amt">${Number.isFinite(r.P.payment) ? esc(money(r.P.payment)) : '<span class="muted">–</span>'}</td>
                 <td class="nowrap">${r.P.status === 'ok' ? esc(MON_LONG(r.P.date)) : r.P.status === 'paid' ? '<span class="delta-good">paid off</span>' : r.P.status === 'never' ? '<span class="delta-bad">not at this rate</span>' : '<span class="muted">–</span>'}</td>
                 <td class="amt">${r.P.status === 'ok' && r.P.interest > 0.5 ? esc(money(r.P.interest)) : '<span class="muted">–</span>'}</td>
@@ -467,7 +474,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
     const loanCards = !loan ? '' : [
         card('Monthly payment', Number.isFinite(monthlyDue) ? money(monthlyDue) : '–',
             `<span class="muted">${Number.isFinite(T.payment) ? `${esc(money(T.payment))} principal &amp; interest${T.escrow ? ` + ${esc(money(T.escrow))} escrow` : ''}${T.computedPayment ? ' (from the terms)' : ''}` : 'add it in Edit'}`
-            + `<br>${T.apr ? `${esc(String(T.apr))}% APR` : 'rate not set'}${Number.isFinite(T.term) ? ` · ${esc(duration(T.term))}` : ''}${account.loanKind ? ` · ${esc(account.loanKind)}` : ''}</span>`),
+            + `<br>${T.apr ? `${esc(aprText(account, T.apr))} APR` : 'rate not set'}${Number.isFinite(T.term) ? ` · ${esc(duration(T.term))}` : ''}${account.loanKind ? ` · ${esc(account.loanKind)}` : ''}</span>`),
         card('Next payment', Number.isFinite(nextAmount) ? money(nextAmount) : '–',
             `<span class="muted">${nextDue ? `${next && next.date < today() ? 'was due' : 'due'} ${esc(dLong(nextDue))}` : 'set the due day in Edit'}${next ? '' : ' · not added yet'}</span>`),
         card('Interest', money(interestPaid),
@@ -524,7 +531,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 ${creditCard}
                 ${payoffCard}
                 ${loan ? '' : card('Interest &amp; fees', money(interestFees),
-                    `<span class="muted">${Number(account.apr) > 0 ? `<strong>${esc(String(account.apr))}% APR</strong>` : 'APR not set: add it in Edit'}<br>`
+                    `<span class="muted">${Number(account.apr) > 0 ? `<strong>${esc(aprText(account))} APR</strong>`
+                        : Number.isFinite(impliedApr(account, L)) ? `<strong>~${impliedApr(account, L)}% APR</strong>, worked out from recent interest: add the real one in Edit` : 'APR not set: add it in Edit'}<br>`
                     + `${activity.length} activity entr${activity.length === 1 ? 'y' : 'ies'}</span>`)}
             </div>
             ${L.points.length > 1 ? '<h3 class="chart-title">Balance over time</h3><canvas class="c-bal" style="display:block;width:100%;height:200px;margin-bottom:14px"></canvas>' : ''}
@@ -538,7 +546,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 <div>
                     <h3 class="chart-title">Payments</h3>
                     <div class="t-pay short-table"></div>
-                    ${loan ? `<p class="note" style="margin-top:6px">Each payment pays the month's interest${T.escrow ? ' and escrow' : ''} first; the rest lowers the balance. Interest marked ~ is estimated (balance × ${esc(String(T.apr || 0))}% ÷ 12): type the amount from your statement in Edit to make it exact.</p>`
+                    ${loan ? `<p class="note" style="margin-top:6px">Each payment pays the month's interest${T.escrow ? ' and escrow' : ''} first; the rest lowers the balance. Interest marked ~ is estimated (balance × ${esc(aprText(account, T.apr || 0))} ÷ 12): type the amount from your statement in Edit to make it exact.</p>`
                         : payments.some(p => p.projected) ? `<p class="note" style="margin-top:6px">Planned payments show the balance as if each one before it is made, with a month's interest each: ${esc(P.model?.text || interestModel(account, L).text)}.</p>` : ''}
                     <div class="row" style="margin-top:10px"><button type="button" class="primary small" data-pay-open>+ Add payment</button>
                         <button type="button" class="small" data-edit-rows="pay" title="Change or remove payments">✎ Edit payments</button></div>
@@ -863,7 +871,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 <span class="muted" style="align-self:end;font-size:0.85em;padding-bottom:8px">The balance before the first payment and activity below.</span>
             </div>
             <div class="add-grid">
-                <label class="field">APR (%)<input type="number" step="0.01" min="0" name="apr" value="${Number(account.apr) > 0 ? account.apr : ''}" placeholder="optional"></label>
+                <div><label class="field">APR (%)<input type="number" step="0.01" min="0" name="apr" value="${Number(account.apr) > 0 ? account.apr : ''}" placeholder="optional"></label>
+                    ${aprEstimateBox(account)}</div>
                 <label class="field">Planned monthly payment ($)<input type="number" step="0.01" min="0" name="planPayment" value="${Number(account.planPayment) > 0 ? account.planPayment : ''}" placeholder="optional"></label>
                 <span class="muted" style="align-self:end;font-size:0.85em;padding-bottom:8px">Used for the payoff estimate. Without a planned payment it uses your next payment.</span>
             </div>
@@ -970,7 +979,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 await updateAccount(account.id, {
                     title, type: ed.querySelector('[name=type]').value, description: ed.querySelector('[name=description]').value, url,
                     openingBalance: Number.isFinite(openingBalance) ? openingBalance : 0, openingDate,
-                    apr: numOf(ed.querySelector('[name=apr]').value), planPayment: numOf(ed.querySelector('[name=planPayment]').value),
+                    apr: numOf(ed.querySelector('[name=apr]').value), aprEstimate: ed.querySelector('[name=aprEstimate]').checked,
+                    planPayment: numOf(ed.querySelector('[name=planPayment]').value),
                     accountNumber: ed.querySelector('[name=accountNumber]').value, creditLimit: numOf(ed.querySelector('[name=creditLimit]').value),
                 });
                 const updated = { ...account, openingBalance: Number.isFinite(openingBalance) ? openingBalance : 0, openingDate: openingDate ? isoDate(openingDate) : '' };
