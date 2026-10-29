@@ -95,6 +95,7 @@ export default {
                     <div class="row"><button type="submit" class="primary">Save</button><button type="button" id="opening-cancel">Cancel</button></div>
                 </form>
                 <div id="activity" class="short-table"></div>
+                <p class="muted" style="font-size:0.85em;margin-top:6px">Oh Sh!t Money: the balance after each entry minus what's set aside in the buckets today (the newest entry's is the Oh sh!t money above).</p>
             </section>
             <section>
                 <h2>Insights</h2>
@@ -268,7 +269,9 @@ export default {
         activityTable = recordTable($('#activity'), {
             columns: [...ACTIVITY_COLUMNS.map(c => (c.name === 'Type' ? { ...c, default: 'Deposit', badge: v => (/^withdraw/i.test(v) ? 'withdrawal' : 'deposit') } // green / red
                 : c.name === 'Date' ? { ...c, default: () => isoDate(today()) } : c)),
-                { name: 'Balance', kind: 'money', total: false, calc: r => L.after.get(r) ?? '' }],
+                { name: 'Balance', kind: 'money', total: false, calc: r => L.after.get(r) ?? '' },
+                // the balance after the entry minus what's in the buckets today (their past balances aren't kept)
+                { name: 'Oh Sh!t Money', kind: 'money', total: false, calc: r => (L.after.has(r) ? Math.round((L.after.get(r) - setAside) * 100) / 100 : '') }],
             rows: activity,
             choices: { Type: { list: ACTIVITY_TYPES, noun: 'type' } },
             save: async rows => {
