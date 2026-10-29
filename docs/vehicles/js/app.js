@@ -6,11 +6,15 @@ import { esc } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import { loadVehicles } from './vehicles.js';
+import alerts from './alerts.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import { renderVehicle, renderNewVehicle, hasUnsavedEdits, forget } from './views/vehicle.js';
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('nav');
 let currentHash = null;
+// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
+const menus = colourMenus(alerts);
 
 function drawNav(list, active) {
     navEl.innerHTML = list.map(v => `<a href="#${esc(v.id)}"${v.id === active ? ' class="active"' : ''}>${esc(v.name)}</a>`).join('')
@@ -36,6 +40,7 @@ async function route(force = false) {
         navEl.innerHTML = '';
         return askForFolder(viewEl, { what: 'Vehicle records', where: 'inputs/vehicles/', onConnected: () => route(true) });
     }
+    menus.ready();
     try {
         const list = await loadVehicles();
         const [want, part] = hash.slice(1).split('/');

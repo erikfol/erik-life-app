@@ -1,6 +1,6 @@
-// One vehicle's page, in three tabs: Overview (information, current mileage for cars, service places, photos,
-// maintenance table), Guides (long how-to notes with reference images) and Notes (a dated log). Also the "Add vehicle"
-// page.
+// One vehicle's page, in three tabs: Overview (information, current mileage and the maintenance schedule for cars,
+// service places, photos, maintenance table), Guides (long how-to notes with reference images) and Notes (a dated log).
+// Also the "Add vehicle" page.
 import { esc, toast } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
@@ -11,17 +11,65 @@ import { renderNotes, notesUnsaved, forgetNotes } from './notes.js';
 import {
     TYPES, VEHICLES_PATH, saveVehicles, photosDir, newVehicle, maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance,
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
+    hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
+    lastText, SOON_MILES, SOON_DAYS,
 } from '../vehicles.js';
 
 let table = null;
 let mileage = null; // the mileage log (cars)
+let schedule = null; // the maintenance schedule (cars)
 let info = null; // the information box
 
-export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!mileage?.hasUnsavedEdits() || !!info?.hasUnsavedEdits()
-    || placesUnsaved() || guidesUnsaved() || notesUnsaved();
+export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!mileage?.hasUnsavedEdits() || !!schedule?.hasUnsavedEdits()
+    || !!info?.hasUnsavedEdits() || placesUnsaved() || guidesUnsaved() || notesUnsaved();
 export const forget = () => {
-    table = null; mileage = null; info = null; closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetGuides(); forgetNotes();
+    table = null; mileage = null; schedule = null; info = null;
+    closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetGuides(); forgetNotes();
 };
+
+const STATUS = { red: 'Overdue', yellow: 'Due soon', ok: 'OK' };
+const STATUS_CLASS = { Overdue: 'due-red', 'Due soon': 'due-yellow', OK: 'due-ok' };
+
+/**
+ * The maintenance schedule: a banner of what's overdue (red) and due soon (yellow), the schedule table (editable; its
+ * Status, Next due and Last done are worked out from get() = { log, readings }, the maintenance and mileage logs as
+ * last saved) and how it's worked out. Returns redraw(), for after either log is saved.
+ */
+function renderSchedule(el, v, rows, get) {
+    let saved = rows;
+    const draw = () => {
+        const { log, readings } = get();
+        const now = currentReading(v, log, readings);
+        const status = r => scheduleStatus(v, r, log, now);
+        const states = saved.map(r => ({ r, s: status(r) }));
+        const red = states.filter(x => x.s.level === 'red'), yellow = states.filter(x => x.s.level === 'yellow');
+        const item = x => `<span class="nowrap"><strong>${esc(x.r.Item)}</strong> <span class="muted">(due ${esc(dueText(x.s))})</span></span>`;
+        el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner bad"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
+            + (yellow.length ? `<div class="banner"><strong>Due soon:</strong> ${yellow.map(item).join(' · ')}</div>` : '')
+            + (saved.length && !red.length && !yellow.length ? '<div class="banner ok">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
+        el.querySelector('.sched-note').innerHTML = `Worked out from ${now ? `the latest mileage, <strong>${now.miles.toLocaleString('en-US')} miles</strong>
+            (${esc(now.date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}),` : 'the mileage (none logged yet)'} and the
+            Maintenance log below. An item counts from the newest entry whose Action is its name (or one of its Also counts names,
+            comma-separated); never logged, it counts from the purchase (by First, where that's filled in). Due soon: within
+            ${SOON_MILES.toLocaleString('en-US')} miles or ${SOON_DAYS} days. Log work with the item's name as the Action and it turns green.`;
+        if (schedule?.hasUnsavedEdits()) return; // don't throw away edits in progress
+        const cols = scheduleColumns([...new Set(log.map(r => String(r.Action || '').trim()).filter(Boolean))]);
+        schedule = recordTable(el.querySelector('.sched'), {
+            columns: [cols[0], cols[1],
+                { name: 'Status', kind: 'text', calc: r => STATUS[status(r).level] || '—', badge: x => STATUS_CLASS[x] || '' },
+                { name: 'Next due', kind: 'text', calc: r => {
+                    const s = status(r);
+                    return s.level ? nextDueText(v, readings, now, s) : 'Fill in Every (or the last entry’s mileage)';
+                } },
+                { name: 'Last done', kind: 'text', calc: r => lastText(v, status(r), r) || 'Not logged' },
+                cols.at(-1), ...cols.slice(2, -1)], // Notes next, so it's in view; then how often
+            rows: saved,
+            save: async next => { await saveSchedule(v, next); saved = next; schedule = null; draw(); },
+        });
+    };
+    draw();
+    return draw;
+}
 
 /** The newest reading in the log (64,870 miles, Oct 23, 2026) and the miles a month and a year it works out to. */
 const currentMileage = (v, rows) => {
@@ -69,10 +117,12 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     const rows = await loadMaintenance(v);
     const miles = hasMileageLog(v) ? await loadMileage(v) : null;
+    const plan = hasSchedule(v) ? await loadSchedule(v) : null;
     el.innerHTML = `
         <h1 class="page" id="v-name"></h1>
         <p class="lead">${esc(TYPES[v.type]?.label || 'Vehicle')} · information in <code>${esc(VEHICLES_PATH)}</code>,
-            ${miles ? `mileage in <code>${esc(mileagePath(v))}</code>, ` : ''}maintenance in <code>${esc(maintenancePath(v))}</code>.</p>
+            ${miles ? `mileage in <code>${esc(mileagePath(v))}</code>, ` : ''}${plan ? `schedule in <code>${esc(schedulePath(v))}</code>, ` : ''}maintenance in
+            <code>${esc(maintenancePath(v))}</code>.</p>
         ${tabs(v, part)}
         <section>
             <h2>Vehicle information</h2>
@@ -82,6 +132,12 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             <h2>Current mileage</h2>
             <div id="miles-now"></div>
             <div id="miles" class="mileage-log"></div>
+        </section>` : ''}
+        ${plan ? `<section id="schedule">
+            <h2>Maintenance schedule</h2>
+            <div class="sched-banner"></div>
+            <div class="sched"></div>
+            <p class="muted mileage-sub sched-note"></p>
         </section>` : ''}
         <section>
             <h2>Service places</h2>
@@ -117,14 +173,16 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             onListChanged(list.find(x => x.id !== v.id)?.id || 'new');
         },
     });
+    // The logs as last saved: the mileage table's worked-out columns and the schedule are worked out from them.
+    const saved = { log: rows, readings: miles || [] };
+    const redrawSchedule = plan ? renderSchedule(el.querySelector('#schedule'), v, plan, () => saved) : () => {};
     if (miles) {
         const now = el.querySelector('#miles-now');
         now.innerHTML = currentMileage(v, miles);
-        let log = miles; // as last saved, for the worked-out columns
         mileage = recordTable(el.querySelector('#miles'), {
-            columns: [...MILEAGE_COLUMNS, ...mileageRateColumns(v, () => log)],
+            columns: [...MILEAGE_COLUMNS, ...mileageRateColumns(v, () => saved.readings)],
             rows: miles,
-            save: async rows => { await saveMileage(v, rows); log = rows; now.innerHTML = currentMileage(v, rows); },
+            save: async rows => { await saveMileage(v, rows); saved.readings = rows; now.innerHTML = currentMileage(v, rows); redrawSchedule(); },
         });
     }
     renderPlaces(el.querySelector('#places'), list, v);
@@ -132,9 +190,9 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
         el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
     });
     table = recordTable(el.querySelector('#maint'), {
-        columns: maintenanceColumns(v),
+        columns: maintenanceColumns(v, (plan || []).map(r => r.Item)), // the schedule's items are offered first as Actions
         rows,
-        save: rows => saveMaintenance(v, rows),
+        save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redrawSchedule(); },
     });
 }
 

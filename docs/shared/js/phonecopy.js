@@ -1,6 +1,6 @@
 // "📱 Phone copy" (Vehicles, House, Health, Pets, Dinner Planner and Kid Lunches top bars): writes one self-contained,
-// read-only page — every vehicle (information, current mileage for cars, service places, maintenance, photos, guides,
-// notes), every house (information, service companies, photos, and per area information, photos, maintenance with its
+// read-only page — every vehicle (information, current mileage and maintenance schedule for cars, service places,
+// maintenance, photos, guides, notes), every house (information, service companies, photos, and per area information, photos, maintenance with its
 // due banners, records; Updates; Projects), every Health section (General Health, Dental and Eye with their information
 // and future appointments), every pet (information, future appointments, photos, records), the Dinner Planner (the
 // calendar a week at a time with its shopping list, every meal) and Kid Lunches (each school day's lunch boxes and the
@@ -11,7 +11,7 @@ import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
-    latestMileage, mileageRate, mileageRateColumns,
+    latestMileage, mileageRate, mileageRateColumns, hasSchedule, loadSchedule, currentReading, scheduleStatus, nextDueText, lastText,
 } from '../../vehicles/js/vehicles.js';
 import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, loadInfo as loadHealthInfo } from '../../health/js/records.js';
 import * as house from '../../house/js/house.js';
@@ -68,6 +68,18 @@ export async function collectData(progress = () => {}) {
         notes.sort((a, b) => b.date.localeCompare(a.date));
         const miles = hasMileageLog(v) ? await loadMileage(v, false) : null;
         const mileCols = miles && [...MILEAGE_COLUMNS, ...mileageRateColumns(v, () => miles)]; // with each reading's miles a month and a year
+        const log = await loadMaintenance(v, false);
+        // The maintenance schedule as it stands now (worked out here, like the page's Status / Next due / Last done)
+        const plan = hasSchedule(v) ? await loadSchedule(v, false) : null;
+        const now = plan && currentReading(v, log, miles || []);
+        const schedule = plan && {
+            asOf: now ? `${now.miles.toLocaleString('en-US')} miles on ${now.date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '',
+            rows: plan.map(r => {
+                const st = scheduleStatus(v, r, log, now);
+                return { item: r.Item, status: { red: 'Overdue', yellow: 'Due soon', ok: 'OK' }[st.level] || '—',
+                    next: st.level ? nextDueText(v, miles || [], now, st) : 'Not set', last: lastText(v, st, r) || 'Not logged', notes: r.Notes || '' };
+            }),
+        };
         vehicles.push({
             name: v.name,
             type: TYPES[v.type]?.label || 'Vehicle',
@@ -76,7 +88,8 @@ export async function collectData(progress = () => {}) {
             mileage: miles && { columns: mileCols.map(c => ({ name: c.name, kind: c.kind })),
                 rows: miles.map(r => Object.fromEntries(mileCols.map(c => [c.name, c.calc ? String(c.calc(r)) : r[c.name]]))),
                 latest: latestMileage(miles), rate: mileageRate(v, miles) },
-            maintenance: { columns: maintenanceColumns(v).map(c => ({ name: c.name, kind: c.kind })), rows: await loadMaintenance(v, false) },
+            schedule,
+            maintenance: { columns: maintenanceColumns(v).map(c => ({ name: c.name, kind: c.kind })), rows: log },
             photos: await images(photosDir(v), tick),
             guides,
             notes,
@@ -329,6 +342,13 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
                 <p class="muted">Each reading's miles a month and a year are since the one before it (the oldest one's since the purchase).</p>`
                 : '<p class="muted">Nothing logged yet.</p>'}<div></div>`;
             records(el.lastElementChild, v.mileage.columns, v.mileage.rows);
+        });
+        if (v.schedule) section('Maintenance schedule', true, el => { // as it stood when this copy was made
+            const tone = { Overdue: 'background:#fdecea;color:#a8322a', 'Due soon': 'background:#fff8e1;color:#8a5a00', OK: 'background:#e8f8ef;color:#1e7a46' };
+            el.innerHTML = `${v.schedule.asOf ? `<p class="muted">As of ${esc(v.schedule.asOf)}, when this copy was made.</p>` : ''}${v.schedule.rows.map(r => `
+                <div class="card"><div class="card-head"><b>${esc(r.item)}</b><span class="tag" style="${tone[r.status] || ''}">${esc(r.status)}</span></div>
+                <div class="sub">Next due: ${esc(r.next)}</div><div class="sub">Last done: ${esc(r.last)}</div>
+                ${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</div>`).join('') || '<p class="muted">Nothing on the schedule.</p>'}`;
         });
         if (v.places.length) section(`Service places (${v.places.length})`, false, placesHtml(v.places));
         section(`Maintenance (${v.maintenance.rows.length})`, true, el => records(el, v.maintenance.columns, v.maintenance.rows));

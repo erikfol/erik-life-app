@@ -11,6 +11,7 @@ import { backupPanel } from './backup.js';
 const ALERTS = {
     'bills-etc': () => import('../../bills-etc/js/alerts.js'),
     health: () => import('../../health/js/alerts.js'),
+    vehicles: () => import('../../vehicles/js/alerts.js'),
     house: () => import('../../house/js/alerts.js'),
     pets: () => import('../../pets/js/alerts.js'),
     gifts: () => import('../../gifts/js/alerts.js'),

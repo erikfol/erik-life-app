@@ -141,3 +141,9 @@ h3.g-images { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.4p
     padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: #f8faff;
 }
 #n-new .note-form { border: 1px solid var(--line-strong); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+
+/* Maintenance schedule (cars): each item's Status */
+.cat-badge.due-red { background: #fdecea; color: #a8322a; }
+.cat-badge.due-yellow { background: #fff8e1; color: #8a5a00; }
+.cat-badge.due-ok { background: #e8f8ef; color: #1e7a46; }
+#schedule [data-read] td:nth-child(6) { min-width: 300px; } /* Notes: wide enough to read without very tall rows */
