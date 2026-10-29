@@ -441,13 +441,18 @@ details.bucket[open] > .bucket-row { background: #eef4ff; }
 .b-date { font-size: 0.82em; text-align: right; }
 .b-notes { margin: 2px 8px 10px; padding: 10px 14px; background: #f8faff; border-left: 3px solid var(--line-strong); border-radius: 4px; font-size: 0.88em; line-height: 1.6; color: #444; }
 details.bucket.separate .where-bar span { background: #9db7d9; }
+/* Savings → Where the money is: the Grand total row under the buckets */
+.bucket-total { margin-top: 10px; padding-top: 6px; border-top: 2px solid var(--line-strong); }
+.bucket-total .bucket-row:hover { background: none; }
+.bucket-total .b-name, .bucket-total .b-amt { font-weight: 700; }
+.bucket-total .total-note { font-size: 0.82em; }
 details.bucket-group { margin-top: 14px; }
 details.bucket-group > summary { cursor: pointer; margin-bottom: 8px; }
 .upd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 10px; }
 .b-grid textarea, .loan-grid textarea { font: inherit; font-size: 0.85em; width: 260px; min-height: 34px; }
 @media (max-width: 640px) {
     .bucket-row { grid-template-columns: 1fr 80px; }
-    .bucket-row .where-bar, .bucket-row .b-check, .bucket-row .b-date { display: none; }
+    .bucket-row .where-bar, .bucket-row .b-check, .bucket-row .b-date, .bucket-row .total-note { display: none; }
 }
 .deposit-btn { padding: 2px 8px; font-size: 0.85em; color: var(--green); border-color: #bfe8cf; background: #f2fbf5; font-family: Consolas, 'SF Mono', monospace; }
 .deposit-btn:hover { background: #dff5e7; }

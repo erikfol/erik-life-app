@@ -322,7 +322,17 @@ export default {
             return g.id === 'past'
                 ? `<details class="bucket-group"><summary><strong>${g.title}</strong> <span class="muted">(${list.length}) ${g.sub}</span></summary>${inner}</details>`
                 : `<h3 class="chart-title" style="margin-top:12px">${g.title} <span class="muted" style="font-weight:400">${g.sub}</span></h3>${inner}`;
-        }).join('');
+        }).join('') + (() => { // Grand total: every bucket's balance (not the one-time money, which came and went), and the per-paycheck total
+            const withMoney = live.filter(b => Number.isFinite(b.balance));
+            const apart = sum(heldApart.map(b => b.balance));
+            return `<div class="bucket-list bucket-total"><div class="bucket-row static">
+                <span class="b-name">Grand total <span class="muted">(${withMoney.length} bucket${withMoney.length === 1 ? '' : 's'})</span></span>
+                <span class="muted total-note">${apart ? `includes ${esc(money(apart))} held separately · ` : ''}not counting one-time money</span>
+                <span class="b-amt">${esc(money(sum(withMoney.map(b => b.balance))))}</span>
+                <span class="b-check">${perCheck > 0 ? `+${esc(money(perCheck))}/check` : ''}</span>
+                <span class="b-date"></span>
+            </div></div>`;
+        })();
 
         $('#buckets').addEventListener('click', e => {
             const btn = e.target.closest('[data-deposit]');
