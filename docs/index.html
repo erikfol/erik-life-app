@@ -13,8 +13,8 @@
     </script>
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261029105206";
-        const FILES = ["bills-etc/js/alerts.js", "bills-etc/js/charts.js", "bills-etc/js/csv.js", "bills-etc/js/data.js", "bills-etc/js/datatable.js", "bills-etc/js/dates.js", "bills-etc/js/electric.js", "bills-etc/js/filtermenu.js", "bills-etc/js/fs.js", "bills-etc/js/heating.js", "bills-etc/js/loans.js", "bills-etc/js/propane.js", "bills-etc/js/savings.js", "bills-etc/js/sheet.js", "bills-etc/js/taxes.js", "bills-etc/js/util.js", "bills-etc/js/views/sheeteditor.js", "bills-etc/js/views/taxes.js", "bills-etc/js/views/utilcommon.js", "bills-etc/js/views/water.js", "bills-etc/js/water.js", "gifts/js/alerts.js", "gifts/js/gifts.js", "health/js/alerts.js", "health/js/records.js", "house/js/alerts.js", "house/js/house.js", "pets/js/alerts.js", "pets/js/pets.js", "shared/js/dropbox.js", "shared/js/fileguard.js", "shared/js/home.js"];
+        const VERSION = "20261029112949";
+        const FILES = ["bills-etc/js/alerts.js", "bills-etc/js/charts.js", "bills-etc/js/csv.js", "bills-etc/js/data.js", "bills-etc/js/datatable.js", "bills-etc/js/dates.js", "bills-etc/js/electric.js", "bills-etc/js/filtermenu.js", "bills-etc/js/fs.js", "bills-etc/js/heating.js", "bills-etc/js/loans.js", "bills-etc/js/propane.js", "bills-etc/js/savings.js", "bills-etc/js/sheet.js", "bills-etc/js/taxes.js", "bills-etc/js/util.js", "bills-etc/js/views/sheeteditor.js", "bills-etc/js/views/taxes.js", "bills-etc/js/views/utilcommon.js", "bills-etc/js/views/water.js", "bills-etc/js/water.js", "gifts/js/alerts.js", "gifts/js/gifts.js", "health/js/alerts.js", "health/js/records.js", "house/js/alerts.js", "house/js/house.js", "pets/js/alerts.js", "pets/js/pets.js", "shared/js/backup.js", "shared/js/dropbox.js", "shared/js/fileguard.js", "shared/js/home.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('home-version') !== VERSION) {
@@ -78,12 +78,23 @@
         .count.yellow { background: #f5c518; color: #4a3b00; }
         .count.error { background: #e3e6ec; color: #667; }
         .alerts-note { margin: -8px 0 18px; color: var(--muted); font-size: 0.9em; }
+        /* Manual backup to a folder on the PC (shared/js/backup.js) */
+        .backup {
+            margin-top: 22px; background: var(--surface); border-radius: 10px; padding: 14px 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.92em; line-height: 2;
+        }
+        .backup strong:first-child { margin-right: 6px; }
+        .backup .muted { color: var(--muted); }
+        .backup .ok { color: #1e7a46; }
+        .backup .bad { color: #a8322a; }
+        .backup-msg { line-height: 1.4; margin-top: 4px; }
         .dropbox { margin-top: 26px; color: var(--muted); font-size: 0.9em; }
-        .dropbox button, .alerts-note button {
+        .dropbox button, .alerts-note button, .backup button {
             font: inherit; background: var(--surface); color: var(--text); border: 1px solid #ccd;
             border-radius: 6px; padding: 4px 12px; margin-left: 6px; cursor: pointer;
         }
-        .dropbox button.primary, .alerts-note button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+        .backup button:disabled { opacity: 0.7; cursor: default; }
+        .dropbox button.primary, .alerts-note button.primary, .backup button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
     </style>
 </head>
 <body>
@@ -136,6 +147,7 @@
                 <p>Work history, skills, education, references and the job search, and a resume builder that fits a resume to a job posting.</p>
             </a>
         </div>
+        <div class="backup" id="backup" hidden></div>
         <p class="dropbox" id="dropbox" hidden></p>
     </main>
 </body>

@@ -1,9 +1,11 @@
 // The Home page (docs/index.html): a red and a yellow count on each section's card — how many red and yellow banners
-// its pages show right now (point at one to see what they are) — and, on a tablet or phone, Dropbox sign-in. Each
+// its pages show right now (point at one to see what they are) — the Backup line (backup.js), and, on a tablet or
+// phone, Dropbox sign-in. Each
 // section's rules are in its own alerts.js, which its pages use for their banners too, so the counts always agree.
 import * as dbx from './dropbox.js';
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
+import { backupPanel } from './backup.js';
 
 // The sections that have red / yellow banners (the others have none), by their folder.
 const ALERTS = {
@@ -35,15 +37,18 @@ async function countAll() {
     }));
 }
 
-// ── The folder (this computer) or Dropbox (a tablet or phone) the counts are read from ──
+// ── The folder (this computer) or Dropbox (a tablet or phone) the counts and the backup line are read from ──
 const note = document.getElementById('alerts-note');
+const backup = backupPanel(document.getElementById('backup'));
+const connected = () => { backup.refresh(); return countAll(); };
 
 async function connect() {
     note.hidden = true;
-    if (fs.folder()) return countAll(); // signed in to Dropbox on this device
+    backup.refresh();
+    if (fs.folder()) return connected(); // signed in to Dropbox on this device
     if (!fs.isSupported()) return; // a tablet or phone: sign in with Dropbox below first
     const rem = await fs.rememberedFolder().catch(() => null);
-    if (fs.folder()) return countAll();
+    if (fs.folder()) return connected();
     // After Chrome restarts it asks once before the folder can be read again (needs a click).
     note.innerHTML = rem && !rem.moved
         ? `To show the red and yellow counts, allow your folder again: <button type="button" class="primary">Reconnect “${esc(rem.handle.name)}”</button>`
@@ -74,4 +79,4 @@ const drawDropbox = () => {
 drawDropbox();
 connect();
 // Back from a section (the browser may show this page as it was): count again, since something may have changed.
-window.addEventListener('pageshow', e => { if (e.persisted && fs.folder()) countAll(); });
+window.addEventListener('pageshow', e => { if (e.persisted && fs.folder()) connected(); });
