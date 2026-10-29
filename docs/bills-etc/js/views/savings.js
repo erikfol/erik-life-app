@@ -3,7 +3,7 @@
 // the account comes from the account activity (deposits and withdrawals from a starting balance), like a credit card's:
 // its balance over time, the activity table, and a yellow / red banner when it hasn't been updated in 20 / 40 days.
 import {
-    loadSavings, changeSavings, saveSeparate, bucketCells, transferCells, sheetDollars, longDate, SAVINGS_PATH,
+    loadSavings, changeSavings, bucketCells, transferCells, sheetDollars, longDate, SAVINGS_PATH,
     loadActivity, saveActivity, ACTIVITY_COLUMNS, ACTIVITY_TYPES, ACTIVITY_PATH, savingsLedger, loadSettings, saveSettings, syncAvailable,
 } from '../savings.js';
 import { PATHS, readTable } from '../data.js';
@@ -53,14 +53,14 @@ export default {
             return;
         }
         const [spending, activity, settings] = await Promise.all([averageSpending(), loadActivity(), loadSettings()]);
-        const { available, buckets, transfers, totals, separate } = data;
+        const { available, buckets, transfers, totals } = data;
         // What's in the account: the starting balance (until one is saved, the sheet's Available In Account) plus deposits
         // minus withdrawals.
         const opening = settings?.opening || { balance: Number.isFinite(available?.value) ? available.value : 0, date: isoDate(available?.updated || today()) };
         const L = savingsLedger(opening, activity), balance = L.balance;
         const live = buckets.filter(b => b.group !== 'past');
-        const counted = live.filter(b => !separate.has(b.name) && Number.isFinite(b.balance));
-        const heldApart = live.filter(b => separate.has(b.name) && Number.isFinite(b.balance));
+        // Oh sh!t money = Available in account − the sum of every bucket in "Where the money is" (its Grand total).
+        const counted = live.filter(b => Number.isFinite(b.balance));
         const setAside = sum(counted.map(b => b.balance));
         const cushion = balance - setAside;
         const perCheck = sum(buckets.filter(b => b.group === 'active' && Number.isFinite(b.perCheck)).map(b => b.perCheck));
@@ -151,7 +151,7 @@ export default {
             }
         };
 
-        // ── Paycheck deposits: one per bucket per two weeks; they also go into the account (unless held separately) ──
+        // ── Paycheck deposits: one per bucket per two weeks ──
         // Buckets more than two paychecks behind have probably been paused or not kept up: they're listed to check,
         // not caught up automatically (their own + button still adds one deposit at a time).
         const allDue = buckets.map(b => ({ b, n: depositsDue(b) })).filter(x => x.n > 0);
@@ -215,12 +215,11 @@ export default {
         const changed = Number.isFinite(totals.before) && Number.isFinite(cushion) ? cushion - totals.before : NaN;
         $('#cards').innerHTML = [
             card('Available in account', amountText(balance), `<span class="muted">from the account activity${L.last ? ` · last entry ${esc(dLong(dateOf(L.last)))}` : ''}</span>`, 'var(--blue-text)'),
-            card('Set aside in buckets', money(setAside), `<span class="muted">${counted.filter(b => b.balance > 0).length} buckets with money</span>`),
+            card('Set aside in buckets', money(setAside), `<span class="muted">every bucket in Where the money is · ${counted.filter(b => b.balance > 0).length} with money</span>`),
             card('Oh sh!t money', amountText(cushion),
-                `<span class="muted">available − set aside</span>${Number.isFinite(changed) ? `<br><span class="${changed >= 0 ? 'delta-good' : 'delta-bad'}">${changed >= 0 ? '▲' : '▼'} ${esc(money(Math.abs(changed)))}</span> <span class="muted">vs ${esc(money(totals.before))} before</span>` : ''}`,
+                `<span class="muted">available in account − set aside in buckets</span>${Number.isFinite(changed) ? `<br><span class="${changed >= 0 ? 'delta-good' : 'delta-bad'}">${changed >= 0 ? '▲' : '▼'} ${esc(money(Math.abs(changed)))}</span> <span class="muted">vs ${esc(money(totals.before))} before</span>` : ''}`,
                 cushion >= 0 ? 'var(--green)' : 'var(--red)'),
             card('Saved each paycheck', money(perCheck), `<span class="muted">every other week · about ${esc(money(perCheck * PAYCHECKS))} a year</span>`),
-            heldApart.length ? card('Held separately', money(sum(heldApart.map(b => b.balance))), `<span class="muted">${heldApart.map(b => esc(b.name)).join(', ')}: not in the account total</span>`) : '',
         ].join('');
 
         // ── Available in account over time: the balance at the end of each day with activity, from the starting balance ──
@@ -289,7 +288,6 @@ export default {
             const months = cushion / spending;
             tips.push(`Your oh sh!t money of <strong>${esc(money(cushion))}</strong> covers about <strong>${months.toFixed(1)} month${months >= 0.95 && months < 1.05 ? '' : 's'}</strong> of your average spending (${esc(money(spending))} a month over the last 6 months).${months < 3 ? ' Three to six months is the usual goal.' : ''}`);
         }
-        if (heldApart.length) tips.push(`<span class="muted">${heldApart.map(b => `${esc(b.name)} (${esc(money(b.balance))})`).join(', ')} isn't counted against "Available in account", the way your sheet's Total deductions works. Change this in Edit buckets if that's not right.</span>`);
         const stale = live.filter(b => b.updated && daysAgo(b.updated) > 120 && (b.balance > 0 || b.perCheck > 0));
         if (stale.length) tips.push(`Not updated in over 4 months: ${stale.map(b => `${esc(b.name)} (${esc(dLong(b.updated))})`).join(', ')}.`);
         const setup = buckets.filter(b => b.group === 'setup');
@@ -303,9 +301,9 @@ export default {
         // ── Buckets as bars, grouped ──
         const maxBal = Math.max(1, ...live.map(b => (Number.isFinite(b.balance) ? b.balance : 0)));
         const bucketRow = b => `
-            <details class="bucket${separate.has(b.name) ? ' separate' : ''}">
+            <details class="bucket">
                 <summary class="bucket-row">
-                    <span class="b-name">${esc(b.name)}${separate.has(b.name) ? ' <span class="badge badge-neutral">held separately</span>' : ''}</span>
+                    <span class="b-name">${esc(b.name)}</span>
                     <span class="where-bar"><span style="width:${Number.isFinite(b.balance) && b.balance > 0 ? Math.max(1, b.balance / maxBal * 100).toFixed(1) : 0}%"></span></span>
                     <span class="b-amt">${Number.isFinite(b.balance) ? esc(money(b.balance)) : '<span class="muted">n/a</span>'}</span>
                     <span class="b-check">${b.group === 'active' && b.perCheck > 0
@@ -324,10 +322,9 @@ export default {
                 : `<h3 class="chart-title" style="margin-top:12px">${g.title} <span class="muted" style="font-weight:400">${g.sub}</span></h3>${inner}`;
         }).join('') + (() => { // Grand total: every bucket's balance (not the one-time money, which came and went), and the per-paycheck total
             const withMoney = live.filter(b => Number.isFinite(b.balance));
-            const apart = sum(heldApart.map(b => b.balance));
             return `<div class="bucket-list bucket-total"><div class="bucket-row static">
                 <span class="b-name">Grand total <span class="muted">(${withMoney.length} bucket${withMoney.length === 1 ? '' : 's'})</span></span>
-                <span class="muted total-note">${apart ? `includes ${esc(money(apart))} held separately · ` : ''}not counting one-time money</span>
+                <span class="muted total-note">what's subtracted for the oh sh!t money · not counting one-time money</span>
                 <span class="b-amt">${esc(money(sum(withMoney.map(b => b.balance))))}</span>
                 <span class="b-check">${perCheck > 0 ? `+${esc(money(perCheck))}/check` : ''}</span>
                 <span class="b-date"></span>
@@ -432,7 +429,7 @@ export default {
             }, `Updated ${edits.length} balance${edits.length === 1 ? '' : 's'}`);
         };
 
-        // ── Edit buckets: name, balance, per paycheck, date, notes, held separately; add or remove buckets ──
+        // ── Edit buckets: name, balance, per paycheck, date, notes; add or remove buckets ──
         const be = $('#b-editor');
         const bucketEditRow = b => `<tr data-rec="${b.rec ?? ''}">
             <td><input type="text" data-k="name" value="${esc(b.name || '')}"></td>
@@ -440,7 +437,6 @@ export default {
             <td><input type="number" step="0.01" data-k="perCheck" value="${Number.isFinite(b.perCheck) ? b.perCheck : ''}" placeholder="n/a"></td>
             <td><input type="date" data-k="updated" value="${b.updated ? isoDate(b.updated) : ''}"></td>
             <td><textarea data-k="notes" rows="2">${esc(b.notes || '')}</textarea></td>
-            <td style="text-align:center"><input type="checkbox" data-k="separate"${separate.has(b.name) ? ' checked' : ''} title="Held separately: not part of Available in account"></td>
             <td><button type="button" class="small danger" data-del title="Remove this bucket">✕</button></td>
         </tr>`;
         $('#b-edit').onclick = () => {
@@ -450,7 +446,7 @@ export default {
             be.hidden = false;
             be.innerHTML = `
                 <div class="table-wrap loan-grid"><table class="sheet-table b-grid">
-                    <thead><tr><th>Bucket</th><th>Balance</th><th>Per paycheck</th><th>Last updated</th><th>Notes</th><th>Held<br>separately</th><th></th></tr></thead>
+                    <thead><tr><th>Bucket</th><th>Balance</th><th>Per paycheck</th><th>Last updated</th><th>Notes</th><th></th></tr></thead>
                     <tbody>${live.map(bucketEditRow).join('')}</tbody>
                 </table></div>
                 <div class="row" style="margin-top:8px"><button type="button" class="small" data-add-bucket>+ Add a bucket</button>
@@ -474,14 +470,13 @@ export default {
                 const rows = [...be.querySelectorAll('tbody tr')].map(tr => {
                     const v = k => tr.querySelector(`[data-k=${k}]`);
                     return { rec: tr.dataset.rec === '' ? null : +tr.dataset.rec, name: v('name').value.trim(), balance: numOf(v('balance').value),
-                        perCheck: numOf(v('perCheck').value), updated: dateOf(v('updated').value), notes: v('notes').value, separate: v('separate').checked };
+                        perCheck: numOf(v('perCheck').value), updated: dateOf(v('updated').value), notes: v('notes').value };
                 });
                 if (rows.some(r => !r.name)) { toast('Every bucket needs a name', 'bad'); return; }
                 const names = rows.map(r => r.name.toLowerCase());
                 if (names.some((n, i) => names.indexOf(n) !== i)) { toast('Two buckets have the same name', 'bad'); return; }
                 const kept = new Set(rows.filter(r => r.rec != null).map(r => r.rec));
                 const removed = live.filter(b => !kept.has(b.rec)).map(b => b.rec);
-                await saveSeparate(rows.filter(r => r.separate).map(r => r.name));
                 await save((R, info) => {
                     for (const r of rows.filter(x => x.rec != null)) {
                         const old = R[r.rec];

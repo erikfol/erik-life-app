@@ -47,7 +47,7 @@ async function readRaw() {
 }
 
 /**
- * Everything on the sheet: {available, buckets, transfers, totals, separate}. Buckets:
+ * Everything on the sheet: {available, buckets, transfers, totals}. Buckets:
  * {rec, name, balance, updated, perCheck, notes, group: 'active' | 'setup' | 'other' | 'past'}.
  * Transfers: {rec, kind, to, amount, approx, date, confirmed, description}.
  */
@@ -95,25 +95,14 @@ function parseSavings(R, settings) {
         }
     }
     out.transferHeader = tIdx;
-    // Buckets kept outside "Available In Account". Saved settings win; otherwise work it out from the sheet's own
-    // Total deductions: a bucket whose balance is exactly what's missing from it is held separately.
-    if (settings?.separate) out.separate = new Set(settings.separate);
-    else {
-        out.separate = new Set();
-        const held = out.buckets.filter(b => b.group !== 'past' && Number.isFinite(b.balance));
-        const gap = round2(held.reduce((t, b) => t + b.balance, 0) - (out.totals.deductions ?? NaN));
-        if (gap > 0.5) {
-            const match = held.find(b => Math.abs(b.balance - gap) < 0.5);
-            if (match) out.separate.add(match.name);
-        }
-    }
     out.settingsSaved = !!settings;
     return out;
 }
 
 /**
- * savings_settings.json: { separate: [bucket names not in "Available In Account"], opening: { balance, date } (the
- * account activity's starting balance), activityChecked: 'YYYY-MM-DD' (looked at the account, nothing new) }, or null.
+ * savings_settings.json: { opening: { balance, date } (the account activity's starting balance), activityChecked:
+ * 'YYYY-MM-DD' (looked at the account, nothing new) }, or null. (An old "separate" list of buckets held outside the
+ * account isn't used any more: every bucket counts against the account.)
  */
 export async function loadSettings() {
     const t = await fs.readText(SETTINGS_PATH);
@@ -124,17 +113,16 @@ export async function loadSettings() {
 export async function saveSettings(changes) {
     const { _readme, ...was } = (await loadSettings()) || {};
     await fs.writeText(SETTINGS_PATH, JSON.stringify({
-        _readme: 'Savings page settings. "separate": buckets whose money is NOT in "Available In Account" (kept elsewhere). '
-            + '"opening": the account activity\'s starting balance. "activityChecked": the day you looked and there was nothing new.',
+        _readme: 'Savings page settings. "opening": the account activity\'s starting balance. '
+            + '"activityChecked": the day you looked and there was nothing new.',
         ...was, ...changes,
     }, null, 2) + '\n');
 }
-export const saveSeparate = names => saveSettings({ separate: [...names] });
 
 /**
- * Change the sheet and write it back. `fn(records, info)` edits the records in place (info: {buckets, separate,
- * rows}); afterwards the summary rows are worked out again: Total per paycheck (active buckets), Total deductions
- * (buckets counted in the account), the summary Available, oh sh!t money (available − deductions) and Diff.
+ * Change the sheet and write it back. `fn(records, info)` edits the records in place (info: {buckets, rows});
+ * afterwards the summary rows are worked out again: Total per paycheck (active buckets), Total deductions (every
+ * bucket but the one-time money), the summary Available, oh sh!t money (available − deductions) and Diff.
  */
 export async function changeSavings(fn) {
     const raw = await readRaw();
@@ -142,12 +130,9 @@ export async function changeSavings(fn) {
     const settings = await loadSettings();
     const info = parseSavings(raw.records, settings);
     fn(raw.records, info);
-    // Which buckets are held outside the account is decided before the edit (and saved, the first time), so the
-    // totals below don't shift with it.
-    if (!settings) await saveSeparate(info.separate);
-    const after = parseSavings(raw.records, { separate: [...info.separate] }); // totals from the edited records
+    const after = parseSavings(raw.records, settings); // totals from the edited records
     const R = raw.records, set = (i, col, v) => { if (i != null && R[i]) { while (R[i].length <= col) R[i].push(''); R[i][col] = v; } };
-    const counted = after.buckets.filter(b => b.group !== 'past' && !after.separate.has(b.name) && Number.isFinite(b.balance));
+    const counted = after.buckets.filter(b => b.group !== 'past' && Number.isFinite(b.balance)); // every bucket in Where the money is
     const deductions = round2(counted.reduce((t, b) => t + b.balance, 0));
     const perCheck = round2(after.buckets.filter(b => b.group === 'active' && Number.isFinite(b.perCheck)).reduce((t, b) => t + b.perCheck, 0));
     const avail = after.available?.value;
