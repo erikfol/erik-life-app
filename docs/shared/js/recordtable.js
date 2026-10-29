@@ -120,8 +120,8 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         if (c.kind === 'choice') return {
             ...base, value: get,
             cell: r => {
-                const v = get(r), href = v && c.href?.(v);
-                return !v ? '' : href ? `<a class="cat-badge" href="${esc(href)}">${esc(v)}</a>` : `<span class="cat-badge">${esc(v)}</span>`;
+                const v = get(r), href = v && c.href?.(v), cls = `cat-badge${v && c.badge ? ` ${esc(c.badge(v))}` : ''}`; // c.badge: its colour
+                return !v ? '' : href ? `<a class="${cls}" href="${esc(href)}">${esc(v)}</a>` : `<span class="${cls}">${esc(v)}</span>`;
             },
         };
         if (c.kind === 'link') return {

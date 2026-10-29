@@ -169,6 +169,8 @@ th.sortable:hover { background: #dde8ff; }
 }
 .cat-badge.credit-card { background: #fff0f6; color: #c0392b; }
 .cat-badge.income { background: #e8f8ef; color: var(--green); }
+.cat-badge.deposit { background: #e8f8ef; color: #1e7a46; } /* Savings → Account activity */
+.cat-badge.withdrawal { background: #fdecea; color: #c0392b; }
 .note-text { font-size: 0.85em; color: var(--muted); font-style: italic; }
 td.edit-cell input, td.edit-cell select { width: 100%; min-width: 120px; }
 tr.dirty td { background: #fffbea; }
