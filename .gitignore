@@ -9,6 +9,8 @@ config.json
 /reports
 # Copies made by the Home page's 💾 Back up now
 /backup
+# Personal documents kept in the project folder
+/Home_Equity_Loan_Proposal.md
 
 # --- Python ---
 __pycache__/
