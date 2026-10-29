@@ -1,9 +1,11 @@
 // Editable record table shared by the Home-page sections (Health, Vehicles): read-only with Excel-style sort and
 // filter on every column until Edit is pressed; then every cell is an input, rows can be added, removed and moved up
 // and down, and Save hands the rows back to be written. The rows keep the order they're saved in.
+import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast, money } from '../../bills-etc/js/util.js';
 import { dataTable, closeFilterMenu } from '../../bills-etc/js/datatable.js';
 import { moveButtons } from './infobox.js';
+import { openLightbox } from './lightbox.js';
 
 const NEW_CHOICE = '__new__'; // a choice can't be named this, so it can't clash
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -20,6 +22,19 @@ export function showDate(v) {
 const isLink = v => /^https?:\/\//i.test(v || '');
 const linkText = v => { try { return new URL(v).hostname.replace(/^www\./, ''); } catch { return v; } };
 
+/** A 'files' cell's file names ('a.jpg; b.pdf' → ['a.jpg', 'b.pdf']). */
+const fileNames = v => String(v ?? '').split(';').map(x => x.trim()).filter(Boolean);
+/** A name for a new file in a folder whose names (lower case) are `taken`: '2026-10-29 invoice.jpg', '… (2).jpg' if used. */
+function newFileName(file, date, taken) {
+    const clean = file.name.replace(/[;\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'file';
+    const base = /^\d{4}-\d{2}-\d{2}$/.test(date || '') && !clean.startsWith(date) ? `${date} ${clean}` : clean;
+    const dot = base.lastIndexOf('.'), stem = dot > 0 ? base.slice(0, dot) : base, ext = dot > 0 ? base.slice(dot) : '';
+    let name = base;
+    for (let k = 2; taken.has(name.toLowerCase()); k++) name = `${stem} (${k})${ext}`;
+    taken.add(name.toLowerCase());
+    return name;
+}
+
 const numberOf = v => {
     const s = String(v ?? '').replace(/[$,]/g, '').trim();
     return s === '' ? '' : Number(s);
@@ -31,7 +46,11 @@ const numberOf = v => {
  *            'money' (stored as a plain number, shown as $1,234.56; a Total line sums the rows shown),
  *            'choice' (dropdown, see choices; c.href(value) → a link for it in the read-only view, or null),
  *            'suggest' (free text offering values already used + c.suggestions), 'text' (multi-line),
- *            'link' (a web address, shown as a link to it);
+ *            'link' (a web address, shown as a link to it),
+ *            'files' (images or PDFs kept in a folder — c.dir, else the table's filesDir — e.g. invoices: the cell lists
+ *            their names, 'a.jpg; b.pdf'; shown as 📎 2, which opens them large; in Edit each can be taken off the entry
+ *            (the file stays in the folder) and ＋ adds more, copied into the folder when Save is pressed; c.noun names
+ *            one, default 'file');
  *            c.calc(row) → a worked-out value: shown in the read-only view (and in a money Total), never edited or saved;
  *            c.total: false leaves a money column out of the Total line; c.default: what a new entry starts with (a
  *            string, or a function giving one); c.badge(value) → a class: shown as a coloured badge (e.g. a status)
@@ -39,16 +58,20 @@ const numberOf = v => {
  *   save:    async rows => void (rows already trimmed and without blank entries)
  *   choices: { [name]: { list: string[], noun: 'location', add: async name => void } } for 'choice' columns
  *            (without add the list is fixed: no "＋ New …" option)
+ *   filesDir: the folder for 'files' columns without their own dir
  * Rows are shown in the order they're saved in. Editing starts in the order the read-only view shows (so a column sort
  * can be kept), ↑ ↓ move a row, and a new entry goes at the top of a table with dates (the bottom of one without).
  * Returns { hasUnsavedEdits() }.
  */
-export function recordTable(container, { columns: cols, rows: initial, save, choices = {} }) {
+export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '' }) {
     const tableNo = ++tableCount;
     const editCols = cols.filter(c => !c.calc); // the columns that are typed in and saved
     const valueOf = (c, r) => (c.calc ? c.calc(r) : r[c.name]);
     const state = { rows: initial, draft: null, original: null, shown: null }; // shown: the rows in the read-only view's order
     const dlId = c => `dl-${tableNo}-${cols.indexOf(c)}`;
+    const dirOf = c => c.dir || filesDir;
+    const nounOf = c => c.noun || 'file';
+    const pending = r => Object.values(r._pending || {}).some(l => l.length); // files picked, not saved yet
     container.innerHTML = `
         <div class="row table-tools" data-tools></div>
         <div class="record-table" data-read></div>
@@ -58,13 +81,16 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             <span class="spacer"></span>
             <button type="button" data-cancel>Cancel</button>
             <button type="button" class="primary" data-save>Save</button>
-        </div>`;
+        </div>
+        <input type="file" accept="image/*,application/pdf" multiple hidden data-file-picker>`;
     const tbl = container.querySelector('table');
     const readEl = container.querySelector('[data-read]');
     const editWrap = container.querySelector('[data-edit-wrap]');
     const tools = container.querySelector('[data-tools]');
     const actions = container.querySelector('[data-actions]');
-    const hasUnsavedEdits = () => !!state.draft && JSON.stringify(state.draft) !== state.original;
+    const hasUnsavedEdits = () => !!state.draft && (JSON.stringify(state.draft) !== state.original || state.draft.some(pending));
+    const picker = container.querySelector('[data-file-picker]');
+    let pickFor = null; // { i, k }: the entry and column the picked files are for
 
     // Read-only view: Excel-style sort and filter on every column (the Finance Table's menu).
     const column = c => {
@@ -102,6 +128,15 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             ...base, value: get, text: v => (isLink(v) ? linkText(v) : String(v)),
             cell: r => { const v = get(r); return isLink(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener" title="${esc(v)}">${esc(linkText(v))} ↗</a>` : esc(v); },
         };
+        if (c.kind === 'files') return { // 📎 2: click to see them large
+            ...base, value: r => fileNames(get(r)).length || '',
+            text: v => (v ? `${v} ${nounOf(c)}${v === 1 ? '' : 's'}` : ''),
+            cell: r => {
+                const names = fileNames(get(r));
+                return names.length ? `<button type="button" class="small files-open" data-files-col="${cols.indexOf(c)}" data-files="${esc(names.join(';'))}"
+                    title="${esc(`${names.length} ${nounOf(c)}${names.length === 1 ? '' : 's'}: ${names.join(', ')}`)}">📎 ${names.length}</button>` : '';
+            },
+        };
         if (c.badge) return {
             ...base, value: get,
             cell: r => { const v = get(r); return v ? `<span class="cat-badge ${esc(c.badge(v))}">${esc(v)}</span>` : ''; },
@@ -109,6 +144,20 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         return { ...base, value: get, tdClass: () => 'text' };
     };
     const firstDate = cols.find(c => c.kind === 'date');
+
+    // A 'files' cell's files, large (images, and PDFs in a frame).
+    readEl.addEventListener('click', async e => {
+        const b = e.target.closest('[data-files]');
+        if (!b) return;
+        const c = cols[+b.dataset.filesCol], dir = dirOf(c), names = fileNames(b.dataset.files);
+        b.disabled = true;
+        const files = await Promise.all(names.map(n => fs.readFile(`${dir}/${n}`).catch(() => null)));
+        b.disabled = false;
+        const items = files.map((f, i) => f && { name: names[i], url: URL.createObjectURL(f), pdf: /\.pdf$/i.test(names[i]) }).filter(Boolean);
+        if (!items.length) return toast(`Couldn't find ${names.length === 1 ? 'it' : 'them'} in ${dir}/`, 'bad');
+        if (items.length < names.length) toast(`${names.length - items.length} of them ${names.length - items.length === 1 ? "isn't" : "aren't"} in ${dir}/ any more`, 'bad');
+        openLightbox(items, 0, { onClose: () => items.forEach(x => URL.revokeObjectURL(x.url)) });
+    });
     const startValue = c => String((typeof c.default === 'function' ? c.default() : c.default) ?? '');
 
     const showRead = () => {
@@ -162,6 +211,14 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             if (c.kind === 'choice') return `<select ${attrs}>${choiceOptions(c, v)}</select>`;
             if (c.kind === 'suggest') return `<input type="text" list="${dlId(c)}" ${attrs} value="${esc(v)}">`;
             if (c.kind === 'link') return `<input type="url" placeholder="https://…" ${attrs} value="${esc(v)}">`;
+            if (c.kind === 'files') { // its files (✕ takes one off the entry), the ones picked but not saved yet, ＋ to pick more
+                const waiting = state.draft[i]._pending?.[c.name] || [];
+                return `<div class="files-edit" data-files-i="${i}" data-files-k="${esc(c.name)}">${fileNames(v).map(n => `<span class="file-chip" title="${esc(n)}">📄 ${esc(n)}
+                    <button type="button" data-file-drop="${esc(n)}" title="Take it off this entry (the file stays in the folder)" aria-label="Take ${esc(n)} off">✕</button></span>`).join('')}${
+                    waiting.map((f, j) => `<span class="file-chip new" title="${esc(f.name)}: added when you press Save">＋ ${esc(f.name)}
+                    <button type="button" data-pending-drop="${j}" title="Don't add it" aria-label="Don't add ${esc(f.name)}">✕</button></span>`).join('')}
+                    <button type="button" class="small" data-file-add>＋ ${esc(nounOf(c)[0].toUpperCase() + nounOf(c).slice(1))}</button></div>`;
+            }
             return `<textarea ${attrs} rows="1">${esc(v)}</textarea>`;
         };
         const lists = editCols.filter(c => c.kind === 'suggest').map(c =>
@@ -179,6 +236,11 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             const r = state.draft[+inp.dataset.i];
             const was = r._from == null ? '' : state.rows[r._from][inp.dataset.k];
             inp.classList.toggle('changed', r._from == null ? inp.value !== '' : inp.value !== was);
+        });
+        tbl.querySelectorAll('[data-files-i]').forEach(box => {
+            const r = state.draft[+box.dataset.filesI], k = box.dataset.filesK;
+            const was = r._from == null ? '' : state.rows[r._from][k] || '';
+            box.classList.toggle('changed', (r[k] || '') !== was || !!r._pending?.[k]?.length);
         });
     };
 
@@ -226,6 +288,17 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         markChanged();
     });
     tbl.addEventListener('click', e => {
+        const box = e.target.closest('[data-files-i]');
+        if (box) { // a 'files' cell: ＋ picks files; ✕ takes one off the entry, or drops one picked but not saved
+            const r = state.draft[+box.dataset.filesI], k = box.dataset.filesK;
+            if (e.target.closest('[data-file-add]')) { pickFor = { r, k }; picker.value = ''; picker.click(); return; }
+            const drop = e.target.closest('[data-file-drop]'), undo = e.target.closest('[data-pending-drop]');
+            if (drop) r[k] = fileNames(r[k]).filter(n => n !== drop.dataset.fileDrop).join('; ');
+            else if (undo) r._pending[k].splice(+undo.dataset.pendingDrop, 1);
+            else return;
+            drawEdit();
+            return;
+        }
         const m = e.target.closest('[data-move]');
         if (m) { // ↑ / ↓: swap with the entry above or below, keeping the button focused so clicks can repeat
             const i = [...tbl.tBodies[0].rows].indexOf(m.closest('tr')), j = i + Number(m.dataset.move);
@@ -241,6 +314,34 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         drawEdit();
     });
 
+    picker.onchange = () => {
+        if (!pickFor || !picker.files.length) return;
+        const { r, k } = pickFor;
+        r._pending = { ...r._pending, [k]: [...(r._pending?.[k] || []), ...picker.files] };
+        drawEdit();
+    };
+
+    // The files picked for 'files' cells: copied into their folders (never over another file), their names onto the entries.
+    const writePending = async () => {
+        for (const c of editCols.filter(x => x.kind === 'files')) {
+            const todo = state.draft.filter(r => r._pending?.[c.name]?.length);
+            if (!todo.length) continue;
+            const dir = dirOf(c);
+            if (!dir) throw new Error(`no folder for ${c.name}`);
+            const taken = new Set((await fs.listFiles(dir, '')).map(n => n.toLowerCase()));
+            for (const r of todo) {
+                const added = [];
+                for (const f of r._pending[c.name]) {
+                    const name = newFileName(f, firstDate ? r[firstDate.name] : '', taken);
+                    await fs.writeText(`${dir}/${name}`, f);
+                    added.push(name);
+                }
+                r[c.name] = [...fileNames(r[c.name]), ...added].join('; ');
+                delete r._pending[c.name];
+            }
+        }
+    };
+
     container.querySelector('[data-add]').onclick = () => {
         const row = { ...Object.fromEntries(editCols.map(c => [c.name, startValue(c)])), _from: null };
         if (firstDate) state.draft.unshift(row); else state.draft.push(row); // dated tables keep the newest at the top
@@ -252,6 +353,12 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         showRead();
     };
     container.querySelector('[data-save]').onclick = async () => {
+        if (state.draft.some(pending)) {
+            const btn = container.querySelector('[data-save]');
+            btn.disabled = true;
+            try { await writePending(); } catch (err) { btn.disabled = false; return toast(`Couldn't add the files: ${err.message}`, 'bad'); }
+            btn.disabled = false;
+        }
         // An entry left as it started (blank, or just its starting values) isn't saved.
         const blank = r => editCols.every(c => !String(r[c.name]).trim() || (c.default != null && r[c.name] === startValue(c)));
         const rows = state.draft.filter(r => !blank(r)).map(r => Object.fromEntries(editCols.map(c => [c.name, String(r[c.name]).trim()])));

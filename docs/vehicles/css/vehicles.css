@@ -38,6 +38,7 @@ p.mileage-sub { margin: 0 0 10px; }
 }
 .lightbox figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100% - 120px); max-height: 100%; }
 .lightbox img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 4px; }
+.lightbox iframe { width: min(92vw, 900px); height: calc(100vh - 90px); border: 0; border-radius: 4px; background: #fff; } /* a PDF invoice */
 .lightbox figcaption { color: #ccd3e0; font-size: 0.85em; }
 .lightbox button { background: rgba(255,255,255,0.12); border: 0; color: #fff; font-size: 1.6em; line-height: 1; padding: 10px 16px; border-radius: 8px; }
 .lightbox button:hover { background: rgba(255,255,255,0.25); }

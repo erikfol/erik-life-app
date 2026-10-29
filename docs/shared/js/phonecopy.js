@@ -302,7 +302,9 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
                 + moneyCols.slice(1).filter(c => !Number.isNaN(num(r[c.name]))).map(c => `<div class="sub">${esc(c.name)}: ${money(num(r[c.name]))}</div>`).join('');
             const texts = cols.filter(c => c.kind === 'text' && r[c.name]).map((c, i) => i === 0
                 ? `<div class="desc">${esc(r[c.name])}</div>` : `<div class="note"><b>${esc(c.name)}:</b> ${esc(r[c.name])}</div>`).join('');
-            return `<div class="card"><div class="card-head"><span class="when">${esc(when || 'No date')}</span>${tags}${cost}</div>${nums}${texts}</div>`;
+            // a 'files' column (Invoices): how many there are (the images themselves stay in the app)
+            const files = cols.filter(c => c.kind === 'files' && r[c.name]).map(c => { const n = r[c.name].split(';').filter(x => x.trim()).length; return `<div class="sub">📎 ${n} ${esc(c.name.toLowerCase().replace(/s$/, ''))}${n === 1 ? '' : 's'}</div>`; }).join('');
+            return `<div class="card"><div class="card-head"><span class="when">${esc(when || 'No date')}</span>${tags}${cost}</div>${nums}${texts}${files}</div>`;
         };
         const draw = () => {
             const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);

@@ -56,7 +56,10 @@ export const RECORD_COLUMNS = [
     { name: 'Description', kind: 'text' },
     { name: 'Amount', kind: 'money' },
     { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
+/** Where a policy's invoices (bills, receipts) are kept. */
+export const invoicesDir = p => `${INSURANCE_DIR}/invoices/${p.id}`;
 
 export async function loadRecords(p, track = true) {
     const text = track ? await readTracked(recordsPath(p)) : await fs.readText(recordsPath(p));

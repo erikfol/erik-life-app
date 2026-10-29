@@ -6,7 +6,7 @@ import { esc } from '../../../bills-etc/js/util.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
 import {
     MAINTENANCE_PAGES, pageHref, schedulePath, houseLogPath, scheduleColumns, loadSchedule, saveSchedule, maintenanceColumns,
-    loadHouseLog, saveHouseLog, allMaintenance, pageOfItem, scheduleStatus, dueText, lastText, itemBanner, SOON_DAYS,
+    loadHouseLog, saveHouseLog, allMaintenance, pageOfItem, scheduleStatus, dueText, lastText, itemBanner, SOON_DAYS, invoicesDir,
 } from '../house.js';
 
 let schedule = null, log = null;
@@ -70,6 +70,7 @@ export async function renderScheduleTab(el, h, top) {
         log = recordTable(el.querySelector('.house-log'), {
             columns: maintenanceColumns(h, rows.filter(r => !pageOfItem(r)).map(r => r.Item)),
             rows: logRows,
+            filesDir: invoicesDir(h, 'maintenance'),
             save: async next => {
                 await saveHouseLog(h, next);
                 logRows = next;

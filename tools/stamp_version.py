@@ -17,17 +17,18 @@ DOCS = Path(__file__).resolve().parent.parent / 'docs'
 SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
           'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
           'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js',
-          'shared/js/phonecopy.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js',
+          'shared/js/phonecopy.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js', 'shared/js/lightbox.js',
           'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js',
           'dinner-planner/js/store.js', 'kid-lunches/js/store.js', 'kid-lunches/js/school.js']  # the phone copy reads every app's data
 # A section without the 📱 phone copy: the Home sections' table and information box.
 BASIC = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
          'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
          'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js', 'shared/js/recordtable.js',
-         'shared/js/navcolors.js', 'vehicles/css/vehicles.css']
+         'shared/js/navcolors.js', 'shared/js/lightbox.js', 'vehicles/css/vehicles.css']
 APPS = {
     'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/dropbox.js', 'shared/js/fileguard.js',
-                                       'shared/js/infobox.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js']),  # Forgettable Subs uses the Home sections' table; fs.js uses Dropbox
+                                       'shared/js/infobox.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js',
+                                       'shared/js/lightbox.js']),  # Forgettable Subs uses the Home sections' table; fs.js uses Dropbox
     'health': ('health-version', SHARED + ['vehicles/css/vehicles.css']),  # the General information box's styles
     'vehicles': ('vehicles-version', SHARED),
     'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',

@@ -6,7 +6,7 @@ import { infoBox } from '../../../shared/js/infobox.js';
 import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
 import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
 import {
-    INSURANCE_PATH, STORE, savePolicies, newPolicy, recordsPath, documentsDir, RECORD_COLUMNS, loadRecords, saveRecords,
+    INSURANCE_PATH, STORE, savePolicies, newPolicy, recordsPath, documentsDir, RECORD_COLUMNS, loadRecords, saveRecords, invoicesDir,
 } from '../insurance.js';
 
 let table = null;
@@ -66,6 +66,7 @@ export async function renderPolicy(el, list, p, onListChanged) {
     table = recordTable(el.querySelector('#records'), {
         columns: RECORD_COLUMNS,
         rows,
+        filesDir: invoicesDir(p),
         save: rows => saveRecords(p, rows),
     });
 }

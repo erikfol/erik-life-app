@@ -12,7 +12,7 @@ import {
     TYPES, VEHICLES_PATH, saveVehicles, photosDir, newVehicle, maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance,
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
-    lastText, soonOf, SOON_DAYS,
+    lastText, soonOf, SOON_DAYS, invoicesDir,
 } from '../vehicles.js';
 
 let table = null;
@@ -194,6 +194,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     table = recordTable(el.querySelector('#maint'), {
         columns: maintenanceColumns(v, (plan || []).map(r => r.Item)), // the schedule's items are offered first as Actions
         rows,
+        filesDir: invoicesDir(v),
         save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redrawSchedule(); },
     });
 }

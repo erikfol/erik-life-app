@@ -16,7 +16,7 @@ import { renderScheduleTab, pageBanners, pageSchedule, scheduleUnsaved, forgetSc
 import {
     HOUSE_PATH, AREAS, STORE, areaBoxes, areaInfo, saveHouses, houseAge, photosDir, newHouse, recordsPath, recordColumns, loadRecords, saveRecords,
     maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, tablePath, loadTable, saveTable,
-    houseProjects, pageOfItem,
+    houseProjects, pageOfItem, invoicesDir,
 } from '../house.js';
 
 let table = null;
@@ -141,6 +141,7 @@ async function renderArea(el, list, h, tab, a) {
         // Action offers this page's schedule items first, so what's logged counts for them
         columns: maintenanceColumns(h, [...sched.items.filter(r => pageOfItem(r) === a).map(r => r.Item), ...(a.actions || [])]),
         rows: maintRows,
+        filesDir: invoicesDir(h, `${a.id}-maintenance`),
         save: async r => {
             await saveMaintenance(h, a, r);
             sched.entries = [...sched.entries.filter(e => e.page !== a), ...r.map(row => ({ row, page: a }))];
@@ -150,6 +151,7 @@ async function renderArea(el, list, h, tab, a) {
     if (hasRecords) table = recordTable(el.querySelector('#records'), {
         columns: recordColumns(h, a),
         rows,
+        filesDir: invoicesDir(h, `${a.id}-records`),
         save: r => saveRecords(h, a, r),
     });
 }
@@ -176,6 +178,7 @@ async function renderTableTab(el, h, tab, t) {
         columns,
         rows,
         choices,
+        filesDir: invoicesDir(h, t.id), // Updates Done's invoices
         save: r => saveTable(h, t, r),
     });
 }

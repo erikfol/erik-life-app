@@ -77,7 +77,10 @@ export const RECORD_COLUMNS = [
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
     { name: 'Other Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
+/** Where a pet's invoices are kept. */
+export const invoicesDir = p => `${PETS_DIR}/invoices/${p.id}`;
 
 export async function loadRecords(p, track = true) {
     const text = track ? await readTracked(recordsPath(p)) : await fs.readText(recordsPath(p));

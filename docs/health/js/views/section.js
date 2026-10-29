@@ -10,7 +10,7 @@ import { appointmentStatus } from '../../../pets/js/pets.js';
 import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
-    accountSection, appointmentsSection, loadInfo, saveInfo,
+    accountSection, appointmentsSection, loadInfo, saveInfo, invoicesDir,
 } from '../records.js';
 
 let checks = []; // one "has unsaved edits?" per table and account box on the page
@@ -84,6 +84,7 @@ export async function renderSection(el, section) {
         rows,
         save: rows => saveRecords(section, rows),
         choices: { Location: location },
+        filesDir: invoicesDir(section),
     });
     checks.push(() => table.hasUnsavedEdits());
 }
@@ -310,6 +311,7 @@ function accountBox(box, section, account, rows, ctx) {
     const table = recordTable(box.querySelector('[data-records]'), {
         columns: section.columns,
         rows,
+        filesDir: invoicesDir(section, account),
         save: async rows => { await saveRecords(sec, rows); showBalance(rows); ctx.entriesSaved(account.id, rows); },
     });
     checks.push(() => !gone && (changed() || table.hasUnsavedEdits()));

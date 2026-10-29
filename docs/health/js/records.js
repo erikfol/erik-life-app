@@ -26,6 +26,7 @@ export const SECTIONS = [
         { name: 'Location', kind: 'choice' },
         { name: 'Description', kind: 'text' },
         { name: 'Additional Notes', kind: 'text' },
+        { name: 'Invoices', kind: 'files', noun: 'invoice' },
     ], appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,
         info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: [
@@ -35,6 +36,7 @@ export const SECTIONS = [
         { name: 'Total Cost', kind: 'money' },
         { name: 'Out of Pocket', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
+        { name: 'Invoices', kind: 'files', noun: 'invoice' },
     ], appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`,
         info: ['Eye Doctor', 'Office', 'Phone', 'Address', 'Website', 'Prescription', 'Notes'], columns: [
@@ -44,6 +46,7 @@ export const SECTIONS = [
         { name: 'Total Cost', kind: 'money' },
         { name: 'Out of Pocket', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
+        { name: 'Invoices', kind: 'files', noun: 'invoice' },
     ], appointments: { path: `${HEALTH_DIR}/eye_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     // Several accounts (FLORES, WealthCare…), each with its own entries file; see loadAccounts.
     { id: 'hsa', label: 'Health Savings Account (HSA)', accounts: `${HEALTH_DIR}/hsa.json`, balance: accountBalance, columns: [
@@ -52,8 +55,11 @@ export const SECTIONS = [
         { name: 'Description', kind: 'text' },
         { name: 'Amount', kind: 'money' },
         { name: 'Additional Notes', kind: 'text' },
+        { name: 'Invoices', kind: 'files', noun: 'invoice' },
     ] },
 ];
+/** Where a section's invoices are kept (an HSA account's in its own folder). */
+export const invoicesDir = (section, account = null) => `${HEALTH_DIR}/invoices/${section.id}${account ? '-' + account.id : ''}`;
 
 const names = section => section.columns.map(c => c.name);
 

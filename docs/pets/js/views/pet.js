@@ -4,7 +4,7 @@ import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recor
 import { infoBox } from '../../../shared/js/infobox.js';
 import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
 import { PETS_PATH, ageText, savePets, newPet, recordsPath, photosDir, RECORD_COLUMNS, loadRecords, saveRecords,
-    appointmentsPath, APPOINTMENT_COLUMNS, loadAppointments, saveAppointments, appointmentStatus } from '../pets.js';
+    appointmentsPath, APPOINTMENT_COLUMNS, loadAppointments, saveAppointments, appointmentStatus, invoicesDir } from '../pets.js';
 
 let table = null;
 let appts = null; // the future appointments table
@@ -98,6 +98,7 @@ export async function renderPet(el, list, p, onListChanged) {
     table = recordTable(el.querySelector('#records'), {
         columns: withVets(RECORD_COLUMNS),
         rows,
+        filesDir: invoicesDir(p),
         save: rows => saveRecords(p, rows),
     });
 }

@@ -88,7 +88,10 @@ export const maintenanceColumns = (v, actions = []) => [
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
     { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' }, // images / PDFs in invoicesDir(v)
 ];
+/** Where a vehicle's maintenance invoices are kept. */
+export const invoicesDir = v => `${VEHICLES_DIR}/invoices/${v.id}`;
 
 /** A CSV's rows with just these columns ([] if there's no file yet). */
 async function loadRows(path, cols, track) {

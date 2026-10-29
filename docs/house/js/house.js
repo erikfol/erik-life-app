@@ -33,6 +33,7 @@ const UPDATE_COLUMNS = [
     { name: 'Update', kind: 'text' },
     { name: 'Location', kind: 'suggest', suggestions: UPDATE_LOCATIONS },
     { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
 const FUTURE_UPDATE_COLUMNS = [
     { name: 'Planned Date', kind: 'date' },
@@ -180,7 +181,10 @@ export const recordColumns = (h, a) => [
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
     { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
+/** Where a table's invoices are kept: key 'oil-furnace-maintenance', 'septic-records', 'updates-done', 'maintenance' (the Maintenance tab's log)… */
+export const invoicesDir = (h, key) => `${HOUSE_DIR}/invoices/${h.id}-${key}`;
 
 export const maintenancePath = (h, a) => `${HOUSE_DIR}/${h.id}-${a.id}-maintenance.csv`;
 
@@ -192,6 +196,7 @@ export const maintenanceColumns = (h, actions = []) => [
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
     { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
 
 async function readRows(path, cols, track) {

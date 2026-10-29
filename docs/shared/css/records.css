@@ -54,3 +54,13 @@ td.move .move-btns { margin-right: 0; }
 .links-edit td.move + td { width: 22%; }
 .links-edit td:nth-child(3) { width: 36%; }
 .balance-cards { grid-template-columns: minmax(220px, 320px); margin-bottom: 16px; }
+
+/* A 'files' column (e.g. Invoices): 📎 2 in the table opens them; in Edit, a chip per file (✕ takes it off the entry) and ＋ */
+.record-table .files-open { white-space: nowrap; }
+.files-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 170px; padding: 2px; border-radius: 6px; }
+.files-edit.changed { background: #fff8e1; }
+.file-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 220px; font-size: 0.8em; padding: 2px 4px 2px 8px;
+    border: 1px solid var(--line-strong, #d5dbe5); border-radius: 12px; background: #f8faff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.file-chip.new { border-style: dashed; background: #eef6ff; }
+.file-chip button { border: 0; background: none; padding: 0 4px; font-size: 0.95em; line-height: 1; cursor: pointer; color: #888; }
+.file-chip button:hover { color: #c0392b; }

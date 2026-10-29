@@ -3,17 +3,17 @@
 // folder itself).
 import * as fs from '../../../bills-etc/js/fs.js';
 import { esc, toast } from '../../../bills-etc/js/util.js';
+import { openLightbox, closeLightbox } from '../../../shared/js/lightbox.js';
 
 const IMAGE = /\.(png|jpe?g|gif|webp|heic|bmp)$/i;
 const open = new Map(); // gallery element → its object URLs, released when it re-draws or the page changes
-let closeBox = null; // closes an open large image
 
 const release = el => { open.get(el)?.forEach(u => URL.revokeObjectURL(u)); open.delete(el); };
 
 /** Release every gallery's images (when leaving the page). */
 export function releaseGalleries() {
     [...open.keys()].forEach(release);
-    closeBox?.();
+    closeLightbox();
 }
 
 /** '03-engine-ford-logo.png' → 'engine ford logo'. */
@@ -64,7 +64,7 @@ export async function renderGallery(el, dir, { noun = 'photo', onChange, compact
 
     el.querySelector('.photo-grid')?.addEventListener('click', e => {
         const b = e.target.closest('[data-i]');
-        if (b) openLightbox(images, +b.dataset.i);
+        if (b) openLightbox(images, +b.dataset.i, { caption });
     });
     const picker = el.querySelector('input[type=file]');
     el.querySelector('[data-add-images]').onclick = () => picker.click();
@@ -89,37 +89,4 @@ export async function renderGallery(el, dir, { noun = 'photo', onChange, compact
         await renderGallery(el, dir, { noun, onChange, compact });
         onChange?.(taken.size);
     };
-}
-
-function openLightbox(images, start) {
-    let i = start;
-    const box = document.createElement('div');
-    box.className = 'lightbox';
-    box.innerHTML = `
-        <button type="button" class="lb-close" aria-label="Close" title="Close (Esc)">✕</button>
-        <button type="button" class="lb-prev" aria-label="Previous" title="Previous (←)">‹</button>
-        <figure><img alt=""><figcaption></figcaption></figure>
-        <button type="button" class="lb-next" aria-label="Next" title="Next (→)">›</button>`;
-    const img = box.querySelector('img'), cap = box.querySelector('figcaption');
-    const show = () => {
-        img.src = images[i].url;
-        img.alt = caption(images[i].name);
-        cap.textContent = `${i + 1} of ${images.length} · ${images[i].name}`;
-    };
-    const step = d => { i = (i + d + images.length) % images.length; show(); };
-    const close = () => { box.remove(); document.removeEventListener('keydown', onKey); closeBox = null; };
-    const onKey = e => {
-        if (e.key === 'Escape') close();
-        else if (e.key === 'ArrowLeft') step(-1);
-        else if (e.key === 'ArrowRight') step(1);
-    };
-    box.querySelector('.lb-close').onclick = close;
-    box.querySelector('.lb-prev').onclick = () => step(-1);
-    box.querySelector('.lb-next').onclick = () => step(1);
-    box.addEventListener('click', e => { if (e.target === box) close(); }); // click outside the image
-    document.addEventListener('keydown', onKey);
-    closeBox?.();
-    closeBox = close;
-    document.body.appendChild(box);
-    show();
 }
