@@ -1,26 +1,19 @@
 // Health: General Health / Dental / Eye / HSA pages (#general, #dental, #eye, #hsa). Uses the same folder as Bills Etc
 // (the browser remembers it for the whole site); the records live in inputs/health/. General Health, Dental and Eye also
-// have future appointments, and their names in the menu are red while none is booked.
+// have future appointments. A name in the menu is red or yellow while its page has a red or yellow banner.
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
-import { SECTIONS, loadRecords, appointmentsSection } from './records.js';
-import { appointmentStatus } from '../../pets/js/pets.js';
+import { SECTIONS } from './records.js';
+import alerts from './alerts.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import { renderSection, hasUnsavedEdits, forget } from './views/section.js';
 
 const viewEl = document.getElementById('view');
 let currentHash = null;
-
-/** A section's name in the menu is red while it has no future appointment (the red banner on its page), like a pet's. */
-async function markNoAppointment() {
-    for (const s of SECTIONS.filter(x => x.appointments)) {
-        const level = await loadRecords(appointmentsSection(s), false).then(r => appointmentStatus(r).level, () => null);
-        const a = document.querySelector(`#nav a[href="#${s.id}"]`);
-        a.classList.toggle('bad', level === 'none');
-        if (level === 'none') a.title = 'No future appointment'; else a.removeAttribute('title');
-    }
-}
+// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
+const menus = colourMenus(alerts);
 
 async function route(force = false) {
     const hash = location.hash || '#general';
@@ -35,7 +28,7 @@ async function route(force = false) {
     forget();
     document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === currentHash));
     if (!fs.folder()) return askForFolder(viewEl, { what: 'Health records', where: 'inputs/health/', onConnected: () => route(true) });
-    markNoAppointment();
+    menus.ready();
     try {
         await renderSection(viewEl, section);
     } catch (e) {
@@ -45,7 +38,6 @@ async function route(force = false) {
 }
 
 window.addEventListener('hashchange', () => route());
-window.addEventListener('data-saved', () => { if (fs.folder()) markNoAppointment(); }); // e.g. an appointment added
 window.addEventListener('beforeunload', e => {
     if (hasUnsavedEdits()) { e.preventDefault(); e.returnValue = ''; }
 });

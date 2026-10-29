@@ -205,7 +205,7 @@ export async function dueItems(t0 = today()) {
     return results.flat().sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level));
 }
 
-/** For the Home page: [{ level: 'red' | 'yellow', text }], text without the links. */
+/** For the Home page and the menu colours: [{ level: 'red' | 'yellow', text (without the links), href }]. */
 export default async function alerts() {
     const plain = html => {
         const d = document.createElement('div');
@@ -213,5 +213,5 @@ export default async function alerts() {
         d.querySelectorAll('a').forEach(a => a.remove());
         return d.textContent.replace(/\s+/g, ' ').trim();
     };
-    return (await dueItems()).map(x => ({ level: x.level === 'stale' ? 'red' : 'yellow', text: `${x.where}: ${plain(x.text)}` }));
+    return (await dueItems()).map(x => ({ level: x.level === 'stale' ? 'red' : 'yellow', text: `${x.where}: ${plain(x.text)}`, href: x.href }));
 }

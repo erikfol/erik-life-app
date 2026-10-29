@@ -167,13 +167,16 @@ export async function modifiedAt(path) {
 }
 
 export async function writeText(path, text) {
-    if (isCloud()) { await dbx.upload(path, text); return; }
-    if (root && await isGone(root)) throw movedError(); // never write into a moved folder's old place
-    const [d, name] = split(path);
-    const fh = await (await dir(d, true)).getFileHandle(name, { create: true });
-    const w = await fh.createWritable();
-    await w.write(text);
-    await w.close();
+    if (isCloud()) await dbx.upload(path, text);
+    else {
+        if (root && await isGone(root)) throw movedError(); // never write into a moved folder's old place
+        const [d, name] = split(path);
+        const fh = await (await dir(d, true)).getFileHandle(name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(text);
+        await w.close();
+    }
+    window.dispatchEvent(new CustomEvent('file-written', { detail: path })); // e.g. the menu colours count again
 }
 
 export async function exists(path) {

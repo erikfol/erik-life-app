@@ -5,7 +5,7 @@
 // Also the banner itself (maintenanceBanner), which those pages show at the top.
 import { esc, toast } from '../../../bills-etc/js/util.js';
 import { showDate } from '../../../shared/js/recordtable.js';
-import { AREAS, MAINTENANCE_PAGES, bannerSettings, maintenanceStatus, loadMaintenance, saveHouses } from '../house.js';
+import { AREAS, MAINTENANCE_PAGES, bannerSettings, maintenanceStatus, loadMaintenance, saveHouses, pageHref } from '../house.js';
 
 let draft = null; // { start, read } while the banners are being edited
 
@@ -57,10 +57,6 @@ export function maintenanceBanner(b, rows) {
 }
 
 /** The page of maintenance page `a` (a tab, or a pill of one). */
-const pageHref = (h, a) => {
-    const tab = AREAS.find(t => t === a || t.parts?.includes(a));
-    return `#${h.id}/${tab.id}${tab.parts && tab.parts[0] !== a ? '/' + a.id : ''}`;
-};
 const pageName = a => (a.icon ? `${a.icon} ${a.label}` : a.label);
 
 /** list: every house (saved back whole). top: the house name and menus. */

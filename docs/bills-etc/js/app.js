@@ -2,6 +2,8 @@ import * as fs from './fs.js';
 import { pingOllama, ollamaSettings, aiEnabled } from './ollama.js';
 import { esc } from './util.js';
 import { syncCategories } from './categories.js';
+import alerts from './alerts.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import home from './views/home.js';
 import month from './views/month.js';
 import dashboard from './views/dashboard.js';
@@ -18,6 +20,8 @@ const viewEl = document.getElementById('view');
 let current = null;
 let currentName = null;
 let currentHash = null; // full hash, so moving between sub-pages (#utilities/water) also asks canLeave
+// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
+const menus = colourMenus(alerts);
 
 export async function refreshStatus() {
     const f = document.getElementById('st-folder');
@@ -93,7 +97,7 @@ async function route(force = false) {
     document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + currentName));
     viewEl.innerHTML = '';
     try {
-        if (fs.folder()) await syncCategories();
+        if (fs.folder()) { menus.ready(); await syncCategories(); }
         await view.render(viewEl);
     } catch (e) {
         console.error(e);

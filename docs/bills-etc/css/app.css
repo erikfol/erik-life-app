@@ -53,9 +53,13 @@ body {
 }
 #nav a:hover { color: #fff; background: rgba(255,255,255,0.08); }
 #nav a.active { color: #fff; background: rgba(255,255,255,0.16); }
-#nav a.bad { color: #ffd5d0; background: rgba(231,76,60,0.2); } /* Pets: no future appointment */
+/* Menu colours (shared/js/navcolors.js): red / yellow while that page has a red / yellow banner */
+#nav a.bad { color: #ffd5d0; background: rgba(231,76,60,0.2); }
 #nav a.bad:hover { background: rgba(231,76,60,0.3); }
 #nav a.bad.active { color: #fff; background: rgba(231,76,60,0.42); }
+#nav a.warn { color: #ffe8a3; background: rgba(245,197,24,0.18); }
+#nav a.warn:hover { background: rgba(245,197,24,0.28); }
+#nav a.warn.active { color: #fff; background: rgba(245,197,24,0.4); }
 .status { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .pill {
     font-size: 0.78em;
@@ -336,6 +340,10 @@ tr.selected-row td { background: #eef4ff; }
 }
 .subnav a:hover { color: var(--blue-text); }
 .subnav a.active { color: var(--navy-2); border-bottom-color: var(--blue); }
+.subnav a.bad { color: #c0392b; }
+.subnav a.warn { color: #a07400; }
+.subnav a.bad.active { border-bottom-color: #c0392b; }
+.subnav a.warn.active { border-bottom-color: #e0b100; }
 h2.page-sub { font-size: 1.2em; }
 .bill-note { min-width: 240px; }
 .ledger td:first-child { width: 100%; }
@@ -445,6 +453,10 @@ details.bucket-group > summary { cursor: pointer; margin-bottom: 8px; }
 .pillnav { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
 .pillnav a { padding: 5px 14px; border-radius: 16px; background: var(--head); color: #555; text-decoration: none; font-size: 0.88em; border: 1px solid var(--line-strong); }
 .pillnav a.active { background: var(--navy-2); border-color: var(--navy-2); color: #fff; }
+.pillnav a.bad { background: #fdecea; border-color: #f5c6c0; color: #a8322a; }
+.pillnav a.warn { background: #fff8e1; border-color: #f0d77a; color: #8a5a00; }
+.pillnav a.bad.active { background: #c0392b; border-color: #c0392b; color: #fff; }
+.pillnav a.warn.active { background: #f5c518; border-color: #e0b100; color: #3d2e00; }
 /* Mini-splits */
 .spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 18px; font-size: 0.92em; }
 .spec-label { display: block; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 2px; }

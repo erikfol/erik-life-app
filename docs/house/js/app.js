@@ -7,11 +7,15 @@ import { esc } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import { loadHouses, AREAS, houseProjects } from './house.js';
+import alerts from './alerts.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import { renderHouse, renderHouseSettings, renderNewHouse, hasUnsavedEdits, forget } from './views/house.js';
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('nav');
 let currentHash = null;
+// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
+const menus = colourMenus(alerts);
 
 function drawNav(list, active) {
     navEl.innerHTML = list.map(h => `<a href="#${esc(h.id)}"${h.id === active ? ' class="active"' : ''}>${esc(h.name)}</a>`).join('')
@@ -37,6 +41,7 @@ async function route(force = false) {
         navEl.innerHTML = '';
         return askForFolder(viewEl, { what: 'House records', where: 'inputs/house/', onConnected: () => route(true) });
     }
+    menus.ready();
     try {
         const list = await loadHouses();
         const [want, part, sub] = hash.slice(1).split('/');

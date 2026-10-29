@@ -1,5 +1,5 @@
 // Gifts' red and yellow banners: the rules a person's date banner (views/person.js) and the Christmas banner
-// (views/christmas.js) use, and the Home page's counts from them.
+// (views/christmas.js) use, and the Home page's counts and the menu colours from them.
 import { loadData, loadGifts, loadChristmas, upcomingDates, christmas, comingChristmas, tally, forOccasion, inDays } from './gifts.js';
 
 export const DATE_SOON_DAYS = 30; // a date this close with nothing planned turns the banner red
@@ -28,21 +28,21 @@ export function christmasLevel(year, rows) {
     return !t.count ? 'yellow' : t.todo ? (days <= CHRISTMAS_SOON_DAYS ? 'red' : 'yellow') : 'green';
 }
 
-/** [{ level: 'red' | 'yellow', text }]: each person's next date, and the coming Christmas's list if there is one. */
+/** [{ level: 'red' | 'yellow', text, href }]: each person's next date, and the coming Christmas's list if there is one. */
 export default async function alerts() {
     const data = await loadData(false);
     const people = await Promise.all(data.people.map(async p => {
         const next = upcomingDates(p)[0];
         const level = dateLevel(next, next ? await loadGifts(p, false) : []);
-        return level === 'red' ? [{ level, text: `${p.name}: ${next.label} ${inDays(next.days)}, nothing planned yet` }]
-            : level === 'yellow' ? [{ level, text: `${p.name}: ${next.label} ${inDays(next.days)}, gifts still to buy` }] : [];
+        return level === 'red' ? [{ level, text: `${p.name}: ${next.label} ${inDays(next.days)}, nothing planned yet`, href: `#${p.id}` }]
+            : level === 'yellow' ? [{ level, text: `${p.name}: ${next.label} ${inDays(next.days)}, gifts still to buy`, href: `#${p.id}` }] : [];
     }));
     const year = comingChristmas(), out = people.flat();
     if (data.christmasYears.includes(year)) {
         const rows = await loadChristmas(year, false);
         const level = christmasLevel(year, rows), t = tally(rows);
         if (level === 'red' || level === 'yellow') {
-            out.push({ level, text: `Christmas ${inDays(christmas(year).days)}: ${t.count ? `${t.todo} of ${t.count} gifts still to buy` : `nothing on the ${year} list yet`}` });
+            out.push({ level, text: `Christmas ${inDays(christmas(year).days)}: ${t.count ? `${t.todo} of ${t.count} gifts still to buy` : `nothing on the ${year} list yet`}`, href: `#christmas/${year}` });
         }
     }
     return out;

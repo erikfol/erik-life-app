@@ -5,12 +5,16 @@ import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { loadData, comingChristmas } from './gifts.js';
+import alerts from './alerts.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import * as person from './views/person.js';
 import * as xmas from './views/christmas.js';
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('nav');
 let currentHash = null;
+// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
+const menus = colourMenus(alerts);
 
 const hasUnsavedEdits = () => person.hasUnsavedEdits() || xmas.hasUnsavedEdits();
 
@@ -39,6 +43,7 @@ async function route(force = false) {
         navEl.innerHTML = '';
         return askForFolder(viewEl, { what: 'Gifts, birthdays and anniversaries', where: 'inputs/gifts/', onConnected: () => route(true) });
     }
+    menus.ready();
     try {
         const data = await loadData();
         const [want, sub] = hash.slice(1).split('/');

@@ -1,8 +1,8 @@
-// House's red and yellow banners, for the Home page's counts: each maintenance due banner that's shown (House →
-// ⚙ Settings), red once it's due and yellow in its warning time before, as on its page (maintenanceStatus).
-import { loadHouses, MAINTENANCE_PAGES, bannerSettings, maintenanceStatus, loadMaintenance } from './house.js';
+// House's red and yellow banners, for the Home page's counts and the menu colours: each maintenance due banner that's
+// shown (House → ⚙ Settings), red once it's due and yellow in its warning time before, as on its page (maintenanceStatus).
+import { loadHouses, MAINTENANCE_PAGES, bannerSettings, maintenanceStatus, loadMaintenance, pageHref } from './house.js';
 
-/** [{ level: 'red' | 'yellow', text }] */
+/** [{ level: 'red' | 'yellow', text, href }] (href: the maintenance page) */
 export default async function alerts() {
     const houses = await loadHouses(false);
     const lists = await Promise.all(houses.flatMap(h => MAINTENANCE_PAGES.map(async a => {
@@ -11,8 +11,9 @@ export default async function alerts() {
         const { level, due } = maintenanceStatus(await loadMaintenance(h, a, false), b);
         const what = `${b.what}${houses.length > 1 ? ` (${h.name})` : ''}`;
         const by = due.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-        return level === 'due' ? [{ level: 'red', text: `${what} is due (due by ${by})` }]
-            : level === 'soon' ? [{ level: 'yellow', text: `${what} is due by ${by}` }] : [];
+        const href = pageHref(h, a);
+        return level === 'due' ? [{ level: 'red', text: `${what} is due (due by ${by})`, href }]
+            : level === 'soon' ? [{ level: 'yellow', text: `${what} is due by ${by}`, href }] : [];
     })));
     return lists.flat();
 }

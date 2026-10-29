@@ -212,6 +212,11 @@ export const saveMaintenance = (h, a, rows) => writeRows(maintenancePath(h, a), 
 
 /** Pages with a Maintenance table (each can show a due banner). */
 export const MAINTENANCE_PAGES = AREAS.flatMap(t => t.parts || [t]).filter(a => a.maintenance);
+/** The link to page `a` (a tab, or a pill of one; a tab's first pill is the tab's own link) of house `h`. */
+export const pageHref = (h, a) => {
+    const tab = AREAS.find(t => t === a || t.parts?.includes(a));
+    return `#${h.id}/${tab.id}${tab.parts && tab.parts[0] !== a ? '/' + a.id : ''}`;
+};
 
 /**
  * The due banner settings of maintenance page `a` on house `h`: what's saved under House → ⚙ Settings
