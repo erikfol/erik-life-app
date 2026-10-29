@@ -4,7 +4,7 @@
 // would start the Bills Etc app on the Home page, so nothing here may.
 import * as fs from './fs.js';
 import { PATHS } from './data.js';
-import { loadSavings } from './savings.js';
+import { loadSavings, loadActivity as loadSavingsActivity, loadSettings } from './savings.js';
 import { loadElectric } from './electric.js';
 import { loadWater, nextQuarter } from './water.js';
 import { loadDeliveries } from './heating.js';
@@ -28,8 +28,19 @@ export const LEVELS = ['stale', 'old', 'aging'];
 export const PAYCHECK_EVERY = 14;
 /** Savings: deposits a bucket is behind, one for every two weeks since its last update. */
 export const depositsDue = b => (b.group === 'active' && b.perCheck > 0 && b.updated ? Math.max(0, Math.floor((today() - b.updated) / DAY / PAYCHECK_EVERY)) : 0);
-/** Savings: days after which "Available in account" needs checking again. */
-export const BALANCES_STALE_DAYS = 45;
+/**
+ * Savings: how long since the account activity was last brought up to date — the newest of its last entry, the day
+ * it was marked checked (settings.activityChecked) and the starting balance's date: { lastEntry, checked, days }.
+ * Like a credit card's: yellow from STALE_DAYS, red from VERY_STALE_DAYS.
+ */
+export function savingsActivityAge(rows, settings, t0) {
+    const iso = x => (/^\d{4}-\d{2}-\d{2}$/.test(x || '') ? x : null);
+    const lastEntry = rows.map(r => iso(r.Date)).filter(Boolean).sort().at(-1) || null;
+    const checked = iso(settings?.activityChecked), opened = iso(settings?.opening?.date);
+    const last = [lastEntry, checked, opened].filter(Boolean).sort().at(-1);
+    const day = x => { const [y, m, d] = x.split('-').map(Number); return new Date(y, m - 1, d); };
+    return { lastEntry: lastEntry && day(lastEntry), checked: checked && day(checked), days: last ? Math.floor((t0 - day(last)) / DAY) : Infinity };
+}
 
 // The electric company's customer portal, where statements are downloaded.
 const ELECTRIC_PORTAL = 'https://myaccount.libertyenergyandwater.com/portal/#/login?LUNH';
@@ -88,11 +99,12 @@ async function savingsItems(t0) {
         out.push({ level: most <= 2 ? 'aging' : most <= 4 ? 'old' : 'stale', where, href,
             text: `<strong>${most} paycheck deposit${most === 1 ? '' : 's'} behind</strong> · ${behind.map(x => `${esc(x.b.name)} ${x.n}×`).join(', ')}` });
     }
-    const updated = data.available?.updated;
-    const age = updated ? Math.round((t0 - updated) / DAY) : null;
-    if (age > BALANCES_STALE_DAYS) {
-        out.push({ level: 'aging', where, href,
-            text: `<strong>Balances last updated ${esc(dLong(updated))}</strong> (${days(age)} ago) · check the account and press Update balances` });
+    // Account activity not updated in 20+ (yellow) or 40+ days (red), as the Savings banner
+    const [activity, settings] = await Promise.all([loadSavingsActivity(), loadSettings()]);
+    const a = savingsActivityAge(activity, settings, t0);
+    if (a.days >= STALE_DAYS) {
+        out.push({ level: a.days >= VERY_STALE_DAYS ? 'stale' : 'aging', where, href,
+            text: `<strong>Account activity not updated</strong> · ${a.lastEntry ? `last entry ${esc(dLong(a.lastEntry))}` : 'no entries yet'}${a.checked ? `, checked ${esc(dLong(a.checked))}` : ''}${Number.isFinite(a.days) ? ` (${days(a.days)})` : ''}` });
     }
     return out;
 }

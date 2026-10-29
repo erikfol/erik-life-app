@@ -1,8 +1,10 @@
 // Savings: the buckets in inputs/savings/master_savings.csv: what's in the account, what's set aside for each
-// bucket, the "oh sh!t money" left over, what each paycheck adds, and the log of money moved out of savings.
+// bucket, the "oh sh!t money" left over, what each paycheck adds, and the log of money moved out of savings. What's in
+// the account comes from the account activity (deposits and withdrawals from a starting balance), like a credit card's:
+// its balance over time, the activity table, and a yellow / red banner when it hasn't been updated in 20 / 40 days.
 import {
     loadSavings, changeSavings, saveSeparate, bucketCells, transferCells, sheetDollars, longDate, SAVINGS_PATH,
-    loadAvailableHistory, saveAvailableHistory, recordAvailable, AVAILABLE_HISTORY_PATH,
+    loadActivity, saveActivity, ACTIVITY_COLUMNS, ACTIVITY_TYPES, ACTIVITY_PATH, savingsLedger, loadSettings, saveSettings, syncAvailable,
 } from '../savings.js';
 import { PATHS, readTable } from '../data.js';
 import { normalizeMaster, monthlyBreakdown } from '../finance.js';
@@ -11,7 +13,7 @@ import { drawBars, drawLines } from '../charts.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
 import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
-import { depositsDue, BALANCES_STALE_DAYS, PAYCHECK_EVERY } from '../alerts.js'; // shared with Setup and the Home page
+import { depositsDue, PAYCHECK_EVERY, savingsActivityAge, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
 import { dataTable, closeFilterMenu } from '../datatable.js';
 import { dLong, today, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize, axisMoney, sameDay, sameAmount, dupText } from './utilcommon.js';
 
@@ -25,7 +27,8 @@ const GROUPS = [
     { id: 'other', title: 'Not in the paycheck total', sub: 'deposits listed but not counted in the per-paycheck total' },
     { id: 'past', title: 'One-time money', sub: 'stimulus, escrow, tax returns and other money that came and went' },
 ];
-let editing = null; // 'buckets' | 'transfers' | 'balances' while a form has possible unsaved changes
+let editing = null; // 'buckets' | 'transfers' | 'balances' | 'opening' while a form has possible unsaved changes
+let activityTable = null; // the account activity table
 const daysAgo = d => Math.round((today() - d) / DAY);
 const amountText = v => (Number.isFinite(v) ? money(v) : '–');
 
@@ -49,13 +52,17 @@ export default {
             el.innerHTML = `<h1 class="page">Savings</h1><div class="banner">No savings sheet found. This page reads <code>${esc(SAVINGS_PATH)}</code> in your erik-life-app folder.</div>`;
             return;
         }
-        const [spending, history] = await Promise.all([averageSpending(), loadAvailableHistory()]);
+        const [spending, activity, settings] = await Promise.all([averageSpending(), loadActivity(), loadSettings()]);
         const { available, buckets, transfers, totals, separate } = data;
+        // What's in the account: the starting balance (until one is saved, the sheet's Available In Account) plus deposits
+        // minus withdrawals.
+        const opening = settings?.opening || { balance: Number.isFinite(available?.value) ? available.value : 0, date: isoDate(available?.updated || today()) };
+        const L = savingsLedger(opening, activity), balance = L.balance;
         const live = buckets.filter(b => b.group !== 'past');
         const counted = live.filter(b => !separate.has(b.name) && Number.isFinite(b.balance));
         const heldApart = live.filter(b => separate.has(b.name) && Number.isFinite(b.balance));
         const setAside = sum(counted.map(b => b.balance));
-        const cushion = Number.isFinite(available?.value) ? available.value - setAside : NaN;
+        const cushion = balance - setAside;
         const perCheck = sum(buckets.filter(b => b.group === 'active' && Number.isFinite(b.perCheck)).map(b => b.perCheck));
         const t0 = today(), yearAgo = new Date(t0.getFullYear() - 1, t0.getMonth(), t0.getDate());
         const recent = transfers.filter(t => t.date && t.date >= yearAgo);
@@ -72,12 +79,22 @@ export default {
             <form id="upd-form" class="add-bill" hidden style="margin-bottom:18px"></form>
             <div class="cards kpis sav-cards" id="cards"></div>
             <section>
-                <h2>Available in account <span class="sub">a point each time you save Update balances with a new amount</span></h2>
+                <h2>Available in account <span class="sub">the balance over time, from the account activity</span></h2>
                 <canvas id="c-available" style="display:block;width:100%;height:220px"></canvas>
-                <p class="muted" id="avail-empty" hidden>No readings yet. The next time you save Update balances with a new Available in account, it starts here.</p>
-                <details class="avail-history"><summary class="muted">All readings (${history.length})</summary>
-                    <p class="muted" style="font-size:0.85em;margin:6px 0">Kept in <code>${esc(AVAILABLE_HISTORY_PATH)}</code>. Edit to fix or remove one.</p>
-                    <div id="avail-table"></div></details>
+            </section>
+            <section>
+                <h2>Account activity <span class="sub">deposits and withdrawals · kept in <code>${esc(ACTIVITY_PATH)}</code></span></h2>
+                <div class="row" style="margin-bottom:10px"><span class="muted" id="opening-text"></span>
+                    <button type="button" class="small" id="opening-edit">✎ Starting balance</button></div>
+                <form id="opening-form" class="add-bill" hidden>
+                    <div class="add-grid">
+                        <label class="field">Starting balance ($)<input type="number" step="0.01" name="balance" required></label>
+                        <label class="field">On<input type="date" name="date" required></label>
+                        <span class="muted" style="align-self:end;font-size:0.85em;padding-bottom:8px">What was in the account before the first entry below.</span>
+                    </div>
+                    <div class="row"><button type="submit" class="primary">Save</button><button type="button" id="opening-cancel">Cancel</button></div>
+                </form>
+                <div id="activity"></div>
             </section>
             <section>
                 <h2>Insights</h2>
@@ -113,7 +130,7 @@ export default {
                         <label class="field" style="grid-column:span 2">Description<input type="text" name="description" placeholder="what it was for"></label>
                     </div>
                     <datalist id="t-dests">${[...new Set(transfers.map(t => t.to).filter(Boolean))].map(d => `<option value="${esc(d)}">`).join('')}</datalist>
-                    <p class="muted" style="font-size:0.85em">Also take it out of "Available in account" with Update balances.</p>
+                    <p class="muted" style="font-size:0.85em">Also log it as a Withdrawal in Account activity, so the balance goes down.</p>
                     <div class="row"><button type="submit" class="primary">Save transfer</button><button type="button" id="t-add-cancel">Cancel</button></div>
                 </form>
             </section>`;
@@ -138,15 +155,13 @@ export default {
         // not caught up automatically (their own + button still adds one deposit at a time).
         const allDue = buckets.map(b => ({ b, n: depositsDue(b) })).filter(x => x.n > 0);
         const due = allDue.filter(x => x.n <= 2), behind = allDue.filter(x => x.n > 2);
-        const deposit = (list, msg) => save((R, info) => {
-            let added = 0;
+        // (They fill the buckets only: the account's money comes from the activity, where the deposit itself is logged.)
+        const deposit = (list, msg) => save(R => {
             for (const { b, n } of list) {
                 const bal = (Number.isFinite(b.balance) ? b.balance : 0) + b.perCheck * n;
                 R[b.rec][1] = sheetDollars(bal);
                 R[b.rec][2] = longDate(b.updated ? plusDays(b.updated, EVERY * n) : today());
-                if (!info.separate.has(b.name)) added += b.perCheck * n;
             }
-            if (added && info.available && Number.isFinite(info.available.value)) R[info.available.rec][1] = sheetDollars(info.available.value + added);
         }, msg);
 
         // ── Status ──
@@ -156,9 +171,29 @@ export default {
         const depositBanner = `<div class="banner updated-${level}">${most === 0
             ? '<strong>Deposits up to date</strong> · every bucket has its paycheck deposits'
             : `<strong>${most} deposit${most === 1 ? '' : 's'} behind</strong> · ${[...allDue].sort((a, b) => b.n - a.n).map(x => `${esc(x.b.name)} ${x.n}×`).join(', ')}`}</div>`;
-        const age = available?.updated ? daysAgo(available.updated) : null;
-        $('#status').innerHTML = depositBanner + (age == null ? ''
-            : `<div class="banner${age > BALANCES_STALE_DAYS ? '' : ' ok'}">${age > BALANCES_STALE_DAYS ? '⏰' : '✓'} <strong>Balances last updated ${esc(dLong(available.updated))}</strong> (${age} day${age === 1 ? '' : 's'} ago).${age > BALANCES_STALE_DAYS ? ' Time to check the account and press Update balances.' : ''}</div>`);
+        // The account activity: yellow after 20 days without an entry (or a "checked"), red after 40, like a credit card's.
+        const act = savingsActivityAge(activity, { ...settings, opening }, t0);
+        const actText = [act.lastEntry ? `last entry ${esc(dLong(act.lastEntry))}` : 'no entries yet', act.checked ? `checked ${esc(dLong(act.checked))}` : '']
+            .filter(Boolean).join(', ') + (Number.isFinite(act.days) ? ` <span class="muted">(${act.days} day${act.days === 1 ? '' : 's'})</span>` : '');
+        const actBanner = act.days >= STALE_DAYS
+            ? `<div class="banner updated-${act.days >= VERY_STALE_DAYS ? 'stale' : 'aging'} row"><span><strong>Account activity not updated in ${act.days >= VERY_STALE_DAYS ? VERY_STALE_DAYS : STALE_DAYS}+ days</strong> · ${actText}</span>
+                <span class="spacer"></span><button type="button" class="small" id="act-checked" title="You looked at the account and there's nothing new to add. Saves today's date; no entry is added.">✓ Checked – no new activity</button></div>`
+            : `<div class="banner ok">✓ <strong>Account activity up to date</strong> · ${actText}</div>`;
+        $('#status').innerHTML = depositBanner + actBanner;
+        const checkedBtn = $('#act-checked');
+        if (checkedBtn) checkedBtn.onclick = async () => {
+            checkedBtn.disabled = true;
+            try {
+                await saveSettings({ activityChecked: isoDate(today()), ...(settings?.opening ? {} : { opening }) });
+                toast('Marked checked today', 'ok');
+                const y = scrollY;
+                await this.render(el);
+                scrollTo(0, y);
+            } catch (err) {
+                checkedBtn.disabled = false;
+                toast(`Couldn't save it: ${err.message}`, 'bad');
+            }
+        };
         if (due.length) {
             const total = sum(due.map(x => x.b.perCheck * x.n));
             $('#status').insertAdjacentHTML('beforeend', `<div class="banner row"><span>💵 <strong>${due.length} bucket${due.length === 1 ? ' has' : 's have'} paycheck deposits due</strong> (${esc(money(total))} in all): ${due.map(x => `${esc(x.b.name)} ${x.n}×`).join(', ')}.</span>
@@ -166,7 +201,7 @@ export default {
             $('#deposit-all').onclick = () => {
                 // (only the buckets one or two paychecks behind)
                 const lines = due.map(x => `• ${x.b.name}: ${x.n} × ${money(x.b.perCheck)} = ${money(x.n * x.b.perCheck)} (date → ${dLong(plusDays(x.b.updated, EVERY * x.n))})`).join('\n');
-                if (!confirm(`Add these paycheck deposits?\n\n${lines}\n\nTotal ${money(total)}. Buckets not held separately also add to Available in account.`)) return;
+                if (!confirm(`Add these paycheck deposits?\n\n${lines}\n\nTotal ${money(total)}. Log the money going into the account in Account activity.`)) return;
                 deposit(due, `Added ${due.reduce((t, x) => t + x.n, 0)} deposits (${money(total)})`);
             };
         }
@@ -178,7 +213,7 @@ export default {
         // ── Cards ──
         const changed = Number.isFinite(totals.before) && Number.isFinite(cushion) ? cushion - totals.before : NaN;
         $('#cards').innerHTML = [
-            card('Available in account', amountText(available?.value), `<span class="muted">${available?.updated ? `as of ${esc(dLong(available.updated))}` : 'not dated'}</span>`, 'var(--blue-text)'),
+            card('Available in account', amountText(balance), `<span class="muted">from the account activity${L.last ? ` · last entry ${esc(dLong(dateOf(L.last)))}` : ''}</span>`, 'var(--blue-text)'),
             card('Set aside in buckets', money(setAside), `<span class="muted">${counted.filter(b => b.balance > 0).length} buckets with money</span>`),
             card('Oh sh!t money', amountText(cushion),
                 `<span class="muted">available − set aside</span>${Number.isFinite(changed) ? `<br><span class="${changed >= 0 ? 'delta-good' : 'delta-bad'}">${changed >= 0 ? '▲' : '▼'} ${esc(money(Math.abs(changed)))}</span> <span class="muted">vs ${esc(money(totals.before))} before</span>` : ''}`,
@@ -187,34 +222,61 @@ export default {
             heldApart.length ? card('Held separately', money(sum(heldApart.map(b => b.balance))), `<span class="muted">${heldApart.map(b => esc(b.name)).join(', ')}: not in the account total</span>`) : '',
         ].join('');
 
-        // ── Available in account over time: one point per reading (Update balances), oldest → newest ──
-        let readings = history;
+        // ── Available in account over time: the balance at the end of each day with activity, from the starting balance ──
         const shortDay = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }).replace(/, (\d\d)$/, " '$1");
         const drawA = () => {
-            const pts = readings.map(r => ({ date: dateOf(r.Date), value: numOf(r.Available) })).filter(p => p.date && Number.isFinite(p.value));
-            $('#c-available').hidden = !pts.length;
-            $('#avail-empty').hidden = !!pts.length;
+            const pts = L.days.map(d => ({ date: dateOf(d.date), value: d.balance })).filter(p => p.date);
             if (!pts.length) return;
             drawLines($('#c-available'), {
                 labels: pts.map(p => shortDay(p.date)),
                 series: [{ name: 'Available in account', values: pts.map(p => p.value), color: '#2b6cb0', width: 2.5, dots: true }],
                 fit: true, fmt: v => `$${Math.round(v).toLocaleString('en-US')}`, tipFmt: money,
-                tipHead: i => dLong(pts[i].date),
+                tipHead: i => (i === 0 && L.days[0].date === opening.date ? `${dLong(pts[0].date)} · starting balance` : dLong(pts[i].date)),
             });
         };
-        // The readings, editable (to fix or remove one), oldest first.
-        const drawReadings = () => recordTable($('#avail-table'), {
-            columns: [{ name: 'Date', kind: 'date' }, { name: 'Available', kind: 'money', total: false }],
-            rows: readings,
+
+        // ── Account activity: the starting balance, then every deposit and withdrawal with the balance after it ──
+        // Saving either writes the new balance into the sheet's Available In Account.
+        const reload = async () => { const y = scrollY; await this.render(el); scrollTo(0, y); };
+        $('#opening-text').innerHTML = `Starting balance <strong>${esc(money(opening.balance))}</strong> on ${esc(dLong(dateOf(opening.date)))}`
+            + (settings?.opening ? '' : ' <span class="muted">(the sheet\'s Available in account; change it if the activity starts earlier)</span>');
+        const of = $('#opening-form');
+        $('#opening-edit').onclick = () => {
+            editing = 'opening';
+            of.hidden = false;
+            of.balance.value = opening.balance;
+            of.date.value = opening.date;
+            of.balance.focus();
+        };
+        $('#opening-cancel').onclick = () => { editing = null; of.hidden = true; };
+        of.onsubmit = async e => {
+            e.preventDefault();
+            const b = numOf(of.balance.value), d = of.date.value;
+            if (!Number.isFinite(b) || !dateOf(d)) { toast('Enter the starting balance and its date', 'bad'); return; }
+            const next = { balance: Math.round(b * 100) / 100, date: d };
+            try {
+                await saveSettings({ opening: next });
+                await syncAvailable(savingsLedger(next, activity).balance);
+                editing = null;
+                toast('Starting balance saved', 'ok');
+                await reload();
+            } catch (err) {
+                toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+            }
+        };
+        activityTable = recordTable($('#activity'), {
+            columns: [...ACTIVITY_COLUMNS.map(c => (c.name === 'Type' ? { ...c, default: 'Deposit' } : c.name === 'Date' ? { ...c, default: () => isoDate(today()) } : c)),
+                { name: 'Balance', kind: 'money', total: false, calc: r => L.after.get(r) ?? '' }],
+            rows: activity,
+            choices: { Type: { list: ACTIVITY_TYPES, noun: 'type' } },
             save: async rows => {
-                await saveAvailableHistory(rows);
-                readings = [...rows].sort((a, b) => a.Date.localeCompare(b.Date));
-                $('.avail-history summary').textContent = `All readings (${readings.length})`;
-                drawA();
-                setTimeout(drawReadings); // in date order again, once the table has finished saving
+                await saveActivity(rows);
+                if (!settings?.opening) await saveSettings({ opening }); // the balance it all counts from, kept from now on
+                await syncAvailable(savingsLedger(opening, rows).balance);
+                activityTable = null;
+                await reload();
             },
         });
-        drawReadings();
 
         // ── Insights ──
         const tips = [];
@@ -265,7 +327,7 @@ export default {
             const b = buckets.find(x => x.rec === +btn.dataset.deposit);
             btn.disabled = true;
             const to = b.updated ? plusDays(b.updated, EVERY) : today();
-            deposit([{ b, n: 1 }], `${b.name}: +${money(b.perCheck)} (now ${money((Number.isFinite(b.balance) ? b.balance : 0) + b.perCheck)}, dated ${dLong(to)})${separate.has(b.name) ? '' : '. Also added to Available in account'}`);
+            deposit([{ b, n: 1 }], `${b.name}: +${money(b.perCheck)} (now ${money((Number.isFinite(b.balance) ? b.balance : 0) + b.perCheck)}, dated ${dLong(to)})`);
         });
 
         // ── Each paycheck ──
@@ -328,16 +390,13 @@ export default {
             uf.hidden = false;
             $('#upd-open').hidden = true;
             uf.innerHTML = `
-                <h3>Update balances <span class="muted" style="font-weight:400">changed ones get today's date</span></h3>
-                <div class="add-grid">
-                    <label class="field"><strong>Available in account ($)</strong><input type="number" step="0.01" name="available" value="${Number.isFinite(available?.value) ? available.value : ''}"></label>
-                    <span></span><span></span>
-                </div>
+                <h3>Update balances <span class="muted" style="font-weight:400">the buckets; changed ones get today's date</span></h3>
+                <p class="muted" style="font-size:0.85em;margin:-4px 0 10px">Available in account (${esc(money(balance))}) comes from Account activity: log deposits and withdrawals there.</p>
                 <div class="upd-grid">${updList.map(b => `<label class="field">${esc(b.name)}<input type="number" step="0.01" data-rec="${b.rec}" value="${Number.isFinite(b.balance) ? b.balance : ''}" placeholder="n/a"></label>`).join('')}</div>
                 <p class="add-preview" id="upd-preview"></p>
                 <div class="row"><button type="submit" class="primary">Save balances</button><button type="button" id="upd-cancel">Cancel</button></div>`;
             const preview = () => {
-                const avail = numOf(uf.available.value);
+                const avail = balance;
                 const vals = new Map([...uf.querySelectorAll('[data-rec]')].map(i => [+i.dataset.rec, numOf(i.value)]));
                 const aside = sum(counted.map(b => (vals.has(b.rec) ? vals.get(b.rec) : b.balance)).filter(Number.isFinite));
                 uf.querySelector('#upd-preview').innerHTML = Number.isFinite(avail) ? `Set aside ${esc(money(aside))} · oh sh!t money <strong>${esc(money(avail - aside))}</strong>` : '';
@@ -345,20 +404,17 @@ export default {
             uf.oninput = preview;
             preview();
             uf.querySelector('#upd-cancel').onclick = () => { editing = null; uf.hidden = true; $('#upd-open').hidden = false; };
-            uf.available.focus();
+            uf.querySelector('[data-rec]')?.focus();
         };
         uf.onsubmit = async e => {
             e.preventDefault();
-            const avail = numOf(uf.available.value), now = new Date();
+            const now = new Date();
             const edits = [...uf.querySelectorAll('[data-rec]')].map(i => ({ rec: +i.dataset.rec, value: numOf(i.value) }))
                 .filter(x => { const b = buckets.find(y => y.rec === x.rec); return !(Number.isNaN(x.value) && Number.isNaN(b.balance)) && !sameAmount(x.value, b.balance); });
-            const availChanged = Number.isFinite(avail) && !sameAmount(avail, available?.value);
-            if (!edits.length && !availChanged) { toast('Nothing changed', ''); return; }
+            if (!edits.length) { toast('Nothing changed', ''); return; }
             await save(R => {
-                if (availChanged) { R[available.rec][1] = sheetDollars(avail); R[available.rec][2] = longDate(now); }
                 for (const x of edits) { R[x.rec][1] = Number.isFinite(x.value) ? sheetDollars(x.value) : ' n/a '; R[x.rec][2] = longDate(now); }
-            }, `Updated ${edits.length + (availChanged ? 1 : 0)} balance${edits.length + (availChanged ? 1 : 0) === 1 ? '' : 's'}`,
-            availChanged ? () => recordAvailable(now, avail) : null); // a new point on the Available in account graph
+            }, `Updated ${edits.length} balance${edits.length === 1 ? '' : 's'}`);
         };
 
         // ── Edit buckets: name, balance, per paycheck, date, notes, held separately; add or remove buckets ──
@@ -494,10 +550,11 @@ export default {
     },
 
     canLeave(unloading) {
-        if (!editing) return true;
+        if (!editing && !activityTable?.hasUnsavedEdits()) return true;
         if (unloading) return false;
         if (!confirm('You have unsaved savings edits. Leave without saving?')) return false;
         editing = null;
+        activityTable = null;
         return true;
     },
 

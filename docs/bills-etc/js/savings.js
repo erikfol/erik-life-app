@@ -6,8 +6,8 @@
 //   summary rows: Available In Account, Total deductions, Total oh sh!t money, Before changes…, Diff
 //   a transfer log: Transfer | Amount | Date | Confirmed | Description
 // Records are read with the CSV reader and written back field by field, so untouched parts stay byte-for-byte.
-// Each "Available In Account" saved with Update balances is also kept in available_history.csv (Date, Available) for
-// the page's graph.
+// The account's deposits and withdrawals are kept in activity.csv; "Available In Account" is the running balance from
+// a starting balance (savings_settings.json), written into the sheet whenever the activity changes.
 import * as fs from './fs.js';
 import { parseRecords, parseCSV, toCSV } from './csv.js';
 import { parseBillDate, parseMoney } from './sheet.js';
@@ -111,17 +111,25 @@ function parseSavings(R, settings) {
     return out;
 }
 
-async function loadSettings() {
+/**
+ * savings_settings.json: { separate: [bucket names not in "Available In Account"], opening: { balance, date } (the
+ * account activity's starting balance), activityChecked: 'YYYY-MM-DD' (looked at the account, nothing new) }, or null.
+ */
+export async function loadSettings() {
     const t = await fs.readText(SETTINGS_PATH);
     if (t == null) return null;
     try { return JSON.parse(t); } catch { return null; }
 }
-export async function saveSeparate(names) {
+/** Change some settings, keeping the rest. */
+export async function saveSettings(changes) {
+    const { _readme, ...was } = (await loadSettings()) || {};
     await fs.writeText(SETTINGS_PATH, JSON.stringify({
-        _readme: 'Savings page settings. "separate": buckets whose money is NOT in "Available In Account" (kept elsewhere).',
-        separate: [...names],
+        _readme: 'Savings page settings. "separate": buckets whose money is NOT in "Available In Account" (kept elsewhere). '
+            + '"opening": the account activity\'s starting balance. "activityChecked": the day you looked and there was nothing new.',
+        ...was, ...changes,
     }, null, 2) + '\n');
 }
+export const saveSeparate = names => saveSettings({ separate: [...names] });
 
 /**
  * Change the sheet and write it back. `fn(records, info)` edits the records in place (info: {buckets, separate,
@@ -158,26 +166,53 @@ export const bucketCells = b => [b.name, sheetDollars(b.balance), b.updated ? lo
 /** Cells for a transfer row. */
 export const transferCells = t => [t.kind, (t.approx ? '~' : '') + sheetDollars(t.amount).replace(/^ /, t.approx ? '' : ' '), t.date ? shortDate(t.date) : '', t.confirmed ? 'Yes' : 'No', t.description || ''];
 
-// ── "Available In Account" over time ─────────────────────────────────────────
-export const AVAILABLE_HISTORY_PATH = 'inputs/savings/available_history.csv';
-const AVAILABLE_COLUMNS = ['Date', 'Available'];
+// ── Account activity: the savings account's deposits and withdrawals ────────
+export const ACTIVITY_PATH = 'inputs/savings/activity.csv';
+export const ACTIVITY_TYPES = ['Deposit', 'Withdrawal'];
+export const ACTIVITY_COLUMNS = [
+    { name: 'Date', kind: 'date' },
+    { name: 'Description', kind: 'text' },
+    { name: 'Type', kind: 'choice' },
+    { name: 'Amount', kind: 'money', total: false }, // always positive: Type says which way it goes
+    { name: 'Notes', kind: 'text' },
+];
 
-/** The readings, oldest first: [{ Date: 'YYYY-MM-DD', Available: '11754.41' }] ([] before the first). */
-export async function loadAvailableHistory() {
-    const text = await fs.readText(AVAILABLE_HISTORY_PATH);
+/** The entries as saved ([] before the first): [{ Date: 'YYYY-MM-DD', Description, Type, Amount, Notes }]. */
+export async function loadActivity() {
+    const text = await fs.readText(ACTIVITY_PATH);
     if (text == null) return [];
-    return parseCSV(text).rows.map(r => ({ Date: String(r.Date ?? '').trim(), Available: String(r.Available ?? '').trim() }))
-        .filter(r => r.Date || r.Available).sort((a, b) => a.Date.localeCompare(b.Date));
+    return parseCSV(text).rows.map(r => Object.fromEntries(ACTIVITY_COLUMNS.map(c => [c.name, String(r[c.name] ?? '').trim()])));
+}
+export const saveActivity = rows => fs.writeText(ACTIVITY_PATH, toCSV(ACTIVITY_COLUMNS.map(c => c.name), rows));
+
+/** How an entry moves the balance: a Withdrawal takes its Amount out, anything else puts it in. */
+export const signedAmount = r => {
+    const n = Math.abs(Number(String(r.Amount ?? '').replace(/[$,]/g, '')));
+    return Number.isFinite(n) ? (/^withdraw/i.test(String(r.Type || '').trim()) ? -n : n) : 0;
+};
+
+/**
+ * The running balance from `opening` ({ balance, date: 'YYYY-MM-DD' }) through the entries in date order: { balance (now),
+ * after: Map(entry → balance after it), days: [{ date: 'YYYY-MM-DD', balance }] — the balance at the end of each day
+ * with entries, the opening day first — and last: the newest entry's date }.
+ */
+export function savingsLedger(opening, rows) {
+    let bal = Number(opening?.balance) || 0;
+    const after = new Map(), byDay = new Map(opening?.date ? [[opening.date, round2(bal)]] : []);
+    // In date order; on the same day, from the bottom of the table up (a new entry goes at the top, so it's the latest).
+    const dated = rows.map((r, i) => ({ r, i })).sort((a, b) => (a.r.Date || '9999').localeCompare(b.r.Date || '9999') || b.i - a.i);
+    for (const { r } of dated) {
+        bal = round2(bal + signedAmount(r));
+        after.set(r, bal);
+        if (r.Date) byDay.set(r.Date, bal);
+    }
+    const days = [...byDay].sort((a, b) => a[0].localeCompare(b[0])).map(([date, balance]) => ({ date, balance }));
+    return { balance: bal, after, days, last: dated.filter(x => x.r.Date).at(-1)?.r.Date || null };
 }
 
-export async function saveAvailableHistory(rows) {
-    await fs.writeText(AVAILABLE_HISTORY_PATH, toCSV(AVAILABLE_COLUMNS, [...rows].sort((a, b) => a.Date.localeCompare(b.Date))));
-}
-
-/** Add a reading for `date`; one a day, so a second update the same day replaces the first. */
-export async function recordAvailable(date, value) {
-    const pad = n => String(n).padStart(2, '0');
-    const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    const rows = (await loadAvailableHistory()).filter(r => r.Date !== day);
-    await saveAvailableHistory([...rows, { Date: day, Available: value.toFixed(2) }]);
+/** Write the activity's balance into the sheet's "Available In Account" (dated today), if it isn't that already. */
+export async function syncAvailable(balance) {
+    const data = await loadSavings();
+    if (!data?.available || Math.abs((data.available.value ?? NaN) - balance) < 0.005) return;
+    await changeSavings((R, info) => { R[info.available.rec][1] = sheetDollars(balance); R[info.available.rec][2] = longDate(new Date()); });
 }
