@@ -1,7 +1,7 @@
 // "📱 Phone copy" (Vehicles, House, Health, Pets, Dinner Planner and Kid Lunches top bars): writes one self-contained,
-// read-only page — every vehicle (information, current mileage and maintenance schedule for cars, service places,
-// maintenance, photos, guides, notes), every house (information, service companies, photos, and per area information, photos, maintenance with its
-// due banners, records; Updates; Projects), every Health section (General Health, Dental and Eye with their information
+// read-only page — every vehicle (information, current mileage for cars, maintenance schedule, service places,
+// maintenance, photos, guides, notes), every house (information, service companies, photos, and per area information,
+// photos, maintenance with its due banners, records; Updates; Projects; the Maintenance schedule), every Health section (General Health, Dental and Eye with their information
 // and future appointments), every pet (information, future appointments, photos, records), the Dinner Planner (the
 // calendar a week at a time with its shopping list, every meal) and Kid Lunches (each school day's lunch boxes and the
 // school's menu) — into a folder you pick once,
@@ -98,7 +98,16 @@ export async function collectData(progress = () => {}) {
     const houses = [];
     for (const h of await house.loadHouses(false)) {
         const areas = [];
+        const [items, entries] = await Promise.all([house.loadSchedule(h, false), house.allMaintenance(h)]);
+        const statuses = items.map(r => ({ r, s: house.scheduleStatus(h, r, entries) }));
         for (const t of house.AREAS) for (const a of t.parts || [t]) {
+            if (a.schedule) { // the Maintenance tab: the schedule (as it stands now) and its own log
+                areas.push({ label: a.label, tab: '', schedule: statuses.map(({ r, s }) => ({ item: r.Item, area: r.Area || '',
+                    status: { red: 'Overdue', yellow: 'Due soon', ok: 'OK' }[s.level] || '—', next: house.dueText(s) || 'Not set',
+                    last: house.lastText(s, r) || 'Not logged', notes: r.Notes || '' })),
+                    log: { columns: house.maintenanceColumns(h).map(c => ({ name: c.name, kind: c.kind })), rows: await house.loadHouseLog(h, false) } });
+                continue;
+            }
             if (a.table) { // a page that's just one table (Updates Done, Future Updates)
                 areas.push({ label: a.label, tab: t.parts ? t.label : '', table: { columns: a.table.map(c => ({ name: c.name, kind: c.kind })), rows: await house.loadTable(h, a, false) } });
                 continue;
@@ -119,7 +128,8 @@ export async function collectData(progress = () => {}) {
                 maintenance: a.maintenance ? {
                     columns: house.maintenanceColumns(h).map(c => ({ name: c.name, kind: c.kind })),
                     rows: await house.loadMaintenance(h, a, false),
-                    banner: house.bannerSettings(h, a).show ? house.bannerSettings(h, a) : null, // its due banner (House → ⚙ Settings)
+                    // its schedule items' due banners, as they stand now
+                    banners: statuses.filter(x => house.pageOfItem(x.r) === a).map(x => house.itemBanner(x.r, x.s)).filter(Boolean),
                     note: a.maintenanceNote || '',
                 } : null,
                 photosLabel: a.gallery?.label || 'Photos',
@@ -189,13 +199,13 @@ export function buildHtml(data) {
 <header><div class="brand">Erik's Life App</div><select id="page" aria-label="Page"></select></header>
 <main id="main"><p class="muted">This page needs JavaScript. On Android, open it with Chrome.</p></main>
 <div id="lightbox" hidden><button id="lb-prev" aria-label="Previous">‹</button><img alt=""><button id="lb-next" aria-label="Next">›</button><div id="lb-cap"></div></div>
-<script>(${viewer.toString()})(${json}, ${ageText.toString()}, ${house.houseAge.toString()}, ${appointmentStatus.toString()}, ${house.maintenanceStatus.toString()});</script>
+<script>(${viewer.toString()})(${json}, ${ageText.toString()}, ${house.houseAge.toString()}, ${appointmentStatus.toString()});</script>
 </body>
 </html>`;
 }
 
 // ── The viewer (runs inside the phone page; must not use anything from this module) ──────────────────────────
-function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { // pets.js ageText + appointmentStatus and house.js houseAge + maintenanceStatus, embedded so they count from the day the page is opened
+function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + appointmentStatus and house.js houseAge, embedded so they count from the day the page is opened
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const showDate = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? `${MON[+m[2] - 1]} ${+m[3]}, ${m[1]}` : (v || ''); };
@@ -331,6 +341,15 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
     const infoList = info => `<dl class="info">${info.filter(f => f.value).map(f =>
         `<div><dt>${esc(f.label)}</dt><dd>${esc(f.value)}</dd></div>`).join('') || '<p class="muted">No information.</p>'}</dl>`;
 
+    /** A maintenance schedule as cards: [{ item, area?, status, next, last, notes }] */
+    const scheduleCards = rows => {
+        const tone = { Overdue: 'background:#fdecea;color:#a8322a', 'Due soon': 'background:#fff8e1;color:#8a5a00', OK: 'background:#e8f8ef;color:#1e7a46' };
+        return rows.map(r => `
+            <div class="card"><div class="card-head"><b>${esc(r.item)}</b>${r.area ? `<span class="tag">${esc(r.area)}</span>` : ''}<span class="tag" style="${tone[r.status] || ''}">${esc(r.status)}</span></div>
+            <div class="sub">Next due: ${esc(r.next)}</div><div class="sub">Last done: ${esc(r.last)}</div>
+            ${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</div>`).join('') || '<p class="muted">Nothing on the schedule.</p>';
+    };
+
     function drawVehicle(v) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(v.name)}</h1><p class="muted">${esc(v.type)}</p>`);
         section('Information', true, infoList(v.info));
@@ -344,11 +363,7 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
             records(el.lastElementChild, v.mileage.columns, v.mileage.rows);
         });
         if (v.schedule) section('Maintenance schedule', true, el => { // as it stood when this copy was made
-            const tone = { Overdue: 'background:#fdecea;color:#a8322a', 'Due soon': 'background:#fff8e1;color:#8a5a00', OK: 'background:#e8f8ef;color:#1e7a46' };
-            el.innerHTML = `${v.schedule.asOf ? `<p class="muted">As of ${esc(v.schedule.asOf)}, when this copy was made.</p>` : ''}${v.schedule.rows.map(r => `
-                <div class="card"><div class="card-head"><b>${esc(r.item)}</b><span class="tag" style="${tone[r.status] || ''}">${esc(r.status)}</span></div>
-                <div class="sub">Next due: ${esc(r.next)}</div><div class="sub">Last done: ${esc(r.last)}</div>
-                ${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</div>`).join('') || '<p class="muted">Nothing on the schedule.</p>'}`;
+            el.innerHTML = `${v.schedule.asOf ? `<p class="muted">As of ${esc(v.schedule.asOf)}, when this copy was made.</p>` : ''}${scheduleCards(v.schedule.rows)}`;
         });
         if (v.places.length) section(`Service places (${v.places.length})`, false, placesHtml(v.places));
         section(`Maintenance (${v.maintenance.rows.length})`, true, el => records(el, v.maintenance.columns, v.maintenance.rows));
@@ -402,17 +417,13 @@ function viewer(D, ageText, houseAge, appointmentStatus, maintenanceStatus) { //
         main.insertAdjacentHTML('beforeend', `<h1>${esc(a.label)}</h1><p class="muted">${esc(h.name)}${a.tab ? ` · ${esc(a.tab)}` : ''}</p>`);
         if (a.table) return section(`Entries (${a.table.rows.length})`, true, el => records(el, a.table.columns, a.table.rows));
         if (a.projects) return section(`${a.label} (${a.projects.length})`, true, a.projects.length ? a.projects.map(projectHtml).join('') : '<p class="muted">Nothing here yet.</p>');
-        const m = a.maintenance;
-        if (m?.banner) { // like House's (views/settings.js maintenanceBanner): red once due, yellow when it's coming up, else green
-            const b = m.banner, { level, due, last } = maintenanceStatus(m.rows, b);
-            const by = due.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            const since = b.since ? new Date(+b.since.slice(0, 4), +b.since.slice(5, 7) - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : '';
-            const before = last ? `Last done ${esc(showDate(last.Date))}` : since ? `Nothing logged yet; counting from ${esc(since)}` : 'Nothing logged yet';
-            main.insertAdjacentHTML('beforeend', level === 'due' ? `<div class="banner bad"><b>${esc(b.what)} is due.</b> ${before} (due by ${by}).</div>`
-                : level === 'soon' ? `<div class="banner soon"><b>${esc(b.what)} is due by ${by}.</b> ${before}.</div>`
-                : last ? `<div class="banner ok"><b>${esc(b.what)} done ${esc(showDate(last.Date))}</b>${last.Description ? ` — ${esc(last.Description)}` : ''}. Next due by ${by}.</div>`
-                : `<div class="banner ok"><b>${esc(b.what)} is due by ${by}.</b> ${before}.</div>`);
+        if (a.schedule) { // the Maintenance tab: the schedule as it stood when this copy was made, then its log
+            section('Maintenance schedule', true, el => { el.innerHTML = `<p class="muted">As of when this copy was made.</p>${scheduleCards(a.schedule)}`; });
+            return section(`Maintenance log (${a.log.rows.length})`, true, el => records(el, a.log.columns, a.log.rows));
         }
+        const m = a.maintenance;
+        // its schedule items' due banners, as they stood when this copy was made (red, yellow, green)
+        for (const b of m?.banners || []) main.insertAdjacentHTML('beforeend', `<div class="banner ${{ red: 'bad', yellow: 'soon', ok: 'ok' }[b.level]}"><b>${esc(b.title)}</b> ${esc(b.detail)}</div>`);
         for (const b of a.boxes) section(a.boxes.length > 1 ? b.label : 'Information', true, infoList(withAge(b.info)));
         if (a.photos.length) section(`${a.photosLabel} (${a.photos.length})`, false, gallery(a.photos));
         if (a.improvements?.length) section(`Future improvements (${a.improvements.length})`, false, cardsHtml(a.improvements));

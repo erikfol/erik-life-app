@@ -2,8 +2,9 @@
 // companies, photos) and each area, each showing that area's information, photos and records table (Septic), or as
 // AREAS says: Financing has Mortgage, Closing and Value & Taxes boxes, documents and no records; Updates and
 // Heating/Cooling have pills — Updates Done / Future Updates, each just a table; Oil furnace / Mini-split / Water heater,
-// each with maintenance too (and a due banner, or Future improvements); Projects is views/projects.js; ⚙ Settings
-// (the due banners) is views/settings.js. Also the "Add house" page. Service companies and photos use the Vehicles views.
+// each with maintenance too (and its schedule items' due banners, or Future improvements); Projects is
+// views/projects.js; Maintenance (the schedule) is views/schedule.js. Also the "Add house" page. Service companies and
+// photos use the Vehicles views.
 import { esc, toast } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
@@ -11,11 +12,11 @@ import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gall
 import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
 import { renderImprovements, improvementsUnsaved, forgetImprovements } from './improvements.js';
 import { renderProjectList, renderProject, projectUnsaved, forgetProject } from './projects.js';
-import { renderSettings, settingsUnsaved, forgetSettings, maintenanceBanner } from './settings.js';
+import { renderScheduleTab, pageBanners, pageSchedule, scheduleUnsaved, forgetSchedule } from './schedule.js';
 import {
     HOUSE_PATH, AREAS, STORE, areaBoxes, areaInfo, saveHouses, houseAge, photosDir, newHouse, recordsPath, recordColumns, loadRecords, saveRecords,
-    maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, bannerSettings, tablePath, loadTable, saveTable,
-    houseProjects,
+    maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, tablePath, loadTable, saveTable,
+    houseProjects, pageOfItem,
 } from '../house.js';
 
 let table = null;
@@ -23,21 +24,16 @@ let maint = null; // the Maintenance table
 let infos = []; // the information boxes
 
 export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!maint?.hasUnsavedEdits() || infos.some(b => b.hasUnsavedEdits())
-    || placesUnsaved() || improvementsUnsaved() || projectUnsaved() || settingsUnsaved();
+    || placesUnsaved() || improvementsUnsaved() || projectUnsaved() || scheduleUnsaved();
 export const forget = () => {
     table = null; maint = null; infos = [];
-    closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetImprovements(); forgetProject(); forgetSettings();
+    closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetImprovements(); forgetProject(); forgetSchedule();
 };
 
-/**
- * The menus under a house's name: the Overview, area tabs and ⚙ Settings (settings: it's shown), then (on a tab with
- * parts) the pills for its parts.
- */
-const menus = (h, tab = null, page = null, settings = false) => {
-    const link = (path, label, active, cls = '') => `<a href="#${esc([h.id, ...path].filter(Boolean).join('/'))}"${
-        active || cls ? ` class="${[active && 'active', cls].filter(Boolean).join(' ')}"` : ''}>${esc(label)}</a>`;
-    return `<nav class="subnav">${link([], 'Overview', !tab && !settings)}${AREAS.map(t => link([t.id], t.label, t === tab)).join('')}`
-        + `${link(['settings'], '⚙ Settings', settings, 'subnav-end')}</nav>`
+/** The menus under a house's name: the Overview and area tabs, then (on a tab with parts) the pills for its parts. */
+const menus = (h, tab = null, page = null) => {
+    const link = (path, label, active) => `<a href="#${esc([h.id, ...path].filter(Boolean).join('/'))}"${active ? ' class="active"' : ''}>${esc(label)}</a>`;
+    return `<nav class="subnav">${link([], 'Overview', !tab)}${AREAS.map(t => link([t.id], t.label, t === tab)).join('')}</nav>`
         + (tab?.parts ? `<nav class="pillnav">${tab.parts.map((p, i) => link([tab.id, i ? p.id : ''], `${p.icon} ${p.label}`, p === page)).join('')}</nav>` : '');
 };
 
@@ -48,9 +44,6 @@ const ageItem = f => {
     return age ? `<div class="info-item"><dt>Age</dt><dd>${esc(age)}</dd></div>` : '';
 };
 
-/** The house's ⚙ Settings tab (#<house>/settings). list: every house (saved back whole). */
-export const renderHouseSettings = (el, list, h) => renderSettings(el, list, h, `<h1 class="page">${esc(h.name)}</h1>${menus(h, null, null, true)}`);
-
 /**
  * list: every house (saved back whole); onListChanged(goTo) re-draws the menu and opens #goTo.
  * tab: the AREAS tab shown (none for the Overview); page: the area shown — the tab itself, or one of its parts;
@@ -58,6 +51,7 @@ export const renderHouseSettings = (el, list, h) => renderSettings(el, list, h, 
  */
 export async function renderHouse(el, list, h, onListChanged, tab = null, page = null, project = null) {
     if (page?.table) return renderTableTab(el, h, tab, page);
+    if (page?.schedule) return renderScheduleTab(el, h, `<h1 class="page">${esc(h.name)}</h1>${menus(h, tab, page)}`);
     if (page?.projects) {
         const top = `<h1 class="page">${esc(h.name)}</h1>${menus(h, tab, page)}`;
         return project ? renderProject(el, list, h, top, project) : renderProjectList(el, list, h, top);
@@ -111,15 +105,15 @@ export async function renderHouse(el, list, h, onListChanged, tab = null, page =
 async function renderArea(el, list, h, tab, a) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     const hasRecords = a.records !== false, boxes = areaBoxes(a), gallery = a.gallery || { label: 'Photos', noun: 'photo' };
-    const [rows, maintRows] = await Promise.all([hasRecords ? loadRecords(h, a) : [], a.maintenance ? loadMaintenance(h, a) : []]);
-    const banner = a.maintenance && bannerSettings(h, a).show ? bannerSettings(h, a) : null; // its due banner (⚙ Settings)
+    const [rows, maintRows, sched] = await Promise.all([hasRecords ? loadRecords(h, a) : [], a.maintenance ? loadMaintenance(h, a) : [],
+        a.maintenance ? pageSchedule(h) : null]); // sched: the Maintenance tab's schedule and every maintenance entry, for the banners
     const section = (title, id) => `<section><h2>${esc(title)}</h2><div id="${id}"></div></section>`;
     const kept = [['Information', HOUSE_PATH], a.maintenance && ['maintenance', maintenancePath(h, a)], hasRecords && ['records', recordsPath(h, a)],
         ].filter(Boolean).map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ');
     el.innerHTML = `
         <h1 class="page">${esc(h.name)}</h1>
         ${menus(h, tab, a)}
-        ${banner ? '<div id="maint-banner"></div>' : ''}
+        ${sched ? '<div id="maint-banner"></div>' : ''}
         <p class="lead">${kept}.</p>
         ${boxes.map((b, i) => section(b.label, `info-${i}`)).join('')}
         ${section(gallery.label, 'photos')}
@@ -127,8 +121,8 @@ async function renderArea(el, list, h, tab, a) {
         ${a.maintenance ? `<section><h2>Maintenance</h2>${a.maintenanceNote ? `<p class="section-note">📌 ${esc(a.maintenanceNote)}</p>` : ''}
             <div id="maintenance"></div></section>` : ''}
         ${hasRecords ? section('Records', 'records') : ''}`;
-    const drawBanner = r => { if (banner) el.querySelector('#maint-banner').innerHTML = maintenanceBanner(banner, r); };
-    drawBanner(maintRows);
+    const drawBanner = () => { if (sched) el.querySelector('#maint-banner').innerHTML = pageBanners(h, a, sched.items, sched.entries); };
+    drawBanner();
     infos = boxes.map((b, i) => infoBox(el.querySelector(`#info-${i}`), {
         info: areaInfo(h, a, b),
         noun: 'house',
@@ -144,9 +138,14 @@ async function renderArea(el, list, h, tab, a) {
     });
     if (a.improvements) renderImprovements(el.querySelector('#improvements'), list, h, a);
     if (a.maintenance) maint = recordTable(el.querySelector('#maintenance'), {
-        columns: maintenanceColumns(h),
+        // Action offers this page's schedule items first, so what's logged counts for them
+        columns: maintenanceColumns(h, [...sched.items.filter(r => pageOfItem(r) === a).map(r => r.Item), ...(a.actions || [])]),
         rows: maintRows,
-        save: async r => { await saveMaintenance(h, a, r); drawBanner(r); },
+        save: async r => {
+            await saveMaintenance(h, a, r);
+            sched.entries = [...sched.entries.filter(e => e.page !== a), ...r.map(row => ({ row, page: a }))];
+            drawBanner();
+        },
     });
     if (hasRecords) table = recordTable(el.querySelector('#records'), {
         columns: recordColumns(h, a),

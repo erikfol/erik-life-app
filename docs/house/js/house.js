@@ -18,13 +18,14 @@ export const FIELDS = ['Address', 'Year Built', 'Style', 'Bedrooms', 'Bathrooms'
 // Parts keep their data under their own id, so part and tab ids must all differ.
 // actions: offered in the records table's Action column (anything else can be typed).
 // improvements: the page also has a Future improvements section (views/improvements.js).
-// maintenance: the page also has a Maintenance table, and can show a due banner at the top; `banner` gives its
-// starting settings (see bannerSettings — House → ⚙ Settings changes them per house).
+// maintenance: the page also has a Maintenance table; the Maintenance tab's schedule items for it (their Area is the
+// page's name) show their due banners at the top.
 // maintenanceNote: a line shown at the top of the Maintenance section.
 // boxes: several information boxes instead of one [{ key, label, fields }], each kept under house.areas[<id>][key].
 // gallery: { label, noun } for the photos section (default Photos). records: false = no records table.
 // A tab or part with `table` (its columns) is just that one table, kept in <house>-<its id>.csv. The tab with
-// `projects` is the Projects list and pages (views/projects.js).
+// `projects` is the Projects list and pages (views/projects.js); the tab with `schedule` is the Maintenance tab (the
+// maintenance schedule and a log for the rest of the house, views/schedule.js).
 const UPDATE_LOCATIONS = ['Whole house', 'Kitchen', 'Living room', 'Dining room', 'Bedroom', 'Bathroom', 'Basement', 'Garage',
     'Attic', 'Outside', 'Yard'];
 const UPDATE_COLUMNS = [
@@ -58,24 +59,25 @@ export const AREAS = [
         { id: 'oil-furnace', label: 'Oil furnace', icon: '🔥',
             fields: ['Heating System', 'Fuel', 'Boiler / Furnace Make', 'Model', 'Installed', 'Oil Tank Size', 'Thermostats', 'Notes'],
             actions: ['Boiler / furnace service', 'Oil filter', 'Nozzle', 'Chimney cleaning', 'Thermostat', 'Repair'],
-            maintenance: true, banner: { show: true, what: 'Oil furnace maintenance', month: 9 },
+            maintenance: true,
             maintenanceNote: 'Must be cleaned every year by professional' },
         { id: 'mini-split', label: 'Mini-split', icon: '❄️',
             fields: ['Cooling System', 'Mini-split Units', 'Installed', 'Filter Size', 'Notes'],
             actions: ['Mini-split cleaning', 'Filter change', 'Repair'],
-            maintenance: true, banner: { show: true, what: 'Mini-split maintenance', month: 5 },
+            maintenance: true,
             maintenanceNote: 'Must be cleaned every year by professional' },
         { id: 'water-heater', label: 'Water heater', icon: '🚿',
             fields: ['Hot Water', 'Water Heater Tank', 'Installed', 'Notes'],
             actions: ['Flush tank', 'Element / thermostat', 'Anode rod', 'Replace', 'Repair'],
-            maintenance: true, improvements: true, banner: { what: 'Water heater draining' },
+            maintenance: true, improvements: true,
             maintenanceNote: 'Must be drained every year, can be done DIY' },
     ] },
     { id: 'septic', label: 'Septic',
         fields: ['Tank Size', 'Tank Material', 'Tank Location', 'Leach Field Location', 'Installed', 'Pump Every', 'Notes'],
         actions: ['Pumped', 'Inspection', 'Effluent filter cleaned', 'Baffle repair', 'Riser / cover', 'Repair'],
-        maintenance: true, banner: { what: 'Septic pumping', every: 7 },
+        maintenance: true,
         maintenanceNote: 'Must be pumped every 7 years by a professional' },
+    { id: 'maintenance', label: 'Maintenance', schedule: true },
 ];
 
 /** Updates → Future Updates, whose Project column links a planned update to a project. */
@@ -182,8 +184,10 @@ export const recordColumns = (h, a) => [
 
 export const maintenancePath = (h, a) => `${HOUSE_DIR}/${h.id}-${a.id}-maintenance.csv`;
 
-export const maintenanceColumns = h => [
+/** A Maintenance table's columns. actions: offered first in Action (the schedule's items for that page). */
+export const maintenanceColumns = (h, actions = []) => [
     { name: 'Date', kind: 'date' },
+    { name: 'Action', kind: 'suggest', suggestions: actions },
     { name: 'Done By', kind: 'suggest', suggestions: doneBy(h) },
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
@@ -210,7 +214,7 @@ export const saveTable = (h, t, rows) => writeRows(tablePath(h, t), t.table, row
 export const loadMaintenance = (h, a, track = true) => readRows(maintenancePath(h, a), maintenanceColumns(h), track);
 export const saveMaintenance = (h, a, rows) => writeRows(maintenancePath(h, a), maintenanceColumns(h), rows);
 
-/** Pages with a Maintenance table (each can show a due banner). */
+/** Pages with a Maintenance table (each shows the due banners of its schedule items). */
 export const MAINTENANCE_PAGES = AREAS.flatMap(t => t.parts || [t]).filter(a => a.maintenance);
 /** The link to page `a` (a tab, or a pill of one; a tab's first pill is the tab's own link) of house `h`. */
 export const pageHref = (h, a) => {
@@ -218,32 +222,100 @@ export const pageHref = (h, a) => {
     return `#${h.id}/${tab.id}${tab.parts && tab.parts[0] !== a ? '/' + a.id : ''}`;
 };
 
-/**
- * The due banner settings of maintenance page `a` on house `h`: what's saved under House → ⚙ Settings
- * (house.banners[<page id>]) over the page's starting `banner`. { show, what (the banner's name), every (years),
- * month (due by, 1 = January), warn (how long before it's due to turn yellow: '2w' weeks, '1m' months, '' never),
- * since ('YYYY-MM' to count from while nothing's logged) }.
- */
-export function bannerSettings(h, a) {
-    const b = { show: false, what: `${a.label} maintenance`, every: 1, month: 1, warn: '', since: '', ...a.banner, ...h.banners?.[a.id] };
-    if (typeof b.warn === 'number') b.warn = { 14: '2w', 30: '1m', 61: '2m', 91: '3m', 182: '6m' }[b.warn] || ''; // saved as days at first
-    return b;
+// ── Maintenance schedule ────────────────────────────────────────────────────────────────────────────────────────────
+// What's due every so many months, or by a month of the year (yearly, or every Every (months) ÷ 12 years) — the
+// furnace, mini-split, water heater and septic jobs and the rest of the house (safety, outside, laundry…). An item
+// counts from the newest entry in any of the house's Maintenance tables whose Action is its name (or one of its "Also
+// counts" names). Never logged, it counts from Count from (a month like 2020-05), else the purchase (Financing) — or,
+// for a Due by item without Count from, this year's due date. An item whose Area is a page with a Maintenance table
+// (Oil furnace, Septic…) shows its banner on that page; the rest on the Maintenance tab.
+export const schedulePath = h => `${HOUSE_DIR}/${h.id}-schedule.csv`;
+/** The Maintenance tab's own log, for work that isn't on one of the system pages. */
+export const houseLogPath = h => `${HOUSE_DIR}/${h.id}-maintenance.csv`;
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SCHEDULE_AREAS = ['Safety', 'Exterior', 'Interior', 'Plumbing', 'Electrical', 'Laundry', 'Kitchen', 'Garage', 'Yard'];
+/** actions: Actions already logged, offered as Item names. */
+export const scheduleColumns = (actions = []) => [
+    { name: 'Item', kind: 'suggest', suggestions: actions },
+    { name: 'Area', kind: 'suggest', suggestions: [...MAINTENANCE_PAGES.map(a => a.label), ...SCHEDULE_AREAS] },
+    { name: 'Every (months)', kind: 'number' },
+    { name: 'Due by (month)', kind: 'suggest', suggestions: MONTHS },
+    { name: 'Count from', kind: 'suggest' },
+    { name: 'Also counts', kind: 'suggest', suggestions: actions },
+    { name: 'Notes', kind: 'text' },
+];
+export const loadSchedule = (h, track = true) => readRows(schedulePath(h), scheduleColumns(), track);
+export const saveSchedule = (h, rows) => writeRows(schedulePath(h), scheduleColumns(), rows);
+export const loadHouseLog = (h, track = true) => readRows(houseLogPath(h), maintenanceColumns(h), track);
+export const saveHouseLog = (h, rows) => writeRows(houseLogPath(h), maintenanceColumns(h), rows);
+
+/** The system page a schedule item belongs to (its Area is the page's name), or null for the Maintenance tab. */
+export const pageOfItem = item => MAINTENANCE_PAGES.find(a => a.label.toLowerCase() === String(item.Area || '').trim().toLowerCase()) || null;
+
+/** Every maintenance entry of the house, from each system page's table and the Maintenance tab's log: [{ row, page }]. */
+export async function allMaintenance(h, track = false) {
+    const logs = await Promise.all([...MAINTENANCE_PAGES.map(a => loadMaintenance(h, a, track)), loadHouseLog(h, track)]);
+    return logs.flatMap((rows, i) => rows.map(row => ({ row, page: MAINTENANCE_PAGES[i] || null })));
 }
 
+/** An item turns yellow this many days before it's due (and red once it is). */
+export const SOON_DAYS = 30;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const dayOf = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+const plusMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n,
+    Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate()));
+/** 'Nov', 'November' or '11' → 11; 0 if blank or not a month. */
+const monthOf = x => {
+    const s = String(x ?? '').trim().toLowerCase(), n = Number(s);
+    return n >= 1 && n <= 12 && Number.isInteger(n) ? n : MONTHS.findIndex(m => s.length >= 3 && m.toLowerCase().startsWith(s)) + 1;
+};
+/** '2020-05', '2020-05-14' or 'May 2020' → a Date (the 1st when there's no day); null if it can't be read. */
+const fromDate = x => {
+    const s = String(x ?? '').trim(), m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(s);
+    if (m) return new Date(+m[1], +m[2] - 1, +(m[3] || 1));
+    const d = s ? new Date(s) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : null;
+};
+/** When the house was bought: Financing's Purchase Date (or Closed On), or null. */
+const purchasedOn = h => {
+    const box = [...(h.areas?.financing?.info || []), ...(h.areas?.financing?.closing || [])];
+    return fromDate(box.find(f => /^(purchase date|closed on)$/i.test(f.label.trim()) && f.value)?.value);
+};
+
 /**
- * A due banner from the maintenance rows with a YYYY-MM-DD Date and its settings `b` (bannerSettings): it's due by the
- * 1st of b.month, b.every years after the year of the last entry (or of b.since while there's none; with neither, this
- * year for a yearly one). { level, due (Date), yellow (Date, or null for no yellow), last } — level 'due' (red) from
- * `due`, 'soon' (yellow) from `yellow` (b.warn before it), else 'ok' (green); last = the latest entry (may be missing).
- * Uses nothing outside itself: the phone copy (shared/js/phonecopy.js) embeds it as text.
+ * Where schedule item `item` stands, from `entries` (allMaintenance): { last ({ row, page } it counts from, or null),
+ * dueDate (or null), level: 'red' once it's due, 'yellow' within SOON_DAYS, 'ok', or null with nothing to count from }.
  */
-export function maintenanceStatus(rows, b, today = new Date()) {
-    const last = rows.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.Date || '')).sort((x, y) => y.Date.localeCompare(x.Date))[0];
-    const every = Math.max(1, Math.round(+b.every) || 1);
-    const from = last?.Date || (/^\d{4}-\d{2}/.test(b.since || '') ? b.since : '');
-    const due = new Date((from ? +from.slice(0, 4) : today.getFullYear() - every) + every, (+b.month || 1) - 1, 1);
-    const w = /^(\d+)([wm])$/.exec(String(b.warn || '')), n = w ? +w[1] : 0;
-    const yellow = !n ? null : w[2] === 'm' ? new Date(due.getFullYear(), due.getMonth() - n, 1) : new Date(due.getFullYear(), due.getMonth(), 1 - 7 * n);
+export function scheduleStatus(h, item, entries, today = new Date()) {
+    const names = [item.Item, ...String(item['Also counts'] || '').split(',')].map(s => s.trim().toLowerCase()).filter(Boolean);
+    const last = entries.filter(e => ISO_DAY.test(e.row.Date || '') && names.includes(String(e.row.Action || '').trim().toLowerCase()))
+        .sort((a, b) => b.row.Date.localeCompare(a.row.Date))[0] || null;
+    const every = Number(String(item['Every (months)'] || '').replace(/,/g, '')) || 0;
+    const byMonth = monthOf(item['Due by (month)']);
+    const base = last ? dayOf(last.row.Date) : fromDate(item['Count from']) || (byMonth ? null : purchasedOn(h));
+    const dueDate = byMonth
+        ? new Date((base ? base.getFullYear() + Math.max(1, Math.round((every || 12) / 12)) : today.getFullYear()), byMonth - 1, 1)
+        : base && every > 0 ? plusMonths(base, every) : null;
+    if (!dueDate) return { last, dueDate, level: null };
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return { level: day >= due ? 'due' : yellow && day >= yellow ? 'soon' : 'ok', due, yellow, last };
+    const soon = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() - SOON_DAYS);
+    return { last, dueDate, level: day >= dueDate ? 'red' : day >= soon ? 'yellow' : 'ok' };
+}
+
+const showDay = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+export const dueText = s => (s.dueDate ? showDay(s.dueDate) : '');
+/** 'Oct 29, 2026 (Oil furnace · Furnace cleaning)': when the entry an item counts from was, where, and its Action if another name. */
+export function lastText(s, item) {
+    if (!s.last) return '';
+    const action = String(s.last.row.Action || '').trim();
+    const where = [s.last.page ? s.last.page.label : '', action.toLowerCase() !== String(item.Item || '').trim().toLowerCase() ? action : ''].filter(Boolean);
+    return showDay(dayOf(s.last.row.Date)) + (where.length ? ` (${where.join(' · ')})` : '');
+}
+/** One item's banner: { level ('red' / 'yellow' / 'ok'), title, detail } (plain text), or null if it has no due date. */
+export function itemBanner(item, s) {
+    if (!s.level) return null;
+    const when = dueText(s), last = s.last ? `Last done ${showDay(dayOf(s.last.row.Date))}` : 'Nothing logged yet';
+    if (s.level === 'red') return { level: 'red', title: `${item.Item} is due.`, detail: `${last} (due ${when}). Log it with “${item.Item}” as the Action once it's done.` };
+    if (s.level === 'yellow') return { level: 'yellow', title: `${item.Item} is due by ${when}.`, detail: `${last}.` };
+    return { level: 'ok', title: s.last ? `${item.Item} done ${showDay(dayOf(s.last.row.Date))}.` : `${item.Item} is due by ${when}.`, detail: s.last ? `Next due ${when}.` : `${last}.` };
 }
