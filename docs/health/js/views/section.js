@@ -11,7 +11,7 @@ import { appointmentStatus } from '../../../pets/js/pets.js';
 import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
-    accountSection, appointmentsSection, notesSection, loadInfo, saveInfo, invoicesDir,
+    accountSection, appointmentsSection, notesSection, loadInfo, saveInfo, invoicesDir, PAID_CHOICES, owedRecords,
 } from '../records.js';
 
 let checks = []; // one "has unsaved edits?" per table and account box on the page
@@ -20,6 +20,14 @@ export const hasUnsavedEdits = () => checks.some(f => f());
 export const forget = () => { checks = []; closeFilterMenu(); };
 
 const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+
+/** Red while Records have an I Owe amount not marked Paid: the total and each one. */
+const owedBanner = rows => {
+    const o = owedRecords(rows);
+    if (!o.rows.length) return '';
+    const each = o.rows.map(r => `${esc(showDate(r.Date) || 'undated')}${r.Description ? ` ${esc(r.Description)}` : ''}: ${esc(money(o.owe(r)))}`);
+    return `<div class="banner bad"><strong>You owe ${esc(money(o.total))}</strong> · not paid yet: ${each.join('; ')}. Set Paid? to Paid in Records once it's paid.</div>`;
+};
 
 /** Like a pet's (pets/js/views/pet.js): red with no future appointment, yellow when the next is within 2 weeks, else green. */
 const appointmentBanner = rows => {
@@ -46,6 +54,7 @@ export async function renderSection(el, section) {
     const box = (id, title) => `<section><h2>${title}</h2><div id="${id}"></div></section>`;
     el.innerHTML = `
         <h1 class="page">${esc(section.label)}</h1>
+        <div id="owed-banner"></div>
         ${appts ? '<div id="appt-banner"></div>' : ''}
         <p class="lead">${where} in your folder.</p>
         ${section.info ? '<section><h2 class="info-head" id="info-head"></h2><div id="info-links"></div><div id="info"></div></section>' : ''}
@@ -101,11 +110,14 @@ export async function renderSection(el, section) {
         checks.push(() => apptTable.hasUnsavedEdits());
     }
     const location = { list: locations, noun: 'location', add: name => saveLocations([...location.list, name]) };
+    // A red "You owe" banner while a record has an I Owe amount not marked Paid.
+    const drawOwed = r => { el.querySelector('#owed-banner').innerHTML = owedBanner(r); };
+    drawOwed(rows);
     const table = recordTable(el.querySelector('#records'), {
         columns: section.columns,
         rows,
-        save: rows => saveRecords(section, rows),
-        choices: { Location: location },
+        save: async rows => { await saveRecords(section, rows); drawOwed(rows); },
+        choices: { Location: location, ...PAID_CHOICES },
         filesDir: invoicesDir(section),
     });
     checks.push(() => table.hasUnsavedEdits());

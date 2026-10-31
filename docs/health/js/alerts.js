@@ -1,8 +1,10 @@
 // Health's red and yellow banners, for the Home page's counts and the menu colours. General Health, Dental and Eye:
-// no future appointment (red) or one in the next two weeks (yellow), as their appointment banner. The HSA: an account
+// no future appointment (red) or one in the next two weeks (yellow), as their appointment banner, and Records with
+// an I Owe amount not marked Paid (red), as their "You owe" banner. The HSA: an account
 // whose activity isn't updated in STALE_DAYS (yellow) or VERY_STALE_DAYS (red), as its "Activity not updated" banners
 // (views/section.js draws them from staleAccounts here).
-import { SECTIONS, loadRecords, loadAccounts, appointmentsSection, accountSection } from './records.js';
+import { SECTIONS, loadRecords, loadAccounts, appointmentsSection, accountSection, owedRecords } from './records.js';
+import { money } from '../../bills-etc/js/util.js';
 import { appointmentStatus } from '../../pets/js/pets.js';
 
 // Like Bills Etc → Loan/CC → Credit Cards: an account whose newest entry, or the last time it was marked checked, is
@@ -35,6 +37,10 @@ export default async function alerts() {
             const st = appointmentStatus(await loadRecords(appointmentsSection(s), false));
             if (st.level === 'none') out.push({ level: 'red', text: `${s.label}: no future appointment`, href: `#${s.id}` });
             else if (st.level === 'soon') out.push({ level: 'yellow', text: `${s.label}: appointment ${inDays(st.days)}`, href: `#${s.id}` });
+        }
+        if (s.columns.some(c => c.name === 'I Owe')) {
+            const owed = owedRecords(await loadRecords(s, false));
+            if (owed.rows.length) out.push({ level: 'red', text: `${s.label}: you owe ${money(owed.total)} (not paid)`, href: `#${s.id}` });
         }
         if (s.accounts) {
             const list = await loadAccounts(s, false);

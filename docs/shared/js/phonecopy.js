@@ -13,7 +13,7 @@ import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
     latestMileage, mileageRate, mileageRateColumns, hasSchedule, loadSchedule, currentReading, scheduleStatus, nextDueText, lastText,
 } from '../../vehicles/js/vehicles.js';
-import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, notesSection, loadInfo as loadHealthInfo } from '../../health/js/records.js';
+import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, notesSection, owedRecords, loadInfo as loadHealthInfo } from '../../health/js/records.js';
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
@@ -154,8 +154,11 @@ export async function collectData(progress = () => {}) {
             const appts = s.appointments && appointmentsSection(s); // future appointments (General Health, Dental, Eye)
             // its websites; the sign-in hints stay off the phone copy, like the HSA's
             const links = (healthInfo.links[s.id] || []).filter(l => l.url).map(l => ({ linkText: l.linkText || '', url: l.url }));
-            health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo.sections[s.id] || null,
-                links,
+            const rows = await loadRecords(s, false);
+            // what the Records still owe (an I Owe amount not marked Paid), for the viewer's red "You owe" banner
+            const o = s.columns.some(c => c.name === 'I Owe') ? owedRecords(rows) : null;
+            health.push({ label: s.label, columns: s.columns, rows, info: healthInfo.sections[s.id] || null,
+                links, owed: o?.rows.length ? { total: o.total, items: o.rows.map(r => ({ date: r.Date, what: r.Description || '', amount: o.owe(r) })) } : null,
                 appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null,
                 notes: s.notes ? { label: s.notes.label, columns: s.notes.columns, rows: await loadRecords(notesSection(s), false) } : null });
             continue;
@@ -458,6 +461,8 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
 
     function drawHealth(h) {
         main.insertAdjacentHTML('beforeend', `<h1>${esc(h.label)}</h1>`);
+        if (h.owed) main.insertAdjacentHTML('beforeend', `<div class="banner bad"><b>You owe ${money(h.owed.total)}</b> · not paid yet: ${h.owed.items.map(x => // like the app's "You owe" banner
+            `${esc(showDate(x.date) || 'undated')}${x.what ? ` ${esc(x.what)}` : ''}: ${money(x.amount)}`).join('; ')}</div>`);
         if (h.appointments) appointmentBanner(h.appointments.rows);
         if (h.info) section('General information', true, (h.links || []).filter(l => /^https?:\/\//i.test(l.url)).map(l =>
             `<p class="info-link"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.linkText || 'Website')} ↗</a></p>`).join('') + infoList(h.info));

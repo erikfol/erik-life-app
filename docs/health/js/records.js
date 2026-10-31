@@ -18,16 +18,31 @@ const APPOINTMENT_COLUMNS = [
 ];
 
 // The Records of General Health, Dental and Eye: each visit, where (the office: offers the ones used before, not
-// General Health's body locations), what it cost and what was paid out of pocket.
+// General Health's body locations), what it cost, what was paid out of pocket, and what you still owe and whether
+// that's paid (green Paid, red Not paid; see owedRecords).
 const RECORD_COLUMNS = [
     { name: 'Date', kind: 'date' },
     { name: 'Description', kind: 'text' },
     { name: 'Location', kind: 'suggest' },
     { name: 'Total Cost', kind: 'money' },
     { name: 'Out of Pocket', kind: 'money' },
+    { name: 'I Owe', kind: 'money' },
+    { name: 'Paid?', kind: 'choice', badge: v => (v === 'Paid' ? 'paid' : v === 'Not paid' ? 'not-paid' : '') },
     { name: 'Additional Notes', kind: 'text' },
     { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
+/** The Records' Paid? dropdown (for the record table's choices). */
+export const PAID_CHOICES = { 'Paid?': { list: ['Paid', 'Not paid'], noun: 'status' } };
+
+/**
+ * What a section's Records still owe: { rows (each with an I Owe amount not marked Paid), total }. Its pages show
+ * a red banner for them, and the Home page counts it (alerts.js).
+ */
+export function owedRecords(rows) {
+    const owe = r => parseFloat(String(r['I Owe'] ?? '').replace(/[$,\s]/g, ''));
+    const owed = rows.filter(r => owe(r) > 0 && r['Paid?'] !== 'Paid');
+    return { rows: owed, total: owed.reduce((t, r) => t + owe(r), 0), owe };
+}
 
 // Column kinds are the shared record table's (shared/js/recordtable.js). `info`: the General information fields a
 // section starts with (any can be renamed or removed). `notes`: a second table after Records ({ label, path, columns }).
