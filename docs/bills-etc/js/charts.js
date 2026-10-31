@@ -279,9 +279,10 @@ function bindTip(canvas) {
 /**
  * Lines over shared labels. fit: the y axis spans the values (at least 10% of the largest, so small changes stay small)
  * instead of starting at 0, labelled with fmt. hlines: [{ value, label, color }] dashed lines across the chart (e.g. a
- * level to stay above), each labelled at its right end; the axis makes room for them.
+ * level to stay above), each labelled at its right end; the axis makes room for them. xs: each label's place across the
+ * chart (0 to 1, e.g. by date, for points unevenly apart) instead of evenly spaced; labels that would overlap are left out.
  */
-export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false, hlines = [] }) {
+export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false, hlines = [], xs = null }) {
     const s = setup(canvas);
     const n = labels.length;
     canvas._tip = null;
@@ -309,7 +310,7 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
         if (best) ({ from: minVal, to: maxVal, n: ticks } = best);
     }
     yGrid(ctx, pad, chartW, chartH, maxVal, minVal, fit ? fmt : kFmt, ticks);
-    const xOf = i => pad.left + (n === 1 ? chartW / 2 : i * chartW / (n - 1));
+    const xOf = i => pad.left + (n === 1 ? chartW / 2 : (xs ? xs[i] : i / (n - 1)) * chartW);
     const yOf = v => pad.top + chartH - ((Math.max(minVal, v) - minVal) / (maxVal - minVal)) * chartH;
 
     ctx.font = `11px ${FONT}`;
@@ -317,7 +318,16 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     ctx.textAlign = 'center';
     const every = Math.ceil(n / Math.max(1, Math.floor(chartW / 64)));
     // (a label that would run off the right edge is moved in just enough to fit)
-    labels.forEach((l, i) => { if (i % every === 0 || i === n - 1) ctx.fillText(l, Math.min(xOf(i), W - 2 - ctx.measureText(l).width / 2), pad.top + chartH + 18); });
+    const labelX = (l, i) => Math.min(xOf(i), W - 2 - ctx.measureText(l).width / 2);
+    if (xs) { // the last label, then each one from the left that has room
+        const taken = [];
+        [n - 1, ...labels.keys()].forEach(i => {
+            const x = labelX(labels[i], i), half = ctx.measureText(labels[i]).width / 2 + 4;
+            if (taken.some(([a, b]) => x + half > a && x - half < b)) return;
+            taken.push([x - half, x + half]);
+            ctx.fillText(labels[i], x, pad.top + chartH + 18);
+        });
+    } else labels.forEach((l, i) => { if (i % every === 0 || i === n - 1) ctx.fillText(l, labelX(l, i), pad.top + chartH + 18); });
 
     if (markIndex >= 0 && markIndex < n) {
         ctx.save();
@@ -368,7 +378,8 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     }
 
     canvas._tip = {
-        hit: x => (n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round((x - pad.left) / (chartW / (n - 1)))))),
+        hit: x => (n === 1 ? 0 : xs ? [...labels.keys()].reduce((best, i) => (Math.abs(xOf(i) - x) < Math.abs(xOf(best) - x) ? i : best), 0)
+            : Math.max(0, Math.min(n - 1, Math.round((x - pad.left) / (chartW / (n - 1)))))),
         html: i => {
             const lines = series.filter(x => x.name && Number.isFinite(x.values[i]))
                 .map(x => `<div><span class="tip-dot" style="background:${x.color}"></span>${esc(x.name)}: <strong>${esc((tipFmt || fmt)(x.values[i]))}</strong></div>`);

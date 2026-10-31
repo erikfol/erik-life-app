@@ -1,5 +1,5 @@
 // 401(k): the plan's information and contributions (inputs/401k/401k.json), the balance history (balances.csv: each
-// statement's starting balance, net transactions, investment returns and current balance), the investments (investments.csv) and the plan's documents (documents.csv,
+// statement's period, starting balance, net transactions, investment returns and current balance), the investments (investments.csv) and the plan's documents (documents.csv,
 // with the files in documents/). inputs/ is kept out of git.
 import * as fs from '../../bills-etc/js/fs.js';
 import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
@@ -30,13 +30,20 @@ export async function savePlan(plan) {
 
 const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
+// The period a statement's numbers cover (its "Show these returns"): the years before its date.
+export const RETURN_PERIODS = ['1-year', '3-year', '5-year', '10-year'];
+export const periodYears = v => (RETURN_PERIODS.includes(v) ? parseInt(v, 10) : NaN);
+
+// Entries can cover overlapping periods, so their amounts aren't added up (no Total line).
 export const BALANCE_COLUMNS = [
     { name: 'Date', kind: 'date', default: todayIso },
+    { name: 'Show These Returns', kind: 'choice', default: '1-year' },
     { name: 'Starting Balance', kind: 'money', total: false },
-    { name: 'Net Transactions', kind: 'money' }, // what went in less what came out (contributions, withdrawals, fees)
-    { name: 'Investment Returns', kind: 'money' },
+    { name: 'Net Transactions', kind: 'money', total: false }, // what went in less what came out (contributions, withdrawals, fees)
+    { name: 'Investment Returns', kind: 'money', total: false },
     { name: 'Current Balance', kind: 'money', total: false },
 ];
+export const BALANCE_CHOICES = { 'Show These Returns': { list: RETURN_PERIODS, noun: 'period' } };
 
 export const INVESTMENT_COLUMNS = [
     { name: 'Fund', kind: 'suggest' },
@@ -77,16 +84,21 @@ export const saveDocuments = rows => saveCsv(DOCUMENTS_PATH, DOCUMENT_COLUMNS, r
 export const amountOf = v => { const s = String(v ?? '').replace(/[$,\s]/g, ''); return s === '' ? NaN : Number(s); };
 
 /**
- * The entries with a date and a current balance, oldest first: [{ row, date ('YYYY-MM-DD'), start, net, returns,
- * balance }] (start NaN when not typed; net and returns 0). A blank current balance is worked out from the other three
- * when they're all there. Entries on the same day count from the bottom of the table up (a new entry goes at the top).
+ * The entries with a date and a current balance, oldest first: [{ row, date ('YYYY-MM-DD'), period ('1-year' … or ''),
+ * from (the period's first day, or null), start, net, returns, balance }] (start NaN when not typed; net and returns 0).
+ * A blank current balance is worked out from the other three when they're all there. Entries on the same day count
+ * from the bottom of the table up (a new entry goes at the top).
  */
 export function ledger(rows) {
     return rows.map((row, i) => {
         const start = amountOf(row['Starting Balance']), net = amountOf(row['Net Transactions']), returns = amountOf(row['Investment Returns']);
         const typed = amountOf(row['Current Balance']);
         const balance = Number.isFinite(typed) ? typed : [start, net, returns].every(Number.isFinite) ? start + net + returns : NaN;
-        return { row, i, date: /^\d{4}-\d{2}-\d{2}$/.test(row.Date) ? row.Date : null, start, net: net || 0, returns: returns || 0, balance };
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(row.Date) ? row.Date : null, years = periodYears(row['Show These Returns']);
+        // The same day `years` years before (Feb 29 → Feb 28).
+        const from = date && years ? (d => (d.getDate() === +date.slice(8) ? isoOf(d) : isoOf(new Date(d.getFullYear(), d.getMonth(), 0))))(
+            new Date(+date.slice(0, 4) - years, +date.slice(5, 7) - 1, +date.slice(8))) : null;
+        return { row, i, date, period: years ? row['Show These Returns'] : '', from, start, net: net || 0, returns: returns || 0, balance };
     })
         .filter(p => p.date && Number.isFinite(p.balance))
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.i - a.i));
@@ -96,20 +108,33 @@ export function ledger(rows) {
 export const notAddingUp = pts => pts.filter(p => Number.isFinite(p.start) && Number.isFinite(amountOf(p.row['Current Balance']))
     && Math.abs(p.start + p.net + p.returns - p.balance) > 0.5);
 
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /**
- * What the history adds up to (null without any entries): the first, latest and the one before the latest entry;
- * since the first entry's starting balance (start): the net transactions, investment returns and change in all; and
- * this year's net transactions and returns (from the entries dated this year).
+ * Every balance the entries give, oldest first: [{ date, balance, kind: 'current' | 'start', entry }] — each entry's
+ * current balance on its date, and its starting balance on the first day of its period. One per day (a current
+ * balance wins).
  */
-export function summary(pts, now = new Date()) {
+export function balancePoints(pts) {
+    const byDate = new Map();
+    for (const p of pts) byDate.set(p.date, { date: p.date, balance: p.balance, kind: 'current', entry: p });
+    for (const p of pts) {
+        if (p.from && Number.isFinite(p.start) && !byDate.has(p.from)) byDate.set(p.from, { date: p.from, balance: p.start, kind: 'start', entry: p });
+    }
+    return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/**
+ * What the history comes to (null without any entries): the latest entry (last), the balance before it (prev: the
+ * latest earlier balance point, or null), every balance point, and the latest entry for each period (byPeriod, in
+ * RETURN_PERIODS order).
+ */
+export function summary(pts) {
     if (!pts.length) return null;
-    const total = (list, f) => list.reduce((t, p) => t + f(p), 0);
-    const first = pts[0], last = pts.at(-1), year = now.getFullYear(), thisYear = pts.filter(p => p.date.startsWith(`${year}-`));
-    const start = Number.isFinite(first.start) ? first.start : first.balance - first.net - first.returns;
+    const last = pts.at(-1), points = balancePoints(pts);
     return {
-        first, last, prev: pts.at(-2) || null, start, net: total(pts, p => p.net), returns: total(pts, p => p.returns),
-        change: last.balance - start, year, yearEntries: thisYear.length,
-        ytdNet: total(thisYear, p => p.net), ytdReturns: total(thisYear, p => p.returns),
+        last, prev: points.filter(b => b.date < last.date).at(-1) || null, points,
+        byPeriod: RETURN_PERIODS.map(name => pts.filter(p => p.period === name).at(-1)).filter(Boolean),
     };
 }
 
