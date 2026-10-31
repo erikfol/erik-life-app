@@ -127,7 +127,6 @@ export async function renderSection(el, section) {
             rows: noteRows,
             save: rows => saveRecords(notes, rows),
             choices: { Location: location },
-            filesDir: notes.filesDir,
         });
         checks.push(() => notesTable.hasUnsavedEdits());
     }

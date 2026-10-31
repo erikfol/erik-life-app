@@ -55,7 +55,6 @@ export const SECTIONS = [
             { name: 'Location', kind: 'choice' },
             { name: 'Description', kind: 'text' },
             { name: 'Additional Notes', kind: 'text' },
-            { name: 'Invoices', kind: 'files', noun: 'invoice' },
         ] },
         appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,
@@ -77,8 +76,8 @@ export const SECTIONS = [
 /** Where a section's invoices are kept (an HSA account's in its own folder). */
 export const invoicesDir = (section, account = null) => `${HEALTH_DIR}/invoices/${section.id}${account ? '-' + account.id : ''}`;
 
-/** A section's `notes` table (General Health's Personal Notes) as a table of its own, with its own invoices folder. */
-export const notesSection = section => ({ ...section, ...section.notes, filesDir: `${HEALTH_DIR}/invoices/${section.id}-notes` });
+/** A section's `notes` table (General Health's Personal Notes) as a table of its own. */
+export const notesSection = section => ({ ...section, ...section.notes });
 
 const names = section => section.columns.map(c => c.name);
 
