@@ -13,9 +13,9 @@ export const DOCUMENTS_PATH = `${K_DIR}/documents.csv`;
 export const STATEMENTS_DIR = `${K_DIR}/statements`;
 export const DOCUMENTS_DIR = `${K_DIR}/documents`;
 
-// The information fields the plan starts with (any can be renamed, removed or reordered).
-export const FIELDS = ['Plan Provider', 'Employer', 'Website', 'Account Number', 'Your Contribution', 'Pre-tax or Roth',
-    'Employer Match', 'Vesting', 'Beneficiaries', 'Notes'];
+// The information fields the plan starts with (any can be renamed, removed or reordered). What you put in and the
+// employer match are in the plan's `contributions` (the Overview's Contributions box).
+export const FIELDS = ['Plan Provider', 'Employer', 'Website', 'Account Number', 'Vesting', 'Beneficiaries', 'Notes'];
 
 /** track: false for read-only use (the Home page's counts), so the save guard keeps the version this page is editing. */
 export async function loadPlan(track = true) {
@@ -116,11 +116,89 @@ export const IRS_LIMITS = {
     2026: { base: 24500, catchUp: 8000, catchUp6063: 11250 },
 };
 
-/** The limit for `year`, or the latest one known before it (announced: false) when the IRS hasn't said yet. */
-export function irsLimit(year) {
+/**
+ * The limit for `year`, or the latest one known before it (announced: false) when the IRS hasn't said yet. With a birth
+ * year, also the catch-up for the age you turn that year (extra: 0 under 50) and your total; without, extra is NaN.
+ */
+export function irsLimit(year, birthYear = NaN) {
     const years = Object.keys(IRS_LIMITS).map(Number).sort((a, b) => a - b);
     const y = years.filter(x => x <= year).at(-1) ?? years[0];
-    return { ...IRS_LIMITS[y], year: y, announced: y === year };
+    const L = IRS_LIMITS[y], age = birthYear > 0 ? year - birthYear : NaN;
+    const extra = !Number.isFinite(age) ? NaN : age >= 60 && age <= 63 ? L.catchUp6063 : age >= 50 ? L.catchUp : 0;
+    return { ...L, year: y, announced: y === year, age, extra, total: L.base + (extra || 0) };
+}
+
+// ── Contributions (the plan's `contributions`): what you put in each paycheck and the employer match ──
+
+export const CONTRIBUTION_TYPES = ['Pre-tax', 'Roth', 'Pre-tax + Roth'];
+
+// How often you're paid, and how many paychecks that makes a year.
+export const PAY_EVERY = [
+    { id: 'week', label: 'Every week', perYear: 52 },
+    { id: '2weeks', label: 'Every other week', perYear: 26 },
+    { id: 'twice-month', label: 'Twice a month', perYear: 24 },
+    { id: 'month', label: 'Every month', perYear: 12 },
+];
+export const payEvery = c => PAY_EVERY.find(p => p.id === c?.payEvery) || PAY_EVERY[1];
+
+/** The match as words: '100% of the first 3% of pay, then 50% of the next 2%'; '' without one. */
+export const matchText = tiers => tiers.map(([m, u], k) => `${+m}% of ${k ? 'the next' : 'the first'} ${+u}%${k ? '' : ' of pay'}`).join(', then ');
+
+/**
+ * What the contribution details work out to (c: the plan's `contributions`; any field can be blank):
+ *   pct (your % of pay: typed, or worked out from the amount and gross pay), gross (pay per paycheck before taxes),
+ *   mine ($ you put in a paycheck: typed, else pct × gross; mineWorkedOut when it's worked out), every / perYear,
+ *   tiers ([[match %, up to % of pay], …]), fullAt (the % of pay that gets the whole match), employerPct / employer (the
+ *   employer's % of pay and $ a paycheck at your pct), maxEmployerPct / maxEmployer (the most the match pays).
+ */
+export function contributionMath(c = {}) {
+    const n = v => amountOf(v);
+    const gross = n(c.grossPay), typed = n(c.amount), every = payEvery(c);
+    const pct = Number.isFinite(n(c.percent)) ? n(c.percent) : gross > 0 && Number.isFinite(typed) ? typed / gross * 100 : NaN;
+    const mine = Number.isFinite(typed) ? typed : gross > 0 && Number.isFinite(pct) ? gross * pct / 100 : NaN;
+    const tiers = [[n(c.matchPercent), n(c.matchUpTo)], [n(c.match2Percent), n(c.match2UpTo)]].filter(([m, u]) => m > 0 && u > 0);
+    // The employer's % of pay when you put in p% (each tier matches its share of the next part of your pay).
+    const matchAt = p => tiers.reduce((t, [m, u], k) => {
+        const before = tiers.slice(0, k).reduce((s, x) => s + x[1], 0);
+        return t + Math.max(0, Math.min(p - before, u)) * m / 100;
+    }, 0);
+    const fullAt = tiers.reduce((t, [, u]) => t + u, 0);
+    const employerPct = tiers.length && Number.isFinite(pct) ? matchAt(pct) : NaN, maxEmployerPct = tiers.length ? matchAt(fullAt) : NaN;
+    return {
+        pct, gross, mine, mineWorkedOut: !Number.isFinite(typed) && Number.isFinite(mine), every, perYear: every.perYear,
+        tiers, fullAt, employerPct, maxEmployerPct,
+        employer: gross > 0 ? gross * employerPct / 100 : NaN, maxEmployer: gross > 0 ? gross * maxEmployerPct / 100 : NaN,
+    };
+}
+
+const dayOf = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], m[2] - 1, +m[3]) : null; };
+
+/**
+ * The paydays from `from` (a Date, counted) to Dec 31 of its year: { count, next, estimated }. Worked out from any one
+ * payday (c.payday) and how often; twice a month means that day and the one 15 days from it. Without a payday, the
+ * count is the year's share of paychecks for the days left (estimated: true, next: null).
+ */
+export function paydaysLeft(c, from) {
+    const t0 = new Date(from); t0.setHours(0, 0, 0, 0);
+    const year = t0.getFullYear(), end = new Date(year, 11, 31), every = payEvery(c), d0 = dayOf(c?.payday);
+    if (!d0) {
+        const days = Math.round((end - t0) / 864e5) + 1, inYear = Math.round((new Date(year + 1, 0, 1) - new Date(year, 0, 1)) / 864e5);
+        return { count: Math.round(every.perYear * days / inYear), next: null, estimated: true };
+    }
+    const out = [];
+    if (every.id === 'week' || every.id === '2weeks') {
+        const step = every.id === 'week' ? 7 : 14, d = new Date(d0);
+        d.setDate(d.getDate() + Math.ceil(Math.round((t0 - d0) / 864e5) / step) * step); // the first payday on or after t0
+        for (; d <= end; d.setDate(d.getDate() + step)) out.push(new Date(d));
+    } else {
+        const day = d0.getDate(), days = every.id === 'month' ? [day] : [day, day <= 15 ? day + 15 : day - 15];
+        for (let m = t0.getMonth(); m <= 11; m++) for (const dd of days) {
+            const d = new Date(year, m, Math.min(dd, new Date(year, m + 1, 0).getDate()));
+            if (d >= t0) out.push(d);
+        }
+        out.sort((a, b) => a - b);
+    }
+    return { count: out.length, next: out[0] || null, estimated: false };
 }
 
 // The balance should be updated about monthly (a statement comes at least every quarter): yellow after 45 days, red after 100.
