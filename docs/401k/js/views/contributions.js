@@ -4,7 +4,7 @@
 import { esc, money, toast } from '../../../bills-etc/js/util.js';
 import { dLong } from '../../../bills-etc/js/views/utilcommon.js';
 import {
-    CONTRIBUTION_TYPES, PAY_EVERY, contributionMath, matchText, paydaysLeft, irsLimit, loadPlan, savePlan, amountOf,
+    CONTRIBUTION_TYPES, PAY_EVERY, contributionMath, matchText, yearPaychecks, irsLimit, loadPlan, savePlan, amountOf,
 } from '../401k.js';
 
 const NUMBERS = ['percent', 'rothPercent', 'grossPay', 'amount', 'matchPercent', 'matchUpTo', 'match2Percent', 'match2UpTo', 'birthYear'];
@@ -14,30 +14,29 @@ const dayOf = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); re
 const pctOf = v => `${+v.toFixed(2)}%`;
 const blank = '<span class="muted">—</span>';
 
-/** "What it adds up to" for contributions `c`, with this year's total so far from the balance history (S: summary()). */
-export function contributionTips(c, S, now = new Date()) {
-    const M = contributionMath(c), year = now.getFullYear(), L = irsLimit(year, amountOf(c.birthYear));
+/**
+ * "What it adds up to" for contributions `c`. This year's figures are estimates: what goes in a paycheck now, for each of
+ * this year's paychecks (counted from the payday, else the year's share).
+ */
+export function contributionTips(c, now = new Date()) {
+    const M = contributionMath(c), year = now.getFullYear(), L = irsLimit(year, amountOf(c.birthYear)), Y = yearPaychecks(c, now);
     const limitName = L.extra > 0 ? `your ${year} limit, ${money(L.total)} (${money(L.base)} + ${money(L.extra)} catch-up)` : `the ${year} limit, ${money(L.base)}`;
-    // The paychecks still to be counted this year: after the year's latest balance entry (its total is what's in so far).
-    const after = S?.ytdLast ? dayOf(S.ytdLast.date) : null;
-    if (after) after.setDate(after.getDate() + 1);
-    const P = paydaysLeft(c, after || new Date(year, 0, 1)), ytd = S?.ytdMine || 0;
+    const ytd = Number.isFinite(M.mine) ? M.mine * Y.soFar : 0;
     const tips = [];
     if (Number.isFinite(M.mine)) {
         tips.push(`<strong>Each paycheck:</strong> you ${esc(money(M.mine))}${Number.isFinite(M.employer)
             ? ` + employer about ${esc(money(M.employer))} = <strong>${esc(money(M.mine + M.employer))}</strong> going in` : ''}.`);
         tips.push(`<strong>A year</strong> (${M.perYear} paychecks): you about ${esc(money(M.mine * M.perYear))}${Number.isFinite(M.employer)
             ? `, employer about ${esc(money(M.employer * M.perYear))}` : ''}.`);
-        const by = ytd + M.mine * P.count;
-        tips.push(`<strong>By Dec 31:</strong> about ${esc(money(by))} of ${esc(limitName)}: ${esc(money(ytd))} so far${S?.ytdLast ? ` (to ${esc(dLong(dayOf(S.ytdLast.date)))})` : ''}`
-            + ` + ${P.count} more paycheck${P.count === 1 ? '' : 's'}${P.estimated ? ' (estimated: add a payday for the exact count)' : ''}`
-            + `${by > L.total + 0.005 ? ' · <span class="delta-bad">more than the limit</span>' : ''}.`);
+        const by = M.mine * Y.total;
+        tips.push(`<strong>${year}:</strong> ${Y.total} paychecks${Y.estimated ? ' (about: add a payday for the exact count)' : ''}, so about ${esc(money(by))} of ${esc(limitName)}`
+            + ` (~${esc(money(ytd))} so far, ${Y.left} paycheck${Y.left === 1 ? '' : 's'} left)${by > L.total + 0.005 ? ' · <span class="delta-bad">more than the limit</span>' : ''}.`);
     }
     // What it takes to put in the whole limit: over a year, and (when one paycheck could cover it) by this Dec 31.
     const ofPay = v => (M.gross > 0 ? ` (${(v / M.gross * 100).toFixed(1)}% of pay)` : '');
-    const perYear = L.total / M.perYear, room = L.total - ytd, need = P.count ? room / P.count : NaN;
+    const perYear = L.total / M.perYear, room = L.total - ytd, need = Y.left ? room / Y.left : NaN;
     tips.push(`To put in all of ${esc(limitName)}: about <strong>${esc(money(perYear))}</strong> a paycheck over a whole year${ofPay(perYear)}`
-        + (room > 0 && P.count > 0 && !(need > M.gross) ? `; to get there by Dec 31, about ${esc(money(need))} for each of the ${P.count} paychecks left${ofPay(need)}.` : '.'));
+        + (room > 0 && Y.left > 0 && !(need > M.gross) ? `; to get there by Dec 31, about ${esc(money(need))} for each of the ${Y.left} paychecks left${ofPay(need)}.` : '.'));
     if (M.tiers.length) {
         const most = `${pctOf(M.maxEmployerPct)} of pay${Number.isFinite(M.maxEmployer) ? ` (about ${esc(money(M.maxEmployer * M.perYear))} a year)` : ''}`;
         tips.push(`<strong>The match</strong> pays the most, ${most}, when you put in ${pctOf(M.fullAt)} or more`
@@ -49,10 +48,10 @@ export function contributionTips(c, S, now = new Date()) {
 }
 
 /**
- * Draw the box into `el`. plan: from loadPlan() (its `contributions` is changed in place on save); S: the balance
- * history's summary() or null; onSaved(): after a save. Returns { hasUnsavedEdits() }.
+ * Draw the box into `el`. plan: from loadPlan() (its `contributions` is changed in place on save); onSaved(): after a
+ * save. Returns { hasUnsavedEdits() }.
  */
-export function contributionsBox(el, { plan, S, onSaved }) {
+export function contributionsBox(el, { plan, onSaved }) {
     let start = null; // the form's values when editing started
 
     const show = () => {
@@ -74,7 +73,7 @@ export function contributionsBox(el, { plan, S, onSaved }) {
             ['Auto-increase', c.autoIncrease || ''],
             ['Birth year', c.birthYear ? `${c.birthYear}${Number.isFinite(age) ? ` (${age} this year)` : ''}` : ''],
         ];
-        const tips = Object.keys(c).length ? contributionTips(c, S) : [];
+        const tips = Object.keys(c).length ? contributionTips(c) : [];
         el.innerHTML = `
             <div class="row table-tools"><button type="button" class="small" data-edit>✎ Edit</button>
                 <span class="muted edit-hint">Your contribution, how you're paid and the employer match: the amounts are worked out from them.</span></div>

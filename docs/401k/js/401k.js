@@ -1,6 +1,6 @@
-// 401(k): the plan's information (inputs/401k/401k.json), the balance history (balances.csv: one entry per statement or
-// check-in, with what went in since the entry before), the investments (investments.csv) and the plan's documents
-// (documents.csv, with the files in documents/). inputs/ is kept out of git.
+// 401(k): the plan's information and contributions (inputs/401k/401k.json), the balance history (balances.csv: each
+// statement's starting balance, net transactions, investment returns and current balance), the investments (investments.csv) and the plan's documents (documents.csv,
+// with the files in documents/). inputs/ is kept out of git.
 import * as fs from '../../bills-etc/js/fs.js';
 import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
@@ -10,7 +10,6 @@ export const PLAN_PATH = `${K_DIR}/401k.json`;
 export const BALANCES_PATH = `${K_DIR}/balances.csv`;
 export const INVESTMENTS_PATH = `${K_DIR}/investments.csv`;
 export const DOCUMENTS_PATH = `${K_DIR}/documents.csv`;
-export const STATEMENTS_DIR = `${K_DIR}/statements`;
 export const DOCUMENTS_DIR = `${K_DIR}/documents`;
 
 // The information fields the plan starts with (any can be renamed, removed or reordered). What you put in and the
@@ -33,11 +32,10 @@ const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${Stri
 
 export const BALANCE_COLUMNS = [
     { name: 'Date', kind: 'date', default: todayIso },
-    { name: 'Balance', kind: 'money', total: false },
-    { name: 'You Put In', kind: 'money' },
-    { name: 'Employer Put In', kind: 'money' },
-    { name: 'Notes', kind: 'text' },
-    { name: 'Statement', kind: 'files', noun: 'statement' },
+    { name: 'Starting Balance', kind: 'money', total: false },
+    { name: 'Net Transactions', kind: 'money' }, // what went in less what came out (contributions, withdrawals, fees)
+    { name: 'Investment Returns', kind: 'money' },
+    { name: 'Current Balance', kind: 'money', total: false },
 ];
 
 export const INVESTMENT_COLUMNS = [
@@ -50,7 +48,7 @@ export const INVESTMENT_COLUMNS = [
 
 export const DOCUMENT_COLUMNS = [
     { name: 'Date', kind: 'date', default: todayIso },
-    { name: 'Document', kind: 'suggest', suggestions: ['Summary Plan Description', 'Fee disclosure', 'Beneficiary form',
+    { name: 'Document', kind: 'suggest', suggestions: ['Statement', 'Summary Plan Description', 'Fee disclosure', 'Beneficiary form',
         'Enrollment', 'Contribution change', 'Rollover', '1099-R'] },
     { name: 'Notes', kind: 'text' },
     { name: 'Files', kind: 'files', noun: 'document' },
@@ -79,33 +77,39 @@ export const saveDocuments = rows => saveCsv(DOCUMENTS_PATH, DOCUMENT_COLUMNS, r
 export const amountOf = v => { const s = String(v ?? '').replace(/[$,\s]/g, ''); return s === '' ? NaN : Number(s); };
 
 /**
- * The entries with a date and a balance, oldest first: [{ row, date ('YYYY-MM-DD'), balance, mine, employer, growth }].
- * growth: the change in balance since the entry before that wasn't money put in (gains, losses and fees); NaN for the
- * first. Entries on the same day count from the bottom of the table up (a new entry goes at the top).
+ * The entries with a date and a current balance, oldest first: [{ row, date ('YYYY-MM-DD'), start, net, returns,
+ * balance }] (start NaN when not typed; net and returns 0). A blank current balance is worked out from the other three
+ * when they're all there. Entries on the same day count from the bottom of the table up (a new entry goes at the top).
  */
 export function ledger(rows) {
-    const pts = rows.map((row, i) => ({ row, i, date: /^\d{4}-\d{2}-\d{2}$/.test(row.Date) ? row.Date : null, balance: amountOf(row.Balance),
-        mine: amountOf(row['You Put In']) || 0, employer: amountOf(row['Employer Put In']) || 0 }))
+    return rows.map((row, i) => {
+        const start = amountOf(row['Starting Balance']), net = amountOf(row['Net Transactions']), returns = amountOf(row['Investment Returns']);
+        const typed = amountOf(row['Current Balance']);
+        const balance = Number.isFinite(typed) ? typed : [start, net, returns].every(Number.isFinite) ? start + net + returns : NaN;
+        return { row, i, date: /^\d{4}-\d{2}-\d{2}$/.test(row.Date) ? row.Date : null, start, net: net || 0, returns: returns || 0, balance };
+    })
         .filter(p => p.date && Number.isFinite(p.balance))
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.i - a.i));
-    pts.forEach((p, k) => { p.growth = k ? p.balance - pts[k - 1].balance - p.mine - p.employer : NaN; });
-    return pts;
 }
 
+/** Entries whose starting balance + net transactions + investment returns isn't their current balance (a typo?). */
+export const notAddingUp = pts => pts.filter(p => Number.isFinite(p.start) && Number.isFinite(amountOf(p.row['Current Balance']))
+    && Math.abs(p.start + p.net + p.returns - p.balance) > 0.5);
+
 /**
- * What the history adds up to (null without any entries): the first and latest entries, what went in after the first
- * (you, employer) and the growth since it; and this year's: what you and the employer put in, and the growth.
+ * What the history adds up to (null without any entries): the first, latest and the one before the latest entry;
+ * since the first entry's starting balance (start): the net transactions, investment returns and change in all; and
+ * this year's net transactions and returns (from the entries dated this year).
  */
 export function summary(pts, now = new Date()) {
     if (!pts.length) return null;
     const total = (list, f) => list.reduce((t, p) => t + f(p), 0);
-    const first = pts[0], last = pts.at(-1), later = pts.slice(1);
-    const year = now.getFullYear(), thisYear = pts.filter(p => p.date.startsWith(`${year}-`));
-    const mine = total(later, p => p.mine), employer = total(later, p => p.employer);
+    const first = pts[0], last = pts.at(-1), year = now.getFullYear(), thisYear = pts.filter(p => p.date.startsWith(`${year}-`));
+    const start = Number.isFinite(first.start) ? first.start : first.balance - first.net - first.returns;
     return {
-        first, last, prev: pts.at(-2) || null, mine, employer, growth: last.balance - first.balance - mine - employer,
-        year, ytdMine: total(thisYear, p => p.mine), ytdEmployer: total(thisYear, p => p.employer),
-        ytdGrowth: total(thisYear.filter(p => Number.isFinite(p.growth)), p => p.growth), ytdLast: thisYear.at(-1) || null,
+        first, last, prev: pts.at(-2) || null, start, net: total(pts, p => p.net), returns: total(pts, p => p.returns),
+        change: last.balance - start, year, yearEntries: thisYear.length,
+        ytdNet: total(thisYear, p => p.net), ytdReturns: total(thisYear, p => p.returns),
     };
 }
 
@@ -199,6 +203,14 @@ export function paydaysLeft(c, from) {
         out.sort((a, b) => a - b);
     }
     return { count: out.length, next: out[0] || null, estimated: false };
+}
+
+/** This year's paychecks: { total, soFar (through today), left (after today), estimated (no payday to count from) }. */
+export function yearPaychecks(c, now = new Date()) {
+    const year = now.getFullYear(), tomorrow = new Date(now); tomorrow.setHours(0, 0, 0, 0); tomorrow.setDate(tomorrow.getDate() + 1);
+    const all = paydaysLeft(c, new Date(year, 0, 1));
+    const left = tomorrow.getFullYear() > year ? 0 : paydaysLeft(c, tomorrow).count;
+    return { total: all.count, soFar: all.count - left, left, estimated: all.estimated };
 }
 
 // The balance should be updated about monthly (a statement comes at least every quarter): yellow after 45 days, red after 100.
