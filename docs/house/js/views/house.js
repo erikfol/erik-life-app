@@ -8,6 +8,7 @@
 import { esc, toast } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
+import { infoLinks } from '../../../shared/js/infolinks.js';
 import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
 import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
 import { renderImprovements, improvementsUnsaved, forgetImprovements } from './improvements.js';
@@ -120,7 +121,8 @@ async function renderArea(el, list, h, tab, a) {
         ${menus(h, tab, a)}
         ${sched ? '<div id="maint-banner"></div>' : ''}
         <p class="lead">${kept}.</p>
-        ${boxes.map((b, i) => section(b.label, `info-${i}`, b.link)).join('')}
+        ${boxes.map((b, i) => (b.links ? `<section><h2 class="info-head" id="links-head-${i}"></h2><div id="links-hints-${i}"></div><div id="info-${i}"></div></section>`
+            : section(b.label, `info-${i}`, b.link))).join('')}
         ${tables.map((t, i) => `<section><h2>${esc(t.label)}${t.sub ? ` <span class="sub">${esc(t.sub)}</span>` : ''}</h2><div id="table-${i}"></div></section>`).join('')}
         ${section(gallery.label, 'photos')}
         ${a.improvements ? section('Future improvements', 'improvements') : ''}
@@ -144,6 +146,17 @@ async function renderArea(el, list, h, tab, a) {
         rows: tableRows[i],
         save: r => saveAreaTable(h, a, t, r),
     }));
+    // A box with links: its websites on its heading (kept under the area's `links`), counted with the boxes for unsaved edits.
+    boxes.forEach((b, i) => {
+        if (!b.links) return;
+        infos.push(infoLinks(el.querySelector(`#links-head-${i}`), el.querySelector(`#links-hints-${i}`), h.areas?.[a.id]?.links || [], async links => {
+            const kept = { ...h.areas?.[a.id] };
+            if (links.length) kept.links = links; else delete kept.links;
+            const updated = { ...h, areas: { ...h.areas, [a.id]: kept } };
+            await saveHouses(list.map(x => (x.id === h.id ? updated : x)));
+            Object.assign(h, updated);
+        }, { title: esc(b.label), example: 'Company site' }));
+    });
     renderGallery(el.querySelector('#photos'), photosDir(h, a), { noun: gallery.noun }).catch(err => {
         el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load ${esc(gallery.noun)}s: ${esc(err.message)}</div>`;
     });

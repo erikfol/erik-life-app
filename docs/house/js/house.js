@@ -22,7 +22,8 @@ export const FIELDS = ['Address', 'Year Built', 'Style', 'Bedrooms', 'Bathrooms'
 // page's name) show their due banners at the top.
 // maintenanceNote: a line shown at the top of the Maintenance section.
 // boxes: several information boxes instead of one [{ key, label, fields, link? }], each kept under house.areas[<id>][key];
-// link: { text, href } shown on the box's heading (e.g. where its payments are kept).
+// link: { text, href } shown on the box's heading (e.g. where its payments are kept); links: true = website links with
+// sign-in hints on the box's heading, edited with ✎ Links (shared/js/infolinks.js), kept under house.areas[<id>].links.
 // gallery: { label, noun } for the photos section (default Photos). records: false = no records table.
 // tables: more tables on the page, after its information [{ key, label, sub, columns(h, a) }], each kept in
 // <house>-<area id>-<key>.csv (e.g. Solar's yearly production).
@@ -95,7 +96,7 @@ export const AREAS = [
         // Renewable Energy Credits: the credits the panels earn, sold through a REC company. Just its information for now.
         { id: 'rec', label: 'REC', icon: '📜',
             boxes: [{ key: 'info', label: 'Renewable Energy Credits (REC)', fields: ['Company', 'Program', 'Account Number', 'Contract Start',
-                'Contract Length', 'Price per REC', 'Paid How / When', 'Contact', 'Website', 'Notes'] }],
+                'Contract Length', 'Price per REC', 'Paid How / When', 'Contact', 'Notes'], links: true }],
             gallery: { label: 'Documents & photos', noun: 'image' },
             records: false },
     ] },
