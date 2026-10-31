@@ -124,6 +124,12 @@ export async function collectData(progress = () => {}) {
                 label: a.label,
                 tab: t.parts ? t.label : '', // a part (pill) of this tab
                 boxes: house.areaBoxes(a).map(b => ({ label: b.label, info: house.areaInfo(h, a, b) })),
+                // its other tables (e.g. Solar's yearly production), with the worked-out columns filled in
+                tables: await Promise.all((a.tables || []).map(async t => {
+                    const cols = t.columns(h, a), rows = await house.loadAreaTable(h, a, t, false);
+                    return { label: t.label, columns: cols.map(c => ({ name: c.name, kind: c.kind })),
+                        rows: rows.map(r => ({ ...r, ...Object.fromEntries(cols.filter(c => c.calc).map(c => [c.name, String(c.calc(r))])) })) };
+                })),
                 improvements: house.areaImprovements(h, a),
                 maintenance: a.maintenance ? {
                     columns: house.maintenanceColumns(h).map(c => ({ name: c.name, kind: c.kind })),
@@ -427,6 +433,7 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
         // its schedule items' due banners, as they stood when this copy was made (red, yellow, green)
         for (const b of m?.banners || []) main.insertAdjacentHTML('beforeend', `<div class="banner ${{ red: 'bad', yellow: 'soon', ok: 'ok' }[b.level]}"><b>${esc(b.title)}</b> ${esc(b.detail)}</div>`);
         for (const b of a.boxes) section(a.boxes.length > 1 ? b.label : 'Information', true, infoList(withAge(b.info)));
+        for (const t of a.tables || []) section(`${t.label} (${t.rows.length})`, true, el => records(el, t.columns, t.rows));
         if (a.photos.length) section(`${a.photosLabel} (${a.photos.length})`, false, gallery(a.photos));
         if (a.improvements?.length) section(`Future improvements (${a.improvements.length})`, false, cardsHtml(a.improvements));
         if (m) section(`Maintenance (${m.rows.length})`, true, el => {

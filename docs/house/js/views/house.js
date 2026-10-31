@@ -15,18 +15,19 @@ import { renderProjectList, renderProject, projectUnsaved, forgetProject } from 
 import { renderScheduleTab, pageBanners, pageSchedule, scheduleUnsaved, forgetSchedule } from './schedule.js';
 import {
     HOUSE_PATH, AREAS, STORE, areaBoxes, areaInfo, saveHouses, houseAge, photosDir, newHouse, recordsPath, recordColumns, loadRecords, saveRecords,
-    maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, tablePath, loadTable, saveTable,
+    maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, tablePath, loadTable, saveTable, areaTablePath, loadAreaTable, saveAreaTable,
     houseProjects, pageOfItem, invoicesDir,
 } from '../house.js';
 
 let table = null;
 let maint = null; // the Maintenance table
 let infos = []; // the information boxes
+let extras = []; // the page's other tables (its `tables`)
 
 export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!maint?.hasUnsavedEdits() || infos.some(b => b.hasUnsavedEdits())
-    || placesUnsaved() || improvementsUnsaved() || projectUnsaved() || scheduleUnsaved();
+    || extras.some(t => t.hasUnsavedEdits()) || placesUnsaved() || improvementsUnsaved() || projectUnsaved() || scheduleUnsaved();
 export const forget = () => {
-    table = null; maint = null; infos = [];
+    table = null; maint = null; infos = []; extras = [];
     closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetImprovements(); forgetProject(); forgetSchedule();
 };
 
@@ -105,11 +106,14 @@ export async function renderHouse(el, list, h, onListChanged, tab = null, page =
 async function renderArea(el, list, h, tab, a) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     const hasRecords = a.records !== false, boxes = areaBoxes(a), gallery = a.gallery || { label: 'Photos', noun: 'photo' };
-    const [rows, maintRows, sched] = await Promise.all([hasRecords ? loadRecords(h, a) : [], a.maintenance ? loadMaintenance(h, a) : [],
-        a.maintenance ? pageSchedule(h) : null]); // sched: the Maintenance tab's schedule and every maintenance entry, for the banners
+    const tables = a.tables || [];
+    const [rows, maintRows, sched, ...tableRows] = await Promise.all([hasRecords ? loadRecords(h, a) : [], a.maintenance ? loadMaintenance(h, a) : [],
+        a.maintenance ? pageSchedule(h) : null, // sched: the Maintenance tab's schedule and every maintenance entry, for the banners
+        ...tables.map(t => loadAreaTable(h, a, t))]);
     const section = (title, id, link = null) => `<section><h2>${esc(title)}${link
         ? `<span class="spacer"></span><a class="ext-link" href="${esc(link.href)}">${esc(link.text)} →</a>` : ''}</h2><div id="${id}"></div></section>`;
-    const kept = [['Information', HOUSE_PATH], a.maintenance && ['maintenance', maintenancePath(h, a)], hasRecords && ['records', recordsPath(h, a)],
+    const kept = [['Information', HOUSE_PATH], ...tables.map(t => [t.label.toLowerCase(), areaTablePath(h, a, t)]),
+        a.maintenance && ['maintenance', maintenancePath(h, a)], hasRecords && ['records', recordsPath(h, a)],
         ].filter(Boolean).map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ');
     el.innerHTML = `
         <h1 class="page">${esc(h.name)}</h1>
@@ -117,6 +121,7 @@ async function renderArea(el, list, h, tab, a) {
         ${sched ? '<div id="maint-banner"></div>' : ''}
         <p class="lead">${kept}.</p>
         ${boxes.map((b, i) => section(b.label, `info-${i}`, b.link)).join('')}
+        ${tables.map((t, i) => `<section><h2>${esc(t.label)}${t.sub ? ` <span class="sub">${esc(t.sub)}</span>` : ''}</h2><div id="table-${i}"></div></section>`).join('')}
         ${section(gallery.label, 'photos')}
         ${a.improvements ? section('Future improvements', 'improvements') : ''}
         ${a.maintenance ? `<section><h2>Maintenance</h2>${a.maintenanceNote ? `<p class="section-note">📌 ${esc(a.maintenanceNote)}</p>` : ''}
@@ -133,6 +138,11 @@ async function renderArea(el, list, h, tab, a) {
             await saveHouses(list.map(x => (x.id === h.id ? updated : x)));
             Object.assign(h, updated);
         },
+    }));
+    extras = tables.map((t, i) => recordTable(el.querySelector(`#table-${i}`), {
+        columns: t.columns(h, a),
+        rows: tableRows[i],
+        save: r => saveAreaTable(h, a, t, r),
     }));
     renderGallery(el.querySelector('#photos'), photosDir(h, a), { noun: gallery.noun }).catch(err => {
         el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load ${esc(gallery.noun)}s: ${esc(err.message)}</div>`;

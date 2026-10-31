@@ -24,6 +24,8 @@ export const FIELDS = ['Address', 'Year Built', 'Style', 'Bedrooms', 'Bathrooms'
 // boxes: several information boxes instead of one [{ key, label, fields, link? }], each kept under house.areas[<id>][key];
 // link: { text, href } shown on the box's heading (e.g. where its payments are kept).
 // gallery: { label, noun } for the photos section (default Photos). records: false = no records table.
+// tables: more tables on the page, after its information [{ key, label, sub, columns(h, a) }], each kept in
+// <house>-<area id>-<key>.csv (e.g. Solar's yearly production).
 // A tab or part with `table` (its columns) is just that one table, kept in <house>-<its id>.csv. The tab with
 // `projects` is the Projects list and pages (views/projects.js); the tab with `schedule` is the Maintenance tab (the
 // maintenance schedule and a log for the rest of the house, views/schedule.js).
@@ -86,6 +88,7 @@ export const AREAS = [
             { key: 'loan', label: 'Solar loan', fields: ['Term', 'Rate', 'Borrowed', 'Tax Credit (est.)', 'Balance (est.)', 'Lender', 'Notes'],
                 link: { text: 'Payments in Bills Etc', href: '../bills-etc/#loans/loans' } },
         ],
+        tables: [{ key: 'production', label: 'Yearly production', sub: 'what the panels made each year', columns: (h, a) => productionColumns(h, a) }],
         actions: ['Panel cleaning', 'Inspection', 'Inverter', 'Monitoring', 'Repair'],
         maintenance: true },
     { id: 'maintenance', label: 'Maintenance', schedule: true },
@@ -133,6 +136,23 @@ export const IMPROVEMENT_STATUSES = ['Idea', 'Researching', 'Getting quotes', 'P
 export const areaImprovements = (h, a) => h.areas?.[a.id]?.improvements ?? [];
 
 const blank = fields => fields.map(label => ({ label, value: '' }));
+
+/**
+ * Solar's yearly production: the year, the kWh the panels made, how that compares with the Solar system box's
+ * Est. Annual Production (worked out, not saved), and notes.
+ */
+function productionColumns(h, a) {
+    const est = parseFloat(String(areaInfo(h, a).find(f => /annual production/i.test(f.label))?.value || '').replace(/,/g, ''));
+    return [
+        { name: 'Year', kind: 'suggest' },
+        { name: 'Production (kWh)', kind: 'number' },
+        { name: '% of Estimate', kind: 'number', calc: r => {
+            const kwh = parseFloat(String(r['Production (kWh)'] || '').replace(/,/g, ''));
+            return est > 0 && Number.isFinite(kwh) ? Math.round(kwh / est * 100) : '';
+        } },
+        { name: 'Notes', kind: 'text' },
+    ];
+}
 
 /** An area's information boxes: its `boxes`, or one box of its `fields`. */
 export const areaBoxes = a => a.boxes || [{ key: 'info', label: `${a.label} information`, fields: a.fields }];
@@ -220,6 +240,11 @@ async function writeRows(path, cols, rows) {
     await writeTracked(path, toCSV(cols.map(c => c.name), rows));
     window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
+
+/** One of an area's `tables` (t) on house `h`: its file, and its rows (the calculated columns aren't saved). */
+export const areaTablePath = (h, a, t) => `${HOUSE_DIR}/${h.id}-${a.id}-${t.key}.csv`;
+export const loadAreaTable = (h, a, t, track = true) => readRows(areaTablePath(h, a, t), t.columns(h, a).filter(c => !c.calc), track);
+export const saveAreaTable = (h, a, t, rows) => writeRows(areaTablePath(h, a, t), t.columns(h, a).filter(c => !c.calc), rows);
 
 export const loadRecords = (h, a, track = true) => readRows(recordsPath(h, a), recordColumns(h, a), track);
 export const saveRecords = (h, a, rows) => writeRows(recordsPath(h, a), recordColumns(h, a), rows);
