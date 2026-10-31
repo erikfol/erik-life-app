@@ -10,6 +10,7 @@ import { backupPanel } from './backup.js';
 // The sections that have red / yellow banners (the others have none), by their folder.
 const ALERTS = {
     'bills-etc': () => import('../../bills-etc/js/alerts.js'),
+    '401k': () => import('../../401k/js/alerts.js'),
     health: () => import('../../health/js/alerts.js'),
     vehicles: () => import('../../vehicles/js/alerts.js'),
     house: () => import('../../house/js/alerts.js'),
