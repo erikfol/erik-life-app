@@ -107,7 +107,8 @@ async function renderArea(el, list, h, tab, a) {
     const hasRecords = a.records !== false, boxes = areaBoxes(a), gallery = a.gallery || { label: 'Photos', noun: 'photo' };
     const [rows, maintRows, sched] = await Promise.all([hasRecords ? loadRecords(h, a) : [], a.maintenance ? loadMaintenance(h, a) : [],
         a.maintenance ? pageSchedule(h) : null]); // sched: the Maintenance tab's schedule and every maintenance entry, for the banners
-    const section = (title, id) => `<section><h2>${esc(title)}</h2><div id="${id}"></div></section>`;
+    const section = (title, id, link = null) => `<section><h2>${esc(title)}${link
+        ? `<span class="spacer"></span><a class="ext-link" href="${esc(link.href)}">${esc(link.text)} →</a>` : ''}</h2><div id="${id}"></div></section>`;
     const kept = [['Information', HOUSE_PATH], a.maintenance && ['maintenance', maintenancePath(h, a)], hasRecords && ['records', recordsPath(h, a)],
         ].filter(Boolean).map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ');
     el.innerHTML = `
@@ -115,7 +116,7 @@ async function renderArea(el, list, h, tab, a) {
         ${menus(h, tab, a)}
         ${sched ? '<div id="maint-banner"></div>' : ''}
         <p class="lead">${kept}.</p>
-        ${boxes.map((b, i) => section(b.label, `info-${i}`)).join('')}
+        ${boxes.map((b, i) => section(b.label, `info-${i}`, b.link)).join('')}
         ${section(gallery.label, 'photos')}
         ${a.improvements ? section('Future improvements', 'improvements') : ''}
         ${a.maintenance ? `<section><h2>Maintenance</h2>${a.maintenanceNote ? `<p class="section-note">📌 ${esc(a.maintenanceNote)}</p>` : ''}

@@ -21,7 +21,8 @@ export const FIELDS = ['Address', 'Year Built', 'Style', 'Bedrooms', 'Bathrooms'
 // maintenance: the page also has a Maintenance table; the Maintenance tab's schedule items for it (their Area is the
 // page's name) show their due banners at the top.
 // maintenanceNote: a line shown at the top of the Maintenance section.
-// boxes: several information boxes instead of one [{ key, label, fields }], each kept under house.areas[<id>][key].
+// boxes: several information boxes instead of one [{ key, label, fields, link? }], each kept under house.areas[<id>][key];
+// link: { text, href } shown on the box's heading (e.g. where its payments are kept).
 // gallery: { label, noun } for the photos section (default Photos). records: false = no records table.
 // A tab or part with `table` (its columns) is just that one table, kept in <house>-<its id>.csv. The tab with
 // `projects` is the Projects list and pages (views/projects.js); the tab with `schedule` is the Maintenance tab (the
@@ -78,6 +79,15 @@ export const AREAS = [
         actions: ['Pumped', 'Inspection', 'Effluent filter cleaned', 'Baffle repair', 'Riser / cover', 'Repair'],
         maintenance: true,
         maintenanceNote: 'Must be pumped every 7 years by a professional' },
+    { id: 'solar', label: 'Solar',
+        boxes: [
+            { key: 'info', label: 'Solar system', fields: ['Panels', 'Watts per Panel', 'System Size', 'Est. Annual Production',
+                'Est. Grid Usage', 'Grid Usage (2024 actual)', 'Est. Coverage (w/ mini-splits)', 'Installed', 'Installer', 'Warranty', 'Notes'] },
+            { key: 'loan', label: 'Solar loan', fields: ['Term', 'Rate', 'Borrowed', 'Tax Credit (est.)', 'Balance (est.)', 'Lender', 'Notes'],
+                link: { text: 'Payments in Bills Etc', href: '../bills-etc/#loans/loans' } },
+        ],
+        actions: ['Panel cleaning', 'Inspection', 'Inverter', 'Monitoring', 'Repair'],
+        maintenance: true },
     { id: 'maintenance', label: 'Maintenance', schedule: true },
 ];
 
