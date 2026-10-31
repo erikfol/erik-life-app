@@ -26,7 +26,9 @@ export const FIELDS = ['Address', 'Year Built', 'Style', 'Bedrooms', 'Bathrooms'
 // sign-in hints on the box's heading, edited with ✎ Links (shared/js/infolinks.js), kept under house.areas[<id>].links.
 // gallery: { label, noun } for the photos section (default Photos). records: false = no records table.
 // tables: more tables on the page, after its information [{ key, label, sub, columns(h, a) }], each kept in
-// <house>-<area id>-<key>.csv (e.g. Solar's yearly production).
+// <house>-<area id>-<key>.csv (e.g. Solar's yearly production); optionally choices(h, a, rows) for its 'choice' columns,
+// banners(h, a, rows) → [{ level: 'red' | 'yellow' | 'ok', title, detail }] shown at the top of the page (red and
+// yellow ones also counted on the Home page), and note(h, a, rows) → a line under its heading (e.g. REC payments).
 // A tab or part with `table` (its columns) is just that one table, kept in <house>-<its id>.csv. The tab with
 // `projects` is the Projects list and pages (views/projects.js); the tab with `schedule` is the Maintenance tab (the
 // maintenance schedule and a log for the rest of the house, views/schedule.js).
@@ -93,10 +95,16 @@ export const AREAS = [
             tables: [{ key: 'production', label: 'Yearly production', sub: 'what the panels made each year', columns: (h, a) => productionColumns(h, a) }],
             actions: ['Panel cleaning', 'Inspection', 'Inverter', 'Monitoring', 'Repair'],
             maintenance: true },
-        // Renewable Energy Credits: the credits the panels earn, sold through a REC company. Just its information for now.
+        // Renewable Energy Credits: the credits the panels earn, sold through a REC company — its information, and the
+        // payments for each quarter, with a reminder while one is due or late (recStatus).
         { id: 'rec', label: 'REC', icon: '📜',
             boxes: [{ key: 'info', label: 'Renewable Energy Credits (REC)', fields: ['Company', 'Program', 'Account Number', 'Contract Start',
                 'Contract Length', 'Price per REC', 'Paid How / When', 'Contact', 'Notes'], links: true }],
+            tables: [{ key: 'payments', label: 'REC payments', sub: 'one row per quarter of production: the RECs minted and what they paid',
+                columns: () => REC_PAYMENT_COLUMNS,
+                choices: (h, a, rows) => ({ Quarter: { list: recQuarters(rows), noun: 'quarter' } }),
+                banners: (h, a, rows) => recBanners(recStatus(h, a, rows)),
+                note: (h, a, rows) => recNote(recStatus(h, a, rows)) }],
             gallery: { label: 'Documents & photos', noun: 'image' },
             records: false },
     ] },
@@ -162,6 +170,87 @@ function productionColumns(h, a) {
         { name: 'Notes', kind: 'text' },
     ];
 }
+
+// ── REC payments ──
+// The REC company's schedule (as in the REC information): 1 REC for each 1,000 kWh (what's left over rolls into the
+// next quarter), minted about 3½ months after a quarter ends — Jan–Mar on Jul 15, Apr–Jun Oct 15, Jul–Sep Jan 15,
+// Oct–Dec Apr 15 — and paid by the 15th of the month after. A quarter is { y, q } (q 1–4).
+const QUARTER_MONTHS = ['Jan–Mar', 'Apr–Jun', 'Jul–Sep', 'Oct–Dec'];
+/** REC payments' Quarter: '2026 Q2 (Apr–Jun)'. */
+const quarterValue = k => `${k.y} Q${k.q} (${QUARTER_MONTHS[k.q - 1]})`;
+/** 'Apr–Jun 2026' */
+const quarterName = k => `${QUARTER_MONTHS[k.q - 1]} ${k.y}`;
+/** '2026 Q2 (Apr–Jun)' → { y: 2026, q: 2 }; null if it isn't one. */
+const quarterOf = v => { const m = /^(\d{4})\s*Q([1-4])\b/i.exec(String(v ?? '').trim()); return m ? { y: +m[1], q: +m[2] } : null; };
+const nextQuarter = k => (k.q === 4 ? { y: k.y + 1, q: 1 } : { y: k.y, q: k.q + 1 });
+/** When a quarter's RECs are minted, and the day their payment is due by. */
+export const recMinted = k => new Date(k.y, k.q * 3 + 3, 15);
+export const recPaidBy = k => new Date(k.y, k.q * 3 + 4, 15);
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** The latest quarter minted by `today`: what a new REC payments row starts with. */
+const lastMinted = (today = new Date()) => {
+    let k = { y: today.getFullYear() - 2, q: 1 };
+    while (recMinted(nextQuarter(k)) <= today) k = nextQuarter(k);
+    return k;
+};
+
+const REC_PAYMENT_COLUMNS = [
+    { name: 'Quarter', kind: 'choice', default: () => quarterValue(lastMinted()) }, // the quarter of production
+    { name: 'Paid By', kind: 'date', calc: r => { const k = quarterOf(r.Quarter); return k ? isoOf(recPaidBy(k)) : ''; } },
+    { name: 'RECs', kind: 'number' }, // minted (0 when it was under 1,000 kWh: it rolls over)
+    { name: 'Price per REC', kind: 'money', total: false },
+    { name: 'Amount', kind: 'money' },
+    { name: 'Paid On', kind: 'date' },
+    { name: 'Notes', kind: 'text' },
+];
+
+/** Quarter's choices: each quarter that's ended, from two years back (newest first), and any other one already used. */
+function recQuarters(rows, today = new Date()) {
+    const out = [];
+    for (let k = { y: today.getFullYear() - 2, q: 1 }; new Date(k.y, k.q * 3, 1) <= today; k = nextQuarter(k)) out.unshift(quarterValue(k));
+    for (const r of rows) if (r.Quarter && !out.includes(r.Quarter)) out.push(r.Quarter);
+    return out;
+}
+
+/**
+ * Where the REC payments stand on `today`: { first (the quarter reminders count from: Contract Start's, else the
+ * first one in REC payments; null without either), due ([{ k, level }] for each quarter from `first` that's been minted
+ * but isn't settled: 'yellow' until its paid-by day, then 'red'), next (the first quarter not settled whose paid-by day
+ * hasn't passed) }. A quarter is settled once its row has a Paid On date, or RECs 0 (none minted).
+ */
+export function recStatus(h, a, rows, today = new Date()) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const logged = rows.map(r => ({ r, k: quarterOf(r.Quarter) })).filter(x => x.k);
+    const none = r => String(r.RECs ?? '').trim() !== '' && Number(String(r.RECs).replace(/,/g, '')) === 0;
+    const settled = k => logged.some(x => x.k.y === k.y && x.k.q === k.q && (String(x.r['Paid On'] || '').trim() !== '' || none(x.r)));
+    const start = fromDate(areaInfo(h, a).find(f => /^contract start$/i.test(f.label.trim()))?.value);
+    const first = start ? { y: start.getFullYear(), q: Math.floor(start.getMonth() / 3) + 1 }
+        : logged.map(x => x.k).sort((x, y) => x.y - y.y || x.q - y.q)[0] || null;
+    const due = [];
+    if (first) for (let k = first; recMinted(k) <= day; k = nextQuarter(k)) {
+        if (!settled(k)) due.push({ k, level: day > recPaidBy(k) ? 'red' : 'yellow' });
+    }
+    let next = { y: day.getFullYear() - 1, q: 1 };
+    while (recPaidBy(next) < day || settled(next)) next = nextQuarter(next);
+    return { first, due, next };
+}
+
+/** The banners at the top of the REC page: each payment that's due (yellow) or late (red), else (once they count) ✓ up to date. */
+export function recBanners(s) {
+    const out = s.due.map(({ k, level }) => (level === 'red'
+        ? { level, title: `REC payment for ${quarterName(k)} is late.`,
+            detail: `It was due by ${showDay(recPaidBy(k))}. Log it in REC payments with the day it was paid (Paid On), or RECs 0 if none were minted.` }
+        : { level, title: `REC payment for ${quarterName(k)} is due by ${showDay(recPaidBy(k))}.`,
+            detail: `Its RECs were minted ${showDay(recMinted(k))}. Log it in REC payments once it's paid (Paid On), or RECs 0 if none were minted.` }));
+    if (s.first && !out.length) {
+        out.push({ level: 'ok', title: 'REC payments up to date.', detail: `Next: ${quarterName(s.next)}, minted ${showDay(recMinted(s.next))}, paid by ${showDay(recPaidBy(s.next))}.` });
+    }
+    return out;
+}
+
+/** Under REC payments' heading until reminders count (no Contract Start, nothing logged): the next payment, and how they start. */
+export const recNote = s => (s.first ? '' : `Next payment: ${quarterName(s.next)} production, minted ${showDay(recMinted(s.next))}, paid by `
+    + `${showDay(recPaidBy(s.next))}. Reminders start once Contract Start is filled in above, or a quarter is logged here.`);
 
 /** An area's information boxes: its `boxes`, or one box of its `fields`. */
 export const areaBoxes = a => a.boxes || [{ key: 'info', label: `${a.label} information`, fields: a.fields }];

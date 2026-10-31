@@ -145,7 +145,7 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         };
         return { ...base, value: get, tdClass: () => 'text' };
     };
-    const firstDate = cols.find(c => c.kind === 'date');
+    const firstDate = cols.find(c => c.kind === 'date' && !c.calc); // the first typed-in date (not a worked-out one, like REC payments' Paid By)
 
     // An entry's button (rowActions).
     readEl.addEventListener('click', async e => {

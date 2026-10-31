@@ -1,6 +1,7 @@
 // The Overview's Contributions box: what you put in (% of pay, pre-tax or Roth, $ a paycheck), how often you're paid,
 // the employer match, auto-increase and birth year (for the catch-up) — and what that adds up to: each paycheck, a year,
-// this year against the IRS limit, and the match. Kept in 401k.json's `contributions`.
+// this year against the IRS limit, and the match. Kept in 401k.json's `contributions` (a change to what you put in
+// also goes into Contribution changes: the Overview does that, from onSaved).
 import { esc, money, toast } from '../../../bills-etc/js/util.js';
 import { dLong } from '../../../bills-etc/js/views/utilcommon.js';
 import {
@@ -18,8 +19,8 @@ const blank = '<span class="muted">—</span>';
  * "What it adds up to" for contributions `c`. This year's figures are estimates: what goes in a paycheck now, for each of
  * this year's paychecks (counted from the payday, else the year's share).
  */
-export function contributionTips(c, now = new Date()) {
-    const M = contributionMath(c), year = now.getFullYear(), L = irsLimit(year, amountOf(c.birthYear)), Y = yearPaychecks(c, now);
+export function contributionTips(c, limits, now = new Date()) {
+    const M = contributionMath(c), year = now.getFullYear(), L = irsLimit(year, amountOf(c.birthYear), limits), Y = yearPaychecks(c, now);
     const limitName = L.extra > 0 ? `your ${year} limit, ${money(L.total)} (${money(L.base)} + ${money(L.extra)} catch-up)` : `the ${year} limit, ${money(L.base)}`;
     const ytd = Number.isFinite(M.mine) ? M.mine * Y.soFar : 0;
     const tips = [];
@@ -43,15 +44,16 @@ export function contributionTips(c, now = new Date()) {
             + (!Number.isFinite(M.pct) ? '.' : M.pct >= M.fullAt - 1e-9 ? `: ✓ at ${pctOf(M.pct)} you get all of it.`
                 : `: at ${pctOf(M.pct)} you get ${pctOf(M.employerPct)} of pay${Number.isFinite(M.maxEmployer) ? `, about ${esc(money((M.maxEmployer - M.employer) * M.perYear))} a year less than the most` : ''}.`));
     }
-    if (!L.announced) tips.push(`<span class="muted">The IRS hasn't announced ${year}'s limits yet: these use ${L.year}'s.</span>`);
+    if (!L.added) tips.push(`<span class="muted">${year}'s IRS limits aren't added yet (Plan &amp; investments → IRS limits): these use ${L.year}'s.</span>`);
     return tips;
 }
 
 /**
- * Draw the box into `el`. plan: from loadPlan() (its `contributions` is changed in place on save); onSaved(): after a
- * save. Returns { hasUnsavedEdits() }.
+ * Draw the box into `el`. plan: from loadPlan() (its `contributions` is changed in place on save); limits: limitsOf()
+ * the IRS limits table; onSaved(prev, next): after a save, with the contributions before and after it. Returns
+ * { hasUnsavedEdits() }.
  */
-export function contributionsBox(el, { plan, onSaved }) {
+export function contributionsBox(el, { plan, limits, onSaved }) {
     let start = null; // the form's values when editing started
 
     const show = () => {
@@ -73,7 +75,7 @@ export function contributionsBox(el, { plan, onSaved }) {
             ['Auto-increase', c.autoIncrease || ''],
             ['Birth year', c.birthYear ? `${c.birthYear}${Number.isFinite(age) ? ` (${age} this year)` : ''}` : ''],
         ];
-        const tips = Object.keys(c).length ? contributionTips(c) : [];
+        const tips = Object.keys(c).length ? contributionTips(c, limits) : [];
         el.innerHTML = `
             <div class="row table-tools"><button type="button" class="small" data-edit>✎ Edit</button>
                 <span class="muted edit-hint">Your contribution, how you're paid and the employer match: the amounts are worked out from them.</span></div>
@@ -130,7 +132,7 @@ export function contributionsBox(el, { plan, onSaved }) {
         el.querySelector('[data-cancel]').onclick = show;
         form.onsubmit = async e => {
             e.preventDefault();
-            const next = read(form);
+            const next = read(form), prev = plan.contributions || {};
             if (next.type === 'Pre-tax + Roth' && next.rothPercent > (next.percent ?? Infinity)) return toast('The Roth part can\'t be more than the contribution', 'bad');
             try {
                 const latest = await loadPlan(); // re-read, so the plan information saved elsewhere stays
@@ -140,7 +142,7 @@ export function contributionsBox(el, { plan, onSaved }) {
             } catch (err) { return toast(`Couldn't save: ${err.message}`, 'bad'); }
             toast('Saved contributions', 'ok');
             show();
-            onSaved?.();
+            onSaved?.(prev, next);
         };
         form.percent.focus();
     };

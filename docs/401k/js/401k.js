@@ -1,6 +1,7 @@
 // 401(k): the plan's information and contributions (inputs/401k/401k.json), the balance history (balances.csv: each
 // statement's period, starting balance, net transactions, investment returns and current balance), the investments (investments.csv) and the plan's documents (documents.csv,
-// with the files in documents/). inputs/ is kept out of git.
+// with the files in documents/), each change to what you put in (contribution_changes.csv) and the IRS limits
+// (irs_limits.csv). inputs/ is kept out of git.
 import * as fs from '../../bills-etc/js/fs.js';
 import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
@@ -11,6 +12,10 @@ export const BALANCES_PATH = `${K_DIR}/balances.csv`;
 export const INVESTMENTS_PATH = `${K_DIR}/investments.csv`;
 export const DOCUMENTS_PATH = `${K_DIR}/documents.csv`;
 export const DOCUMENTS_DIR = `${K_DIR}/documents`;
+export const CHANGES_PATH = `${K_DIR}/contribution_changes.csv`;
+export const LIMITS_PATH = `${K_DIR}/irs_limits.csv`;
+/** The IRS page with each year's limits (each fall it has the next year's). */
+export const IRS_LIMITS_URL = 'https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-401k-and-profit-sharing-plan-contribution-limits';
 
 // The information fields the plan starts with (any can be renamed, removed or reordered). What you put in and the
 // employer match are in the plan's `contributions` (the Overview's Contributions box), the provider's website and
@@ -62,9 +67,20 @@ export const DOCUMENT_COLUMNS = [
     { name: 'Files', kind: 'files', noun: 'document' },
 ];
 
-async function loadCsv(path, columns, track) {
+// The IRS limits table: one row a year (a blank catch-up is the year before's). Starts with IRS_LIMITS' years; each
+// fall the next year's is added from the IRS page (a yellow reminder from Nov 15 until it is, limitsStatus).
+export const LIMIT_COLUMNS = [
+    { name: 'Year', kind: 'suggest' },
+    { name: 'Limit', kind: 'money', total: false },
+    { name: 'Catch-up (50+)', kind: 'money', total: false },
+    { name: 'Catch-up (60–63)', kind: 'money', total: false },
+    { name: 'Notes', kind: 'text' },
+];
+
+/** missing: what a file that isn't there yet gives. */
+async function loadCsv(path, columns, track, missing = []) {
     const text = track ? await readTracked(path) : await fs.readText(path);
-    if (text === null) return [];
+    if (text === null) return missing;
     const names = columns.map(c => c.name);
     return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
 }
@@ -76,10 +92,14 @@ async function saveCsv(path, columns, rows) {
 
 export const loadBalances = (track = true) => loadCsv(BALANCES_PATH, BALANCE_COLUMNS, track);
 export const saveBalances = rows => saveCsv(BALANCES_PATH, BALANCE_COLUMNS, rows);
-export const loadInvestments = () => loadCsv(INVESTMENTS_PATH, INVESTMENT_COLUMNS, true);
+export const loadInvestments = (track = true) => loadCsv(INVESTMENTS_PATH, INVESTMENT_COLUMNS, track);
 export const saveInvestments = rows => saveCsv(INVESTMENTS_PATH, INVESTMENT_COLUMNS, rows);
-export const loadDocuments = () => loadCsv(DOCUMENTS_PATH, DOCUMENT_COLUMNS, true);
+export const loadDocuments = (track = true) => loadCsv(DOCUMENTS_PATH, DOCUMENT_COLUMNS, track);
 export const saveDocuments = rows => saveCsv(DOCUMENTS_PATH, DOCUMENT_COLUMNS, rows);
+/** Until it's first saved, the IRS limits table is IRS_LIMITS' years (oldest first, so the next goes at the bottom). */
+export const loadLimits = (track = true) => loadCsv(LIMITS_PATH, LIMIT_COLUMNS, track, Object.entries(IRS_LIMITS).map(([y, L]) => ({
+    Year: y, Limit: String(L.base), 'Catch-up (50+)': String(L.catchUp), 'Catch-up (60–63)': String(L.catchUp6063), Notes: '' })));
+export const saveLimits = rows => saveCsv(LIMITS_PATH, LIMIT_COLUMNS, rows);
 
 /** '12,345.67', '$12,345.67' → 12345.67; blank or anything else → NaN. */
 export const amountOf = v => { const s = String(v ?? '').replace(/[$,\s]/g, ''); return s === '' ? NaN : Number(s); };
@@ -140,27 +160,68 @@ export function summary(pts) {
 }
 
 // The most you can put in each year (the employer's money doesn't count toward it), the extra allowed from the year you
-// turn 50 (catchUp), and the larger extra at 60–63 (catchUp6063). From the IRS; add each new year when it's announced.
+// turn 50 (catchUp), and the larger extra at 60–63 (catchUp6063). From the IRS: what the IRS limits table starts with
+// (each new year is added there, on Plan & investments).
 export const IRS_LIMITS = {
     2025: { base: 23500, catchUp: 7500, catchUp6063: 11250 },
     2026: { base: 24500, catchUp: 8000, catchUp6063: 11250 },
 };
 
+/** The IRS limits table's rows as { year: { base, catchUp, catchUp6063 } } (IRS_LIMITS if none has a year and a limit). */
+export function limitsOf(rows) {
+    const out = {};
+    let catchUp = 0, catchUp6063 = 0;
+    const years = rows.map(r => ({ y: Number(String(r.Year ?? '').trim()), base: amountOf(r.Limit), c50: amountOf(r['Catch-up (50+)']), c60: amountOf(r['Catch-up (60–63)']) }))
+        .filter(x => Number.isInteger(x.y) && x.y > 1900 && Number.isFinite(x.base)).sort((a, b) => a.y - b.y);
+    for (const x of years) {
+        if (Number.isFinite(x.c50)) catchUp = x.c50;
+        if (Number.isFinite(x.c60)) catchUp6063 = x.c60;
+        out[x.y] = { base: x.base, catchUp, catchUp6063: catchUp6063 || catchUp };
+    }
+    return years.length ? out : IRS_LIMITS;
+}
+
 /**
- * The limit for `year`, or the latest one known before it (announced: false) when the IRS hasn't said yet. With a birth
- * year, also the catch-up for the age you turn that year (extra: 0 under 50) and your total; without, extra is NaN.
+ * The limit for `year` (limits: limitsOf() the IRS limits table), or the latest one before it (added: false) while
+ * that year's isn't in the table. With a birth year, also the catch-up for the age you turn that year (extra: 0
+ * under 50) and your total; without, extra is NaN.
  */
-export function irsLimit(year, birthYear = NaN) {
-    const years = Object.keys(IRS_LIMITS).map(Number).sort((a, b) => a - b);
+export function irsLimit(year, birthYear = NaN, limits = IRS_LIMITS) {
+    const years = Object.keys(limits).map(Number).sort((a, b) => a - b);
     const y = years.filter(x => x <= year).at(-1) ?? years[0];
-    const L = IRS_LIMITS[y], age = birthYear > 0 ? year - birthYear : NaN;
+    const L = limits[y], age = birthYear > 0 ? year - birthYear : NaN;
     const extra = !Number.isFinite(age) ? NaN : age >= 60 && age <= 63 ? L.catchUp6063 : age >= 50 ? L.catchUp : 0;
-    return { ...L, year: y, announced: y === year, age, extra, total: L.base + (extra || 0) };
+    return { ...L, year: y, added: y === year, age, extra, total: L.base + (extra || 0) };
+}
+
+/**
+ * The IRS announces each next year's limits in the fall (November, lately). A yellow reminder (Plan & investments,
+ * the Home page's count): while this year's isn't in the table, and from Nov 15 while next year's isn't.
+ * { year, text } or null.
+ */
+export function limitsStatus(limits, now = new Date()) {
+    const y = now.getFullYear();
+    if (!limits[y]) return { year: y, text: `${y} IRS limits not added yet` };
+    if (!limits[y + 1] && now >= new Date(y, 10, 15)) return { year: y + 1, text: `${y + 1} IRS limits not added yet` };
+    return null;
 }
 
 // ── Contributions (the plan's `contributions`): what you put in each paycheck and the employer match ──
 
 export const CONTRIBUTION_TYPES = ['Pre-tax', 'Roth', 'Pre-tax + Roth'];
+
+// Contribution changes (contribution_changes.csv): one row each time what you put in changed. Saving a change in the
+// Contributions box adds one (changeRow); earlier ones are added by hand.
+export const CHANGE_COLUMNS = [
+    { name: 'Date', kind: 'date', default: todayIso },
+    { name: 'Contribution %', kind: 'number' },
+    { name: 'Pre-tax or Roth', kind: 'choice' },
+    { name: 'Per Paycheck', kind: 'money', total: false },
+    { name: 'Notes', kind: 'text' },
+];
+export const CHANGE_CHOICES = { 'Pre-tax or Roth': { list: CONTRIBUTION_TYPES, noun: 'type' } };
+export const loadChanges = (track = true) => loadCsv(CHANGES_PATH, CHANGE_COLUMNS, track);
+export const saveChanges = rows => saveCsv(CHANGES_PATH, CHANGE_COLUMNS, rows);
 
 // How often you're paid, and how many paychecks that makes a year.
 export const PAY_EVERY = [
@@ -198,6 +259,28 @@ export function contributionMath(c = {}) {
         pct, gross, mine, mineWorkedOut: !Number.isFinite(typed) && Number.isFinite(mine), every, perYear: every.perYear,
         tiers, fullAt, employerPct, maxEmployerPct,
         employer: gross > 0 ? gross * employerPct / 100 : NaN, maxEmployer: gross > 0 ? gross * maxEmployerPct / 100 : NaN,
+    };
+}
+
+/** Whether what you put in differs between contributions `a` and `b`: the % of pay, pre-tax or Roth, the Roth part, or the $ a paycheck. */
+export const contributionChanged = (a = {}, b = {}) => ['percent', 'type', 'rothPercent', 'amount'].some(k => String(a[k] ?? '') !== String(b[k] ?? ''));
+
+/** What contributions `c` put in, in words for the change log: '6% Pre-tax', '8% Pre-tax + Roth (Roth 2%)'; '' with nothing set. */
+export function contributionText(c = {}) {
+    const M = contributionMath(c), roth = amountOf(c.rothPercent);
+    return [Number.isFinite(M.pct) ? `${+M.pct.toFixed(2)}%` : '', c.type || '',
+        c.type === 'Pre-tax + Roth' && Number.isFinite(roth) ? `(Roth ${+roth.toFixed(2)}%)` : ''].filter(Boolean).join(' ');
+}
+
+/** Contribution changes' row for a change from `prev` to `next` on `date`: the new %, type and $ a paycheck, and what it was. */
+export function changeRow(prev, next, date = todayIso()) {
+    const M = contributionMath(next), was = contributionText(prev);
+    return {
+        Date: date,
+        'Contribution %': Number.isFinite(M.pct) ? String(+M.pct.toFixed(2)) : '',
+        'Pre-tax or Roth': next.type || '',
+        'Per Paycheck': Number.isFinite(M.mine) ? String(Math.round(M.mine * 100) / 100) : '',
+        Notes: was ? `Was ${was}` : '',
     };
 }
 

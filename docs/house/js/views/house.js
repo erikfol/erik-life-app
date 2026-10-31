@@ -13,7 +13,7 @@ import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gall
 import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
 import { renderImprovements, improvementsUnsaved, forgetImprovements } from './improvements.js';
 import { renderProjectList, renderProject, projectUnsaved, forgetProject } from './projects.js';
-import { renderScheduleTab, pageBanners, pageSchedule, scheduleUnsaved, forgetSchedule } from './schedule.js';
+import { renderScheduleTab, pageBanners, bannersHtml, pageSchedule, scheduleUnsaved, forgetSchedule } from './schedule.js';
 import {
     HOUSE_PATH, AREAS, STORE, areaBoxes, areaInfo, saveHouses, houseAge, photosDir, newHouse, recordsPath, recordColumns, loadRecords, saveRecords,
     maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance, tablePath, loadTable, saveTable, areaTablePath, loadAreaTable, saveAreaTable,
@@ -113,17 +113,19 @@ async function renderArea(el, list, h, tab, a) {
         ...tables.map(t => loadAreaTable(h, a, t))]);
     const section = (title, id, link = null) => `<section><h2>${esc(title)}${link
         ? `<span class="spacer"></span><a class="ext-link" href="${esc(link.href)}">${esc(link.text)} →</a>` : ''}</h2><div id="${id}"></div></section>`;
-    const kept = [['Information', HOUSE_PATH], ...tables.map(t => [t.label.toLowerCase(), areaTablePath(h, a, t)]),
+    const kept = [['Information', HOUSE_PATH], ...tables.map(t => [t.label.replace(/^[A-Z][a-z]/, s => s.toLowerCase()), areaTablePath(h, a, t)]), // 'yearly production', 'REC payments'
         a.maintenance && ['maintenance', maintenancePath(h, a)], hasRecords && ['records', recordsPath(h, a)],
         ].filter(Boolean).map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ');
     el.innerHTML = `
         <h1 class="page">${esc(h.name)}</h1>
         ${menus(h, tab, a)}
         ${sched ? '<div id="maint-banner"></div>' : ''}
+        ${tables.some(t => t.banners) ? '<div id="table-banners"></div>' : ''}
         <p class="lead">${kept}.</p>
         ${boxes.map((b, i) => (b.links ? `<section><h2 class="info-head" id="links-head-${i}"></h2><div id="links-hints-${i}"></div><div id="info-${i}"></div></section>`
             : section(b.label, `info-${i}`, b.link))).join('')}
-        ${tables.map((t, i) => `<section><h2>${esc(t.label)}${t.sub ? ` <span class="sub">${esc(t.sub)}</span>` : ''}</h2><div id="table-${i}"></div></section>`).join('')}
+        ${tables.map((t, i) => `<section><h2>${esc(t.label)}${t.sub ? ` <span class="sub">${esc(t.sub)}</span>` : ''}</h2>${t.note
+            ? `<p class="section-note" id="table-note-${i}"></p>` : ''}<div id="table-${i}"></div></section>`).join('')}
         ${section(gallery.label, 'photos')}
         ${a.improvements ? section('Future improvements', 'improvements') : ''}
         ${a.maintenance ? `<section><h2>Maintenance</h2>${a.maintenanceNote ? `<p class="section-note">📌 ${esc(a.maintenanceNote)}</p>` : ''}
@@ -131,6 +133,19 @@ async function renderArea(el, list, h, tab, a) {
         ${hasRecords ? section('Records', 'records') : ''}`;
     const drawBanner = () => { if (sched) el.querySelector('#maint-banner').innerHTML = pageBanners(h, a, sched.items, sched.entries); };
     drawBanner();
+    // The tables' banners (at the top) and notes (under their headings), from their rows and the information (REC
+    // payments counts from Contract Start): drawn again after either is saved.
+    const drawTables = () => {
+        const top = el.querySelector('#table-banners');
+        if (top) top.innerHTML = bannersHtml(tables.flatMap((t, i) => (t.banners ? t.banners(h, a, tableRows[i]) : [])));
+        tables.forEach((t, i) => {
+            const note = t.note && el.querySelector(`#table-note-${i}`);
+            if (!note) return;
+            note.textContent = t.note(h, a, tableRows[i]);
+            note.hidden = !note.textContent;
+        });
+    };
+    drawTables();
     infos = boxes.map((b, i) => infoBox(el.querySelector(`#info-${i}`), {
         info: areaInfo(h, a, b),
         noun: 'house',
@@ -139,12 +154,14 @@ async function renderArea(el, list, h, tab, a) {
             const updated = { ...h, areas: { ...h.areas, [a.id]: { ...h.areas?.[a.id], [b.key]: newInfo } } };
             await saveHouses(list.map(x => (x.id === h.id ? updated : x)));
             Object.assign(h, updated);
+            drawTables();
         },
     }));
     extras = tables.map((t, i) => recordTable(el.querySelector(`#table-${i}`), {
         columns: t.columns(h, a),
         rows: tableRows[i],
-        save: r => saveAreaTable(h, a, t, r),
+        choices: t.choices?.(h, a, tableRows[i]) || {},
+        save: async r => { await saveAreaTable(h, a, t, r); tableRows[i] = r; drawTables(); },
     }));
     // A box with links: its websites on its heading (kept under the area's `links`), counted with the boxes for unsaved edits.
     boxes.forEach((b, i) => {

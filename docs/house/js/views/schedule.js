@@ -17,10 +17,12 @@ const STATUS = { red: 'Overdue', yellow: 'Due soon', ok: 'OK' };
 const STATUS_CLASS = { Overdue: 'due-red', 'Due soon': 'due-yellow', OK: 'due-ok' };
 const BANNER = { red: 'banner bad', yellow: 'banner', ok: 'banner ok' };
 
+/** Banners [{ level, title, detail }] as HTML (red, yellow, green). */
+export const bannersHtml = list => list.map(b => `<div class="${BANNER[b.level]}"><strong>${esc(b.title)}</strong> ${esc(b.detail)}</div>`).join('');
+
 /** The banners at the top of system page `a`: one per schedule item whose Area is that page. */
-export const pageBanners = (h, a, items, entries) => items.filter(r => pageOfItem(r) === a)
-    .map(r => itemBanner(r, scheduleStatus(h, r, entries))).filter(Boolean)
-    .map(b => `<div class="${BANNER[b.level]}"><strong>${esc(b.title)}</strong> ${esc(b.detail)}</div>`).join('');
+export const pageBanners = (h, a, items, entries) => bannersHtml(items.filter(r => pageOfItem(r) === a)
+    .map(r => itemBanner(r, scheduleStatus(h, r, entries))).filter(Boolean));
 
 /** The Maintenance tab. top: the house name and menus. */
 export async function renderScheduleTab(el, h, top) {

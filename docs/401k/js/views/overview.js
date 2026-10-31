@@ -1,29 +1,31 @@
 // The Overview page: a banner when the balance is out of date, cards (balance; the latest investment returns and net
 // transactions for each period; this year's contributions against the IRS limit and the employer's, estimated from
-// Contributions), Contributions (what goes in each paycheck), the balance over time, and the balance history.
-import { esc, money } from '../../../bills-etc/js/util.js';
+// Contributions), Contributions (what goes in each paycheck), Contribution changes (each change to it), the balance
+// over time, and the balance history.
+import { esc, money, toast } from '../../../bills-etc/js/util.js';
 import { drawLines } from '../../../bills-etc/js/charts.js';
 import { card, dLong, dateOf, setResize, clearResize } from '../../../bills-etc/js/views/utilcommon.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import {
     BALANCES_PATH, PLAN_PATH, BALANCE_COLUMNS, BALANCE_CHOICES, loadBalances, saveBalances, loadPlan, savePlan, ledger, summary, notAddingUp, irsLimit,
-    contributionMath, yearPaychecks, amountOf,
+    contributionMath, yearPaychecks, amountOf, CHANGES_PATH, CHANGE_COLUMNS, CHANGE_CHOICES, loadChanges, saveChanges, contributionChanged, changeRow,
+    loadLimits, limitsOf,
 } from '../401k.js';
 import { balanceStatus } from '../alerts.js';
 import { contributionsBox } from './contributions.js';
 import { infoLinks } from '../../../shared/js/infolinks.js';
 
-let table = null, contrib = null, links = null;
+let table = null, contrib = null, links = null, changes = null;
 
-export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!contrib?.hasUnsavedEdits() || !!links?.hasUnsavedEdits();
-export const forget = () => { table = null; contrib = null; links = null; closeFilterMenu(); clearResize(); };
+export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!contrib?.hasUnsavedEdits() || !!links?.hasUnsavedEdits() || !!changes?.hasUnsavedEdits();
+export const forget = () => { table = null; contrib = null; links = null; changes = null; closeFilterMenu(); clearResize(); };
 
 const signed = v => `<span class="${v >= 0 ? 'delta-good' : 'delta-bad'}">${v >= 0 ? '▲' : '▼'} ${esc(money(Math.abs(v)))}</span>`;
 const longDate = iso => dLong(dateOf(iso));
 
 export async function renderOverview(el) {
     el.innerHTML = '<p class="muted">Loading…</p>';
-    const [rows, plan] = await Promise.all([loadBalances(), loadPlan()]);
+    const [rows, plan, changeRows, limits] = await Promise.all([loadBalances(), loadPlan(), loadChanges(), loadLimits(false).then(limitsOf)]);
     const pts = ledger(rows), S = summary(pts), status = balanceStatus(pts);
     const c = plan.contributions || {}, M = contributionMath(c);
     // After a save: draw it all again (the cards and chart follow), where it was.
@@ -39,6 +41,11 @@ export async function renderOverview(el) {
             <div id="contrib"></div>
         </section>
         <section>
+            <h2>Contribution changes <span class="sub">each time what you put in changed · kept in <code>${esc(CHANGES_PATH)}</code></span></h2>
+            <p class="section-note">A change saved in Contributions (the %, pre-tax or Roth, or $ a paycheck) is added here by itself. Add earlier ones with ✎ Edit.</p>
+            <div id="changes"></div>
+        </section>
+        <section>
             <h2>Balance over time <span class="sub">each statement's current balance, and its starting balance at the start of its period</span></h2>
             <canvas id="c-balance" style="display:block;width:100%;height:240px"></canvas>
         </section>
@@ -50,10 +57,10 @@ export async function renderOverview(el) {
         </section>`;
 
     // ── Cards ──
-    const year = new Date().getFullYear(), L = irsLimit(year, amountOf(c.birthYear)), Y = yearPaychecks(c);
+    const year = new Date().getFullYear(), L = irsLimit(year, amountOf(c.birthYear), limits), Y = yearPaychecks(c);
     // Your limit: with a birth year, the base plus the catch-up for your age; without, the base (catch-up mentioned).
     const limitText = L.extra > 0 ? `${esc(money(L.total))} (${esc(money(L.base))} + ${esc(money(L.extra))} catch-up)` : esc(money(L.base));
-    const limitName = `${L.extra > 0 ? 'your' : 'the'} ${L.announced ? year : `${L.year} (${year}'s not announced yet)`} IRS limit, ${limitText}`;
+    const limitName = `${L.extra > 0 ? 'your' : 'the'} ${L.added ? year : `${L.year} (${year}'s isn't added yet)`} IRS limit, ${limitText}`;
     const catchUpNote = Number.isFinite(L.extra) ? '' : `<br><span class="muted">${esc(money(L.catchUp))} more allowed from age 50 (${esc(money(L.catchUp6063))} at 60–63): add your birth year under Contributions</span>`;
     const paychecks = `${Y.soFar} paycheck${Y.soFar === 1 ? '' : 's'} so far${Y.estimated ? ' (about: add a payday under Contributions for the exact count)' : ''}`;
     const cards = [];
@@ -89,7 +96,22 @@ export async function renderOverview(el) {
             + `<br>By Dec 31 about <strong>${esc(money(M.employer * Y.total))}</strong>`));
     }
     el.querySelector('#cards').innerHTML = cards.join('');
-    contrib = contributionsBox(el.querySelector('#contrib'), { plan, onSaved: redraw });
+    // A saved change to what you put in goes into Contribution changes too.
+    contrib = contributionsBox(el.querySelector('#contrib'), { plan, limits, onSaved: async (prev, next) => {
+        if (contributionChanged(prev, next)) {
+            try {
+                await saveChanges([changeRow(prev, next), ...await loadChanges()]); // re-read, so an entry saved since stays
+                toast('Saved contributions, and added the change to Contribution changes', 'ok');
+            } catch (err) { toast(`Couldn't add it to Contribution changes: ${err.message}`, 'bad'); }
+        }
+        redraw();
+    } });
+    changes = recordTable(el.querySelector('#changes'), {
+        columns: CHANGE_COLUMNS,
+        choices: CHANGE_CHOICES,
+        rows: changeRows,
+        save: r => saveChanges(r),
+    });
 
     // ── Balance over time: every balance the statements give (current balances, and starting balances back in time) ──
     const draw = () => {

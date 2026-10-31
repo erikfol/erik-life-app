@@ -19,7 +19,7 @@ SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatabl
           'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js',
           'shared/js/phonecopy.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js', 'shared/js/lightbox.js',
           'shared/js/infolinks.js', 'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js',
-          'dinner-planner/js/store.js', 'kid-lunches/js/store.js', 'kid-lunches/js/school.js']  # the phone copy reads every app's data
+          'dinner-planner/js/store.js', 'kid-lunches/js/store.js', 'kid-lunches/js/school.js', '401k/js/401k.js']  # the phone copy reads every app's data
 # A section without the 📱 phone copy: the Home sections' table and information box.
 BASIC = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
          'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
@@ -40,7 +40,7 @@ APPS = {
     'kid-lunches': ('kid-lunches-version', SHARED + ['dinner-planner/css/dinner.css']),  # the Dinner Planner's calendar look
     'career': ('career-version', BASIC),
     'gifts': ('gifts-version', BASIC),
-    '401k': ('401k-version', BASIC + ['bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
+    '401k': ('401k-version', SHARED + ['vehicles/css/vehicles.css', 'bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # + the 📱 phone copy; Bills Etc's charts and cards
 }
 
 

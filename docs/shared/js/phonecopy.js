@@ -1,14 +1,15 @@
-// "📱 Phone copy" (Vehicles, House, Health, Pets, Dinner Planner and Kid Lunches top bars): writes one self-contained,
+// "📱 Phone copy" (Vehicles, House, Health, Pets, 401(k), Dinner Planner and Kid Lunches top bars): writes one self-contained,
 // read-only page — every vehicle (information, current mileage for cars, maintenance schedule, service places,
 // maintenance, photos, guides, notes), every house (information, service companies, photos, and per area information,
 // photos, maintenance with its due banners, records; Updates; Projects; the Maintenance schedule), every Health section (General Health, Dental and Eye with their information
-// and future appointments), every pet (information, future appointments, photos, records), the Dinner Planner (the
+// and future appointments), every pet (information, future appointments, photos, records), the 401(k) (balance,
+// contributions, their changes, balance history, plan information, investments, IRS limits, documents), the Dinner Planner (the
 // calendar a week at a time with its shopping list, every meal) and Kid Lunches (each school day's lunch boxes and the
 // school's menu) — into a folder you pick once,
 // e.g. in Google Drive so it syncs to your phone. Photos are shrunk and embedded, so the page is a single file that
 // opens offline (Android hands Chrome a single file, so a page can't load anything from next to itself).
 import * as fs from '../../bills-etc/js/fs.js';
-import { esc, toast } from '../../bills-etc/js/util.js';
+import { esc, toast, money } from '../../bills-etc/js/util.js';
 import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
     latestMileage, mileageRate, mileageRateColumns, hasSchedule, loadSchedule, currentReading, scheduleStatus, nextDueText, lastText,
@@ -17,6 +18,7 @@ import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSectio
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
+import * as k401 from '../../401k/js/401k.js';
 import * as dinner from '../../dinner-planner/js/store.js';
 import * as lunches from '../../kid-lunches/js/store.js';
 import * as school from '../../kid-lunches/js/school.js';
@@ -125,11 +127,13 @@ export async function collectData(progress = () => {}) {
                 tab: t.parts ? t.label : '', // a part (pill) of this tab
                 boxes: house.areaBoxes(a).map(b => ({ label: b.label, info: house.areaInfo(h, a, b),
                     links: b.links ? (h.areas?.[a.id]?.links || []).filter(l => l.url).map(l => ({ linkText: l.linkText || '', url: l.url })) : [] })),
-                // its other tables (e.g. Solar's yearly production), with the worked-out columns filled in
+                // its other tables (e.g. Solar's yearly production, REC payments), with the worked-out columns filled in (a
+                // worked-out date, like REC payments' Paid By, is a line on each card), and their banners and notes as they stand now
                 tables: await Promise.all((a.tables || []).map(async t => {
                     const cols = t.columns(h, a), rows = await house.loadAreaTable(h, a, t, false);
-                    return { label: t.label, columns: cols.map(c => ({ name: c.name, kind: c.kind })),
-                        rows: rows.map(r => ({ ...r, ...Object.fromEntries(cols.filter(c => c.calc).map(c => [c.name, String(c.calc(r))])) })) };
+                    return { label: t.label, columns: cols.map(c => ({ name: c.name, kind: c.calc && c.kind === 'date' ? 'due' : c.kind })),
+                        rows: rows.map(r => ({ ...r, ...Object.fromEntries(cols.filter(c => c.calc).map(c => [c.name, String(c.calc(r))])) })),
+                        banners: t.banners ? t.banners(h, a, rows) : [], note: t.note ? t.note(h, a, rows) : '' };
                 })),
                 improvements: house.areaImprovements(h, a),
                 maintenance: a.maintenance ? {
@@ -191,7 +195,43 @@ export async function collectData(progress = () => {}) {
         days: lunchDb.days || {},
         school: Object.assign({}, ...Object.values(menu?.months || {}).map(m => m.days || {})), // { date: { closed } | { items: [{ name, main }] } }
     };
-    return { made: new Date().toISOString(), vehicles, houses, health, pets, dinnerPlanner, kidLunches };
+    // The 401(k): the balance and its returns, what goes in each paycheck (worked out here, as of when the copy is made),
+    // the contribution changes, balance history, investments, IRS limits and documents. The account number and the
+    // website's sign-in hint stay off the phone copy (the file lives on Google Drive). Nothing before its first save.
+    const plan401 = await k401.loadPlan(false);
+    const [balances401, changes401, investments401, documents401, limits401] = await Promise.all([k401.loadBalances(false),
+        k401.loadChanges(false), k401.loadInvestments(false), k401.loadDocuments(false), k401.loadLimits(false)]);
+    const S401 = k401.summary(k401.ledger(balances401)), c401 = plan401.contributions || {}, M401 = k401.contributionMath(c401);
+    const year = new Date().getFullYear(), Y401 = k401.yearPaychecks(c401);
+    const L401 = k401.irsLimit(year, k401.amountOf(c401.birthYear), k401.limitsOf(limits401));
+    const kinds = cols => cols.map(c => ({ name: c.name, kind: c.kind }));
+    const retirement = plan401.info.some(f => f.value) || balances401.length || Object.keys(c401).length ? {
+        info: plan401.info.filter(f => !/account\s*(number|no\b|#)/i.test(f.label)),
+        links: (plan401.links || []).filter(l => l.url).map(l => ({ linkText: l.linkText || '', url: l.url })),
+        balance: S401 && { amount: S401.last.balance, date: S401.last.date },
+        returns: S401 ? S401.byPeriod.map(p => ({ period: p.period, date: p.date, returns: p.returns, net: p.net })) : [],
+        stale: [k401.STALE_DAYS, k401.VERY_STALE_DAYS],
+        contributions: [
+            ['Contribution', k401.contributionText(c401)],
+            ['Paid', c401.payEvery ? `${M401.every.label} (${M401.perYear} paychecks a year)` : ''],
+            ['You put in per paycheck', Number.isFinite(M401.mine) ? money(M401.mine) : ''],
+            ['Employer match', k401.matchText(M401.tiers)],
+            ['Employer puts in per paycheck', Number.isFinite(M401.employer) ? `about ${money(M401.employer)}` : ''],
+            ['Auto-increase', c401.autoIncrease || ''],
+            [`IRS limit, ${year}`, `${money(L401.total)}${L401.extra > 0 ? ` (${money(L401.base)} + ${money(L401.extra)} catch-up)` : ''}${L401.added ? '' : ` (${L401.year}'s: ${year}'s isn't added yet)`}`],
+            [`You put in, ${year}`, Number.isFinite(M401.mine) ? `~${money(M401.mine * Y401.soFar)} so far (${Y401.soFar} paychecks) · about ${money(M401.mine * Y401.total)} by Dec 31` : ''],
+            [`Employer, ${year}`, Number.isFinite(M401.employer) ? `~${money(M401.employer * Y401.soFar)} so far · about ${money(M401.employer * Y401.total)} by Dec 31` : ''],
+            ['Notes', c401.notes || ''],
+        ].map(([label, value]) => ({ label, value })),
+        changes: { columns: kinds(k401.CHANGE_COLUMNS), rows: changes401 },
+        // the current balance first: each card shows its first amount large
+        balances: { columns: kinds(['Date', 'Show These Returns', 'Current Balance', 'Starting Balance', 'Net Transactions', 'Investment Returns']
+            .map(n => k401.BALANCE_COLUMNS.find(c => c.name === n))), rows: balances401 },
+        investments: { columns: kinds(k401.INVESTMENT_COLUMNS), rows: investments401 },
+        limits: { columns: kinds(k401.LIMIT_COLUMNS), rows: limits401 },
+        documents: { columns: kinds(k401.DOCUMENT_COLUMNS), rows: documents401 },
+    } : null;
+    return { made: new Date().toISOString(), vehicles, houses, health, pets, retirement, dinnerPlanner, kidLunches };
 }
 
 /** The phone page: data + viewer in one HTML file. */
@@ -239,6 +279,8 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
         ...(D.dinnerPlanner ? [{ group: 'Dinner Planner', label: 'Calendar', draw: () => drawDinners(D.dinnerPlanner) },
             { group: 'Dinner Planner', label: 'Meals', draw: () => drawMeals(D.dinnerPlanner) }] : []),
         ...(D.kidLunches ? [{ group: 'Kid Lunches', label: 'Lunches', draw: () => drawLunches(D.kidLunches) }] : []),
+        ...(D.retirement ? [{ group: '401(k)', label: 'Overview', draw: () => drawRetirement(D.retirement) },
+            { group: '401(k)', label: 'Plan & investments', draw: () => drawRetirementPlan(D.retirement) }] : []),
     ];
     const groups = [...new Set(pages.map(p => p.group))];
     pick.innerHTML = groups.map(g => `<optgroup label="${esc(g)}">${pages.map((p, i) => p.group === g
@@ -293,9 +335,10 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
         lb.hidden = false;
     });
 
-    /** Records as cards with a search box and newest/oldest order; money columns get a total of what's shown. sorted:
-     *  'desc' or 'asc' for rows that have no order of their own (no "Your order"). */
-    function records(el, cols, rows, { empty = 'Nothing here yet.', sorted = '' } = {}) {
+    /** Records as cards with a search box and newest/oldest order; money columns get a total of what's shown (unless
+     *  total: false, e.g. balances). sorted: 'desc' or 'asc' for rows that have no order of their own (no "Your order").
+     *  A 'due' column (a worked-out date, like REC payments' Paid By) is a line on each card. */
+    function records(el, cols, rows, { empty = 'Nothing here yet.', sorted = '', total: withTotal = true } = {}) {
         const dates = cols.filter(c => c.kind === 'date' || c.kind === 'end');
         const first = dates[0]?.name;
         const moneyCols = cols.filter(c => c.kind === 'money'), moneyCol = moneyCols[0]; // the first is shown in each card's heading
@@ -309,13 +352,14 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
             const when = dates.map(c => (c.kind === 'end' ? (r[c.name] ? showDate(r[c.name]) : 'ongoing') : showDate(r[c.name]))).filter(Boolean).join(' – ');
             const tags = cols.filter(c => (c.kind === 'choice' || c.kind === 'suggest') && r[c.name]).map(c => `<span class="tag">${esc(r[c.name])}</span>`).join('');
             const cost = moneyCol && !Number.isNaN(num(r[moneyCol.name])) ? `<span class="cost">${money(num(r[moneyCol.name]))}</span>` : '';
-            const nums = cols.filter(c => c.kind === 'number' && r[c.name]).map(c => `<div class="sub">${esc(c.name)}: ${esc(Number.isNaN(num(r[c.name])) ? r[c.name] : num(r[c.name]).toLocaleString('en-US'))}</div>`).join('')
+            const nums = cols.filter(c => c.kind === 'due' && r[c.name]).map(c => `<div class="sub">${esc(c.name)}: ${esc(showDate(r[c.name]))}</div>`).join('')
+                + cols.filter(c => c.kind === 'number' && r[c.name]).map(c => `<div class="sub">${esc(c.name)}: ${esc(Number.isNaN(num(r[c.name])) ? r[c.name] : num(r[c.name]).toLocaleString('en-US'))}</div>`).join('')
                 + moneyCols.slice(1).filter(c => !Number.isNaN(num(r[c.name]))).map(c => `<div class="sub">${esc(c.name)}: ${money(num(r[c.name]))}</div>`).join('');
             const texts = cols.filter(c => c.kind === 'text' && r[c.name]).map((c, i) => i === 0
                 ? `<div class="desc">${esc(r[c.name])}</div>` : `<div class="note"><b>${esc(c.name)}:</b> ${esc(r[c.name])}</div>`).join('');
             // a 'files' column (Invoices): how many there are (the images themselves stay in the app)
             const files = cols.filter(c => c.kind === 'files' && r[c.name]).map(c => { const n = r[c.name].split(';').filter(x => x.trim()).length; return `<div class="sub">📎 ${n} ${esc(c.name.toLowerCase().replace(/s$/, ''))}${n === 1 ? '' : 's'}</div>`; }).join('');
-            return `<div class="card"><div class="card-head"><span class="when">${esc(when || 'No date')}</span>${tags}${cost}</div>${nums}${texts}${files}</div>`;
+            return `<div class="card"><div class="card-head">${dates.length ? `<span class="when">${esc(when || 'No date')}</span>` : ''}${tags}${cost}</div>${nums}${texts}${files}</div>`;
         };
         const draw = () => {
             const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -326,7 +370,7 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
             }
             list.innerHTML = shown.length ? shown.map(card).join('') : `<p class="muted">${rows.length ? 'No matches.' : esc(empty)}</p>`;
             const sum = c => money(shown.reduce((t, r) => t + (Number.isNaN(num(r[c.name])) ? 0 : num(r[c.name])), 0));
-            total.innerHTML = moneyCol && shown.length ? `Total of ${shown.length} shown: ${moneyCols.length === 1 ? `<b>${sum(moneyCol)}</b>`
+            total.innerHTML = withTotal && moneyCol && shown.length ? `Total of ${shown.length} shown: ${moneyCols.length === 1 ? `<b>${sum(moneyCol)}</b>`
                 : moneyCols.map(c => `${esc(c.name)} <b>${sum(c)}</b>`).join(' · ')}` : '';
         };
         q.oninput = draw;
@@ -435,11 +479,15 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
             return section(`Maintenance log (${a.log.rows.length})`, true, el => records(el, a.log.columns, a.log.rows));
         }
         const m = a.maintenance;
-        // its schedule items' due banners, as they stood when this copy was made (red, yellow, green)
-        for (const b of m?.banners || []) main.insertAdjacentHTML('beforeend', `<div class="banner ${{ red: 'bad', yellow: 'soon', ok: 'ok' }[b.level]}"><b>${esc(b.title)}</b> ${esc(b.detail)}</div>`);
+        // its schedule items' due banners and its tables' (REC payments), as they stood when this copy was made (red, yellow, green)
+        for (const b of [...(m?.banners || []), ...(a.tables || []).flatMap(t => t.banners || [])]) main.insertAdjacentHTML('beforeend', `<div class="banner ${{ red: 'bad', yellow: 'soon', ok: 'ok' }[b.level]}"><b>${esc(b.title)}</b> ${esc(b.detail)}</div>`);
         for (const b of a.boxes) section(a.boxes.length > 1 ? b.label : 'Information', true, (b.links || []).filter(l => /^https?:\/\//i.test(l.url)).map(l =>
             `<p class="info-link"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.linkText || 'Website')} ↗</a></p>`).join('') + infoList(withAge(b.info)));
-        for (const t of a.tables || []) section(`${t.label} (${t.rows.length})`, true, el => records(el, t.columns, t.rows));
+        for (const t of a.tables || []) section(`${t.label} (${t.rows.length})`, true, el => {
+            if (!t.note) return records(el, t.columns, t.rows);
+            el.innerHTML = `<p class="section-note">${esc(t.note)}</p><div></div>`;
+            records(el.lastElementChild, t.columns, t.rows);
+        });
         if (a.photos.length) section(`${a.photosLabel} (${a.photos.length})`, false, gallery(a.photos));
         if (a.improvements?.length) section(`Future improvements (${a.improvements.length})`, false, cardsHtml(a.improvements));
         if (m) section(`Maintenance (${m.rows.length})`, true, el => {
@@ -491,6 +539,34 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
         if (p.photos?.length) section(`Photos (${p.photos.length})`, false, gallery(p.photos));
         if (p.appointments) section(`Future appointments (${appts.length})`, true, el => records(el, p.appointments.columns, appts));
         section(`Records (${p.records.rows.length})`, true, el => records(el, p.records.columns, p.records.rows));
+    }
+
+    /** 401(k) → Overview, like the app's: the balance banner (counted from the day the page is opened), the balance and
+     *  each period's returns, what goes in each paycheck, the contribution changes and the balance history. */
+    function drawRetirement(k) {
+        main.insertAdjacentHTML('beforeend', '<h1>401(k)</h1>');
+        const [warn, late] = k.stale, t0 = new Date();
+        t0.setHours(0, 0, 0, 0);
+        const days = k.balance ? (([y, m, d]) => Math.max(0, Math.round((t0 - new Date(y, m - 1, d)) / 864e5)))(k.balance.date.split('-').map(Number)) : null;
+        main.insertAdjacentHTML('beforeend', days === null ? '<div class="banner soon"><b>No balance yet</b></div>'
+            : days >= late ? `<div class="banner bad"><b>Balance not updated in ${late}+ days</b> (${days} days)</div>`
+                : days >= warn ? `<div class="banner soon"><b>Balance not updated in ${warn}+ days</b> (${days} days)</div>` : '');
+        const signed = v => `<b class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}${money(Math.abs(v))}</b>`;
+        if (k.balance) main.insertAdjacentHTML('beforeend', `<div class="sec acct"><div><b>Balance ${money(k.balance.amount)}</b> <span class="sub">as of ${esc(showDate(k.balance.date))}</span>
+            ${k.returns.map(p => `<div class="sub">${esc(p.period)} investment returns ${signed(p.returns)} · net transactions ${money(p.net)}${p.date !== k.balance.date ? ` · to ${esc(showDate(p.date))}` : ''}</div>`).join('')}</div></div>`);
+        section('Contributions', true, `<p class="sub">The amounts for this year are estimates, as of when this copy was made.</p>${infoList(k.contributions)}`);
+        section(`Contribution changes (${k.changes.rows.length})`, false, el => records(el, k.changes.columns, k.changes.rows, { total: false }));
+        section(`Balance history (${k.balances.rows.length})`, true, el => records(el, k.balances.columns, k.balances.rows, { total: false }));
+    }
+
+    /** 401(k) → Plan & investments: the plan's information and website, investments, IRS limits and documents. */
+    function drawRetirementPlan(k) {
+        main.insertAdjacentHTML('beforeend', '<h1>Plan &amp; investments</h1><p class="muted">401(k)</p>');
+        section('Plan information', true, k.links.filter(l => /^https?:\/\//i.test(l.url)).map(l =>
+            `<p class="info-link"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.linkText || 'Website')} ↗</a></p>`).join('') + infoList(k.info));
+        section(`Investments (${k.investments.rows.length})`, true, el => records(el, k.investments.columns, k.investments.rows));
+        section(`IRS limits (${k.limits.rows.length})`, false, el => records(el, k.limits.columns, k.limits.rows, { total: false }));
+        section(`Documents (${k.documents.rows.length})`, false, el => records(el, k.documents.columns, k.documents.rows));
     }
 
     // ── Dinner Planner and Kid Lunches: a week at a time, counted from the day the page is opened ──
@@ -726,8 +802,8 @@ a.btn { display:inline-block; text-decoration:none; border:1px solid var(--line)
 `;
 
 // ── Keeping it up to date ─────────────────────────────────────────────────────────────────────────────────────
-// Every save in Vehicles, House, Health, Pets, Dinner Planner or Kid Lunches fires a 'data-saved' event on window (the
-// save functions in vehicles.js, house/js/house.js, health/js/records.js, pets/js/pets.js, dinner-planner/js/store.js,
+// Every save in Vehicles, House, Health, Pets, 401(k), Dinner Planner or Kid Lunches fires a 'data-saved' event on window (the
+// save functions in vehicles.js, house/js/house.js, health/js/records.js, pets/js/pets.js, 401k/js/401k.js, dinner-planner/js/store.js,
 // kid-lunches/js/store.js and school.js, and the image gallery). A few seconds after the last one,
 // the phone copy is rebuilt in the background — if a folder was chosen and Chrome still allows writing to it. After
 // Chrome restarts it has to ask again, which needs a click: then an "Update phone copy" notice stays up instead.
@@ -822,7 +898,7 @@ export function setupPhoneCopy(button) {
         const dir = await fs.rememberedHandle(HANDLE_KEY);
         panel.innerHTML = `
             <h3>📱 Phone copy</h3>
-            <p>A read-only page with Vehicles, House, Health, Pets, the Dinner Planner and Kid Lunches (information, maintenance, guides, notes, photos, health and pet records, dinners, lunches) as one file.
+            <p>A read-only page with Vehicles, House, Health, Pets, 401(k), the Dinner Planner and Kid Lunches (information, maintenance, guides, notes, photos, health and pet records, 401(k) balances, dinners, lunches) as one file.
                Save it in a Google Drive folder and open it on your phone from the Drive app with Chrome.</p>
             <p>It updates by itself a few seconds after you save something here.</p>
             <p class="pc-folder">Folder: <strong>${dir ? esc(dir.name) : 'not chosen yet'}</strong>
