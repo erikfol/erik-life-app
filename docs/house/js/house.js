@@ -81,16 +81,24 @@ export const AREAS = [
         actions: ['Pumped', 'Inspection', 'Effluent filter cleaned', 'Baffle repair', 'Riser / cover', 'Repair'],
         maintenance: true,
         maintenanceNote: 'Must be pumped every 7 years by a professional' },
-    { id: 'solar', label: 'Solar',
-        boxes: [
-            { key: 'info', label: 'Solar system', fields: ['Panels', 'Watts per Panel', 'System Size', 'Est. Annual Production',
-                'Est. Grid Usage', 'Grid Usage (2024 actual)', 'Est. Coverage (w/ mini-splits)', 'Installed', 'Installer', 'Warranty', 'Notes'] },
-            { key: 'loan', label: 'Solar loan', fields: ['Term', 'Rate', 'Borrowed', 'Tax Credit (est.)', 'Balance (est.)', 'Lender', 'Notes'],
-                link: { text: 'Payments in Bills Etc', href: '../bills-etc/#loans/loans' } },
-        ],
-        tables: [{ key: 'production', label: 'Yearly production', sub: 'what the panels made each year', columns: (h, a) => productionColumns(h, a) }],
-        actions: ['Panel cleaning', 'Inspection', 'Inverter', 'Monitoring', 'Repair'],
-        maintenance: true },
+    { id: 'solar-energy', label: 'Solar', parts: [
+        { id: 'solar', label: 'Solar panels', icon: '☀️',
+            boxes: [
+                { key: 'info', label: 'Solar system', fields: ['Panels', 'Watts per Panel', 'System Size', 'Est. Annual Production',
+                    'Est. Grid Usage', 'Grid Usage (2024 actual)', 'Est. Coverage (w/ mini-splits)', 'Installed', 'Installer', 'Warranty', 'Notes'] },
+                { key: 'loan', label: 'Solar loan', fields: ['Term', 'Rate', 'Borrowed', 'Tax Credit (est.)', 'Balance (est.)', 'Lender', 'Notes'],
+                    link: { text: 'Payments in Bills Etc', href: '../bills-etc/#loans/loans' } },
+            ],
+            tables: [{ key: 'production', label: 'Yearly production', sub: 'what the panels made each year', columns: (h, a) => productionColumns(h, a) }],
+            actions: ['Panel cleaning', 'Inspection', 'Inverter', 'Monitoring', 'Repair'],
+            maintenance: true },
+        // Renewable Energy Credits: the credits the panels earn, sold through a REC company. Just its information for now.
+        { id: 'rec', label: 'REC', icon: '📜',
+            boxes: [{ key: 'info', label: 'Renewable Energy Credits (REC)', fields: ['Company', 'Program', 'Account Number', 'Contract Start',
+                'Contract Length', 'Price per REC', 'Paid How / When', 'Contact', 'Website', 'Notes'] }],
+            gallery: { label: 'Documents & photos', noun: 'image' },
+            records: false },
+    ] },
     { id: 'maintenance', label: 'Maintenance', schedule: true },
 ];
 
