@@ -17,37 +17,38 @@ const APPOINTMENT_COLUMNS = [
     { name: 'Additional Notes', kind: 'text' },
 ];
 
+// The Records of General Health, Dental and Eye: each visit, where (the office: offers the ones used before, not
+// General Health's body locations), what it cost and what was paid out of pocket.
+const RECORD_COLUMNS = [
+    { name: 'Date', kind: 'date' },
+    { name: 'Description', kind: 'text' },
+    { name: 'Location', kind: 'suggest' },
+    { name: 'Total Cost', kind: 'money' },
+    { name: 'Out of Pocket', kind: 'money' },
+    { name: 'Additional Notes', kind: 'text' },
+    { name: 'Invoices', kind: 'files', noun: 'invoice' },
+];
+
 // Column kinds are the shared record table's (shared/js/recordtable.js). `info`: the General information fields a
-// section starts with (any can be renamed or removed).
+// section starts with (any can be renamed or removed). `notes`: a second table after Records ({ label, path, columns }).
 export const SECTIONS = [
-    { id: 'general', label: 'General Health', path: `${HEALTH_DIR}/general_health.csv`,
-        info: ['Doctor', 'Practice', 'Phone', 'Address', 'Website', 'Blood Type', 'Allergies', 'Medications', 'Notes'], columns: [
-        { name: 'Date', kind: 'date' },
-        { name: 'Location', kind: 'choice' },
-        { name: 'Description', kind: 'text' },
-        { name: 'Additional Notes', kind: 'text' },
-        { name: 'Invoices', kind: 'files', noun: 'invoice' },
-    ], appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
+    { id: 'general', label: 'General Health', path: `${HEALTH_DIR}/general_records.csv`,
+        info: ['Doctor', 'Practice', 'Phone', 'Address', 'Website', 'Blood Type', 'Allergies', 'Medications', 'Notes'], columns: RECORD_COLUMNS,
+        // General Health's first table (it was its Records): notes by body location (the Location list in locations.json)
+        notes: { label: 'Personal Notes', path: `${HEALTH_DIR}/general_health.csv`, columns: [
+            { name: 'Date', kind: 'date' },
+            { name: 'Location', kind: 'choice' },
+            { name: 'Description', kind: 'text' },
+            { name: 'Additional Notes', kind: 'text' },
+            { name: 'Invoices', kind: 'files', noun: 'invoice' },
+        ] },
+        appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,
-        info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: [
-        { name: 'Date', kind: 'date' },
-        { name: 'Description', kind: 'text' },
-        { name: 'Location', kind: 'suggest' }, // the dental office (offers the ones used before), not General Health's body locations
-        { name: 'Total Cost', kind: 'money' },
-        { name: 'Out of Pocket', kind: 'money' },
-        { name: 'Additional Notes', kind: 'text' },
-        { name: 'Invoices', kind: 'files', noun: 'invoice' },
-    ], appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
+        info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: RECORD_COLUMNS,
+        appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`,
-        info: ['Eye Doctor', 'Office', 'Phone', 'Address', 'Website', 'Prescription', 'Notes'], columns: [
-        { name: 'Date', kind: 'date' },
-        { name: 'Description', kind: 'text' },
-        { name: 'Location', kind: 'suggest' }, // the eye doctor's office, like Dental's
-        { name: 'Total Cost', kind: 'money' },
-        { name: 'Out of Pocket', kind: 'money' },
-        { name: 'Additional Notes', kind: 'text' },
-        { name: 'Invoices', kind: 'files', noun: 'invoice' },
-    ], appointments: { path: `${HEALTH_DIR}/eye_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
+        info: ['Eye Doctor', 'Office', 'Phone', 'Address', 'Website', 'Prescription', 'Notes'], columns: RECORD_COLUMNS,
+        appointments: { path: `${HEALTH_DIR}/eye_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     // Several accounts (FLORES, WealthCare…), each with its own entries file; see loadAccounts.
     { id: 'hsa', label: 'Health Savings Account (HSA)', accounts: `${HEALTH_DIR}/hsa.json`, balance: accountBalance, columns: [
         { name: 'Date', kind: 'date' },
@@ -60,6 +61,9 @@ export const SECTIONS = [
 ];
 /** Where a section's invoices are kept (an HSA account's in its own folder). */
 export const invoicesDir = (section, account = null) => `${HEALTH_DIR}/invoices/${section.id}${account ? '-' + account.id : ''}`;
+
+/** A section's `notes` table (General Health's Personal Notes) as a table of its own, with its own invoices folder. */
+export const notesSection = section => ({ ...section, ...section.notes, filesDir: `${HEALTH_DIR}/invoices/${section.id}-notes` });
 
 const names = section => section.columns.map(c => c.name);
 

@@ -13,7 +13,7 @@ import {
     loadVehicles, loadMaintenance, maintenanceColumns, photosDir, guideDir, noteDir, TYPES, hasMileageLog, loadMileage, MILEAGE_COLUMNS,
     latestMileage, mileageRate, mileageRateColumns, hasSchedule, loadSchedule, currentReading, scheduleStatus, nextDueText, lastText,
 } from '../../vehicles/js/vehicles.js';
-import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, loadInfo as loadHealthInfo } from '../../health/js/records.js';
+import { SECTIONS, loadRecords, loadAccounts, accountSection, appointmentsSection, notesSection, loadInfo as loadHealthInfo } from '../../health/js/records.js';
 import * as house from '../../house/js/house.js';
 import { loadPets, ageText, RECORD_COLUMNS, loadRecords as loadPetRecords, photosDir as petPhotosDir,
     APPOINTMENT_COLUMNS, loadAppointments, appointmentStatus } from '../../pets/js/pets.js';
@@ -156,7 +156,8 @@ export async function collectData(progress = () => {}) {
             const links = (healthInfo.links[s.id] || []).filter(l => l.url).map(l => ({ linkText: l.linkText || '', url: l.url }));
             health.push({ label: s.label, columns: s.columns, rows: await loadRecords(s, false), info: healthInfo.sections[s.id] || null,
                 links,
-                appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null });
+                appointments: appts ? { columns: appts.columns, rows: await loadRecords(appts, false) } : null,
+                notes: s.notes ? { label: s.notes.label, columns: s.notes.columns, rows: await loadRecords(notesSection(s), false) } : null });
             continue;
         }
         // the HSA: each account's title, website, balance and entries; its sign-in hint stays off the phone copy (the
@@ -461,7 +462,11 @@ function viewer(D, ageText, houseAge, appointmentStatus) { // pets.js ageText + 
         if (h.info) section('General information', true, (h.links || []).filter(l => /^https?:\/\//i.test(l.url)).map(l =>
             `<p class="info-link"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.linkText || 'Website')} ↗</a></p>`).join('') + infoList(h.info));
         if (h.appointments) section(`Future appointments (${h.appointments.rows.length})`, true, el => records(el, h.appointments.columns, h.appointments.rows));
-        if (!h.accounts) return section(`${h.appointments || h.info ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
+        if (!h.accounts) {
+            section(`${h.appointments || h.info ? 'Records' : 'Entries'} (${h.rows.length})`, true, el => records(el, h.columns, h.rows));
+            if (h.notes) section(`${h.notes.label} (${h.notes.rows.length})`, true, el => records(el, h.notes.columns, h.notes.rows));
+            return;
+        }
         if (!h.accounts.length) main.insertAdjacentHTML('beforeend', '<p class="muted">No accounts yet.</p>');
         for (const a of h.accounts) {
             const b = a.balance;

@@ -11,7 +11,7 @@ import { appointmentStatus } from '../../../pets/js/pets.js';
 import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
-    accountSection, appointmentsSection, loadInfo, saveInfo, invoicesDir,
+    accountSection, appointmentsSection, notesSection, loadInfo, saveInfo, invoicesDir,
 } from '../records.js';
 
 let checks = []; // one "has unsaved edits?" per table and account box on the page
@@ -35,11 +35,12 @@ const appointmentBanner = rows => {
 export async function renderSection(el, section) {
     el.innerHTML = '<p class="muted">Loading…</p>';
     if (section.accounts) return renderAccounts(el, section);
-    const appts = section.appointments && appointmentsSection(section);
-    const [rows, locations, apptRows, allInfo] = await Promise.all([loadRecords(section), loadLocations(),
-        appts ? loadRecords(appts) : null, section.info ? loadInfo() : null]);
+    const appts = section.appointments && appointmentsSection(section), notes = section.notes && notesSection(section);
+    const [rows, locations, apptRows, allInfo, noteRows] = await Promise.all([loadRecords(section), loadLocations(),
+        appts ? loadRecords(appts) : null, section.info ? loadInfo() : null, notes ? loadRecords(notes) : null]);
     // "Information in …, appointments in …, records in … in your folder." (just "Saved in …" with only records)
-    const files = [section.info && ['information', INFO_PATH], appts && ['appointments', appts.path], ['records', section.path]].filter(Boolean);
+    const files = [section.info && ['information', INFO_PATH], appts && ['appointments', appts.path], ['records', section.path],
+        notes && [notes.label.toLowerCase(), notes.path]].filter(Boolean);
     const where = files.length === 1 ? `Saved in <code>${esc(section.path)}</code>`
         : files.map(([what, path]) => `${what} in <code>${esc(path)}</code>`).join(', ').replace(/^./, c => c.toUpperCase());
     const box = (id, title) => `<section><h2>${title}</h2><div id="${id}"></div></section>`;
@@ -49,7 +50,8 @@ export async function renderSection(el, section) {
         <p class="lead">${where} in your folder.</p>
         ${section.info ? '<section><h2 class="info-head" id="info-head"></h2><div id="info-links"></div><div id="info"></div></section>' : ''}
         ${appts ? box('appointments', 'Future appointments') : ''}
-        ${section.info || appts ? box('records', 'Records') : '<section id="records"></section>'}`;
+        ${section.info || appts ? box('records', 'Records') : '<section id="records"></section>'}
+        ${notes ? box('notes', esc(notes.label)) : ''}`;
     if (section.info) {
         // Re-read the file before each save, so another section's box or link saved since this page loaded stays.
         const changeInfo = async change => {
@@ -69,11 +71,11 @@ export async function renderSection(el, section) {
     if (appts) {
         const drawBanner = r => { el.querySelector('#appt-banner').innerHTML = appointmentBanner(r); };
         drawBanner(apptRows);
-        // Where it is: Dental's and Eye's offer the offices in their records too (General Health's records hold body locations).
+        // Where it is: also offers the offices in the Records (a body Location, a choice, isn't one).
         const offices = section.columns.some(c => c.name === 'Location' && c.kind === 'suggest')
             ? [...new Set(rows.map(r => (r.Location || '').trim()).filter(Boolean))] : [];
-        // "→ Records": the appointment becomes a record — the columns they share (General Health's record Location is a
-        // body location, so it's left blank) — at the top of Records, and leaves Future appointments.
+        // "→ Records": the appointment becomes a record — the columns they share (a Location that's a body location, a
+        // choice, is left blank) — at the top of Records, and leaves Future appointments.
         const moveToRecords = async appt => {
             if (hasUnsavedEdits()) return toast('Save or cancel the edits on this page first', 'bad');
             if (!confirm(`Move the ${showDate(appt.Date) || 'undated'} appointment${appt.Description ? ` (${appt.Description})` : ''} to Records?`)) return;
@@ -107,6 +109,16 @@ export async function renderSection(el, section) {
         filesDir: invoicesDir(section),
     });
     checks.push(() => table.hasUnsavedEdits());
+    if (notes) { // General Health's Personal Notes: its body Location list is the same as the old Records'
+        const notesTable = recordTable(el.querySelector('#notes'), {
+            columns: notes.columns,
+            rows: noteRows,
+            save: rows => saveRecords(notes, rows),
+            choices: { Location: location },
+            filesDir: notes.filesDir,
+        });
+        checks.push(() => notesTable.hasUnsavedEdits());
+    }
 }
 
 const pad = n => String(n).padStart(2, '0');
