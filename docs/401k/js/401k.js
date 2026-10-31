@@ -13,8 +13,9 @@ export const DOCUMENTS_PATH = `${K_DIR}/documents.csv`;
 export const DOCUMENTS_DIR = `${K_DIR}/documents`;
 
 // The information fields the plan starts with (any can be renamed, removed or reordered). What you put in and the
-// employer match are in the plan's `contributions` (the Overview's Contributions box).
-export const FIELDS = ['Plan Provider', 'Employer', 'Website', 'Account Number', 'Vesting', 'Beneficiaries', 'Notes'];
+// employer match are in the plan's `contributions` (the Overview's Contributions box), the provider's website and
+// sign-in hint in its `links` (on the Balance history heading).
+export const FIELDS = ['Plan Provider', 'Employer', 'Account Number', 'Vesting', 'Beneficiaries', 'Notes'];
 
 /** track: false for read-only use (the Home page's counts), so the save guard keeps the version this page is editing. */
 export async function loadPlan(track = true) {

@@ -6,16 +6,17 @@ import { drawLines } from '../../../bills-etc/js/charts.js';
 import { card, dLong, dateOf, setResize, clearResize } from '../../../bills-etc/js/views/utilcommon.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import {
-    BALANCES_PATH, PLAN_PATH, BALANCE_COLUMNS, BALANCE_CHOICES, loadBalances, saveBalances, loadPlan, ledger, summary, notAddingUp, irsLimit,
+    BALANCES_PATH, PLAN_PATH, BALANCE_COLUMNS, BALANCE_CHOICES, loadBalances, saveBalances, loadPlan, savePlan, ledger, summary, notAddingUp, irsLimit,
     contributionMath, yearPaychecks, amountOf,
 } from '../401k.js';
 import { balanceStatus } from '../alerts.js';
 import { contributionsBox } from './contributions.js';
+import { infoLinks } from '../../../shared/js/infolinks.js';
 
-let table = null, contrib = null;
+let table = null, contrib = null, links = null;
 
-export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!contrib?.hasUnsavedEdits();
-export const forget = () => { table = null; contrib = null; closeFilterMenu(); clearResize(); };
+export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!contrib?.hasUnsavedEdits() || !!links?.hasUnsavedEdits();
+export const forget = () => { table = null; contrib = null; links = null; closeFilterMenu(); clearResize(); };
 
 const signed = v => `<span class="${v >= 0 ? 'delta-good' : 'delta-bad'}">${v >= 0 ? '▲' : '▼'} ${esc(money(Math.abs(v)))}</span>`;
 const longDate = iso => dLong(dateOf(iso));
@@ -42,7 +43,8 @@ export async function renderOverview(el) {
             <canvas id="c-balance" style="display:block;width:100%;height:240px"></canvas>
         </section>
         <section>
-            <h2>Balance history <span class="sub">one entry per statement: the numbers from its summary for the period shown</span></h2>
+            <h2 class="info-head" id="links-head"></h2>
+            <div id="links-hints"></div>
             <div id="balances"></div>
             <div id="balance-check"></div>
         </section>`;
@@ -104,7 +106,13 @@ export async function renderOverview(el) {
     draw();
     setResize(draw);
 
-    // ── Balance history ──
+    // ── Balance history, with the provider's website (and sign-in hint) on its heading to get the statements from ──
+    links = infoLinks(el.querySelector('#links-head'), el.querySelector('#links-hints'), plan.links || [], async list => {
+        const latest = await loadPlan(); // re-read, so the plan information and contributions saved since stay
+        if (list.length) latest.links = list; else delete latest.links;
+        await savePlan(latest);
+        plan.links = list;
+    }, { title: 'Balance history <span class="sub">one entry per statement: the numbers from its summary for the period shown</span>', example: 'NetBenefits' });
     table = recordTable(el.querySelector('#balances'), {
         columns: BALANCE_COLUMNS,
         choices: BALANCE_CHOICES,
