@@ -10,7 +10,8 @@
 // due day) and their payments CSV has Interest / Escrow / Principal columns: each payment pays the month's interest
 // (from your statement if you type it in, else balance × APR ÷ 12) and any escrow first; the rest is principal.
 // Timeshare loans also keep their annual maintenance fees, for tracking only (they don't change the balance):
-//   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Paid?, Notes   (Paid?: Yes / Not Yet, like Home Heating's)
+//   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Paid?, Notes, Invoice   (Paid?: Yes / Not Yet, like Home Heating's;
+//                Invoice: the names of its images / PDFs, kept in invoices/<id>/)
 import * as fs from './fs.js';
 import { parseCSV, toCSV } from './csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
@@ -56,7 +57,8 @@ const activityFileOf = a => a.activityFile || a.file.replace(/\.csv$/i, '') + '-
 /** Timeshares have an Annual maintenance fees table (kept next to the payments CSV). */
 export const hasMaintenance = a => isLoan(a) && a.loanKind === 'Timeshare';
 export const maintenanceFileOf = a => a.file.replace(/\.csv$/i, '') + '-maintenance.csv';
-export const FEE_COLS = ['Year', 'Fee', 'Amount', 'Paid?', 'Notes'];
+export const FEE_COLS = ['Year', 'Fee', 'Amount', 'Paid?', 'Notes', 'Invoice'];
+export const feeInvoicesDir = a => `${LOANS_DIR}/invoices/${a.id}`;
 export const FEE_PAID = ['Yes', 'Not Yet'];
 
 /** A timeshare's maintenance fees as saved ({Year, Fee, …} strings). Fees from before Paid? read as Not Yet, as Home Heating's blanks count. */

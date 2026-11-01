@@ -3,7 +3,7 @@ import {
     loadAccounts, addAccount, updateAccount, removeAccount, moveAccount, loadPayments, loadActivity, ledger, saveLedger, estimatePayoff,
     interestModel, simulate, paymentFor, minimumOf, nextPaymentDate, plusMonths,
     ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate, aprText, impliedApr,
-    isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, loadFees, saveFees, unpaidFees, FEE_PAID,
+    isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, loadFees, saveFees, unpaidFees, FEE_PAID, feeInvoicesDir,
 } from '../loans.js';
 import { drawBars, drawLines } from '../charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
@@ -375,6 +375,7 @@ const FEE_COLUMNS = [
     { name: 'Amount', kind: 'money' },
     { name: 'Paid?', kind: 'choice', default: 'Not Yet', badge: v => (v === 'Yes' ? 'paid' : 'not-paid') }, // Not Yet → the banner at the top
     { name: 'Notes', kind: 'text' },
+    { name: 'Invoice', kind: 'files', noun: 'invoice' }, // images / PDFs, like Health's records
 ];
 const FEE_CHOICES = { 'Paid?': { list: FEE_PAID, noun: 'status' } };
 
@@ -399,6 +400,7 @@ function renderFees(el, yearsEl, account, rows, onSaved) {
     feeTables.push(recordTable(el, {
         columns: FEE_COLUMNS,
         choices: FEE_CHOICES,
+        filesDir: feeInvoicesDir(account),
         rows,
         save: async r => { await saveFees(account, r); yearsEl.innerHTML = feeYears(r); onSaved(r); },
     }));
