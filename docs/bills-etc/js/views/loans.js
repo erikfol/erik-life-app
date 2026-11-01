@@ -3,7 +3,7 @@ import {
     loadAccounts, addAccount, updateAccount, removeAccount, moveAccount, loadPayments, loadActivity, ledger, saveLedger, estimatePayoff,
     interestModel, simulate, paymentFor, minimumOf, nextPaymentDate, plusMonths,
     ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate, aprText, impliedApr,
-    isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, maintenanceFileOf,
+    isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, loadFees, saveFees, unpaidFees, FEE_PAID,
 } from '../loans.js';
 import { drawBars, drawLines } from '../charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
@@ -11,8 +11,6 @@ import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
 import { amountDue, staleCards, notPaidBack, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
 import { dataTable, closeFilterMenu } from '../datatable.js';
-import { parseCSV, toCSV } from '../csv.js';
-import { readTracked, writeTracked } from '../../../shared/js/fileguard.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
 import {
     MON, dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize,
@@ -175,8 +173,8 @@ export default {
         const accounts = (await loadAccounts()).filter(tab.has);
         const all = await Promise.all(accounts.map(async a => {
             const rawPayments = await loadPayments(a), rawActivity = await loadActivity(a);
-            // payments with Before/After worked out from the balance, for the due banner
-            return { account: a, rawPayments, rawActivity, payments: ledger(a, rawPayments, rawActivity).payments };
+            // payments with Before/After worked out from the balance, for the due banner; a timeshare's maintenance fees
+            return { account: a, rawPayments, rawActivity, payments: ledger(a, rawPayments, rawActivity).payments, fees: hasMaintenance(a) ? await loadFees(a) : [] };
         }));
 
         el.innerHTML = `
@@ -224,6 +222,7 @@ export default {
                 </div>`}
             </form>
             <div id="due"></div>
+            <div id="fees-due"></div>
             <section id="totals" hidden></section>
             <div id="accounts"></div>`;
         const $ = s => el.querySelector(s);
@@ -305,6 +304,31 @@ export default {
             }
         });
 
+        // ── Timeshare maintenance fees not paid yet (like Home Heating's), a line per year with Mark paid ──
+        const drawFeesDue = () => {
+            const due = all.flatMap(x => unpaidFees(x.fees).map(g => ({ ...g, x })));
+            $('#fees-due').innerHTML = !due.length ? '' : `<div class="banner bad unpaid-list"><strong>Maintenance fees not paid yet:</strong>
+                ${due.map((g, k) => `<span class="nowrap">${esc(g.x.account.title)} ${esc(g.year || '(no year)')}: ${esc(money(g.total))}
+                    <span class="muted">(${g.rows.map(r => esc(r.Fee || 'fee')).join(', ')})</span>
+                    <button type="button" class="small primary" data-fees-paid="${k}">Mark paid</button></span>`).join(' ')}</div>`;
+            $('#fees-due').querySelectorAll('[data-fees-paid]').forEach(b => b.onclick = async () => {
+                const g = due[+b.dataset.feesPaid];
+                if ((editing.size || feeTables.some(t => t.hasUnsavedEdits())) && !confirm('You have unsaved edits on a loan or card. Mark these paid and lose them?')) return;
+                b.disabled = true;
+                try {
+                    await saveFees(g.x.account, g.x.fees.map(r => (g.rows.includes(r) ? { ...r, 'Paid?': 'Yes' } : r)));
+                    toast(`${g.x.account.title}: ${g.year} maintenance fees marked paid`, 'ok');
+                    const y = scrollY;
+                    await this.render(el);
+                    scrollTo(0, y);
+                } catch (err) {
+                    b.disabled = false;
+                    toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+                }
+            });
+        };
+        drawFeesDue();
+
         if (!all.length) {
             $('#accounts').innerHTML = `<section><p>${tab.empty}</p></section>`;
             return;
@@ -314,12 +338,14 @@ export default {
         renderTotals($('#totals'), all, tab);
 
         const redraws = [];
-        all.forEach(({ account, rawPayments, rawActivity }, k) => {
+        all.forEach((x, k) => {
+            const { account, rawPayments, rawActivity } = x;
             const sec = document.createElement('section');
             sec.className = 'loan';
             sec.dataset.account = account.id;
             $('#accounts').appendChild(sec);
-            redraws.push(renderAccount(sec, account, rawPayments, rawActivity, { first: k === 0, last: k === all.length - 1, rerender: () => this.render(el) }));
+            redraws.push(renderAccount(sec, account, rawPayments, rawActivity, { first: k === 0, last: k === all.length - 1, rerender: () => this.render(el),
+                fees: x.fees, onFeesSaved: rows => { x.fees = rows; drawFeesDue(); } }));
         });
         const redraw = () => redraws.forEach(f => f());
         setResize(redraw);
@@ -347,9 +373,10 @@ const FEE_COLUMNS = [
     { name: 'Year', kind: 'suggest', default: () => String(new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)) },
     { name: 'Fee', kind: 'suggest', suggestions: ['Operating Fee', 'Owner Club Dues', 'Property Tax Fee'] },
     { name: 'Amount', kind: 'money' },
+    { name: 'Paid?', kind: 'choice', default: 'Not Yet', badge: v => (v === 'Yes' ? 'paid' : 'not-paid') }, // Not Yet → the banner at the top
     { name: 'Notes', kind: 'text' },
 ];
-const FEE_NAMES = FEE_COLUMNS.map(c => c.name);
+const FEE_CHOICES = { 'Paid?': { list: FEE_PAID, noun: 'status' } };
 
 /** Each year's total, with the change from the year before it: '2026 $1,400.00 · 2027 $1,476.14 (+5.4%)'. */
 function feeYears(rows) {
@@ -367,15 +394,13 @@ function feeYears(rows) {
     }).join(' · ');
 }
 
-async function renderFees(el, yearsEl, account) {
-    const path = maintenanceFileOf(account);
-    const text = await readTracked(path);
-    const rows = text === null ? [] : parseCSV(text).rows.map(r => Object.fromEntries(FEE_NAMES.map(c => [c, r[c] ?? ''])));
+function renderFees(el, yearsEl, account, rows, onSaved) {
     yearsEl.innerHTML = feeYears(rows);
     feeTables.push(recordTable(el, {
         columns: FEE_COLUMNS,
+        choices: FEE_CHOICES,
         rows,
-        save: async r => { await writeTracked(path, toCSV(FEE_NAMES, r)); yearsEl.innerHTML = feeYears(r); },
+        save: async r => { await saveFees(account, r); yearsEl.innerHTML = feeYears(r); onSaved(r); },
     }));
 }
 
@@ -477,7 +502,7 @@ function renderTotals(el, all, tab) {
 }
 
 /** Draw one account (summary, chart, payments and activity tables, add forms, edit mode). Returns its chart redraw. */
-function renderAccount(sec, account, rawPayments, rawActivity, { first, last, rerender }) {
+function renderAccount(sec, account, rawPayments, rawActivity, { first, last, rerender, fees, onFeesSaved }) {
     const $ = s => sec.querySelector(s);
     const L = ledger(account, rawPayments, rawActivity);
     const { payments, activity } = L;
@@ -708,7 +733,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         sort: { col: 'date', dir: 'desc' },
         empty: 'No activity yet',
     });
-    if (hasMaintenance(account)) renderFees($('.t-fees'), $('.fee-years'), account);
+    if (hasMaintenance(account)) renderFees($('.t-fees'), $('.fee-years'), account, fees, onFeesSaved);
 
     // Mark paid: sets that entry's Paid back? to Yes (Edit can change it back).
     $('.t-act').addEventListener('click', async e => {

@@ -10,9 +10,10 @@
 // due day) and their payments CSV has Interest / Escrow / Principal columns: each payment pays the month's interest
 // (from your statement if you type it in, else balance × APR ÷ 12) and any escrow first; the rest is principal.
 // Timeshare loans also keep their annual maintenance fees, for tracking only (they don't change the balance):
-//   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Notes
+//   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Paid?, Notes   (Paid?: Yes / Not Yet, like Home Heating's)
 import * as fs from './fs.js';
 import { parseCSV, toCSV } from './csv.js';
+import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
 
 export const LOANS_DIR = 'inputs/loans_cc';
@@ -55,6 +56,30 @@ const activityFileOf = a => a.activityFile || a.file.replace(/\.csv$/i, '') + '-
 /** Timeshares have an Annual maintenance fees table (kept next to the payments CSV). */
 export const hasMaintenance = a => isLoan(a) && a.loanKind === 'Timeshare';
 export const maintenanceFileOf = a => a.file.replace(/\.csv$/i, '') + '-maintenance.csv';
+export const FEE_COLS = ['Year', 'Fee', 'Amount', 'Paid?', 'Notes'];
+export const FEE_PAID = ['Yes', 'Not Yet'];
+
+/** A timeshare's maintenance fees as saved ({Year, Fee, …} strings). Fees from before Paid? read as Not Yet, as Home Heating's blanks count. */
+export async function loadFees(account, track = true) {
+    const path = maintenanceFileOf(account);
+    const text = track ? await readTracked(path) : await fs.readText(path);
+    if (text == null) return [];
+    return parseCSV(text).rows.map(r => Object.fromEntries(FEE_COLS.map(c => [c, r[c] ?? '']))).map(r => ({ ...r, 'Paid?': r['Paid?'] || 'Not Yet' }));
+}
+export const saveFees = (account, rows) => writeTracked(maintenanceFileOf(account), toCSV(FEE_COLS, rows));
+
+/** Fees not paid yet, a group per year (in year order): [{ year, rows, total }]. */
+export function unpaidFees(rows) {
+    const years = new Map();
+    for (const r of rows.filter(x => x['Paid?'] !== 'Yes')) {
+        const y = String(r.Year).trim();
+        if (!years.has(y)) years.set(y, []);
+        years.get(y).push(r);
+    }
+    return [...years].sort(([a], [b]) => a.localeCompare(b)).map(([year, list]) => ({
+        year, rows: list, total: round2(list.reduce((t, r) => t + (parseMoney(r.Amount) || 0), 0)),
+    }));
+}
 
 /** Accounts in the order you set them up. [] if none yet. */
 export async function loadAccounts() {

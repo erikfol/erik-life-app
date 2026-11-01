@@ -10,7 +10,7 @@ import { loadWater, nextQuarter } from './water.js';
 import { loadDeliveries } from './heating.js';
 import { loadPropane } from './propane.js';
 import { loadTaxes } from './taxes.js';
-import { loadAccounts, loadPayments, loadActivity, ledger, owesBack, isCard } from './loans.js';
+import { loadAccounts, loadPayments, loadActivity, ledger, owesBack, isCard, hasMaintenance, loadFees, unpaidFees } from './loans.js';
 import { parseBillDate } from './sheet.js';
 import { esc, money, sum } from './util.js';
 import { dLong, addMonths, today } from './views/utilcommon.js';
@@ -178,7 +178,7 @@ async function taxItems(t0) {
 async function loanCardItems(t0) {
     const all = await Promise.all((await loadAccounts()).map(async a => {
         const rawPayments = await loadPayments(a), rawActivity = await loadActivity(a);
-        return { account: a, rawActivity, payments: ledger(a, rawPayments, rawActivity).payments };
+        return { account: a, rawActivity, payments: ledger(a, rawPayments, rawActivity).payments, fees: hasMaintenance(a) ? await loadFees(a, false) : [] };
     }));
     const out = [];
     const tab = a => (isCard(a) ? { where: 'Credit Cards', href: '#loans/cards' } : { where: 'Loans', href: '#loans/loans' });
@@ -199,6 +199,12 @@ async function loanCardItems(t0) {
     for (const { account, a } of notPaidBack(all)) {
         out.push({ level: 'stale', ...tab(account),
             text: `<strong>${esc(account.title)}: not paid back yet</strong> · ${a.date ? esc(dLong(a.date)) : 'no date'} ${esc(a.description || a.type)} ${esc(money(a.amount))}${a.paidBack === 'Not yet' ? '' : ` (${esc(a.paidBack)})`}` });
+    }
+    // Timeshare maintenance fees marked Not Yet (red, as on the Loans tab)
+    for (const { account, fees } of all) {
+        for (const g of unpaidFees(fees)) {
+            out.push({ level: 'stale', ...tab(account), text: `<strong>${esc(account.title)}: ${esc(g.year || '(no year)')} maintenance fees not paid yet</strong> · ${esc(money(g.total))}` });
+        }
     }
     return out;
 }
