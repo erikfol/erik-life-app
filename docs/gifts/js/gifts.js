@@ -153,6 +153,8 @@ export const giftColumns = occasions => [
     { name: 'Notes', kind: 'text' },
 ];
 
+const STOCKING = 'Stocking Stuffer';
+
 /** The Christmas list's columns; `people` (the people pages and names on other years' lists) are offered in Person. */
 export const christmasColumns = people => [
     { name: 'Person', kind: 'suggest', suggestions: people },
@@ -160,8 +162,11 @@ export const christmasColumns = people => [
     { name: 'Link', kind: 'link' },
     { name: 'Price', kind: 'money' },
     statusColumn,
+    { name: STOCKING, kind: 'choice', default: 'N', badge: v => (v === 'Y' ? 'ss-yes' : '') },
     { name: 'Notes', kind: 'text' },
 ];
+/** The Christmas list's Y/N dropdown (for the record table's choices). */
+export const CHRISTMAS_CHOICES = { [STOCKING]: { list: ['Y', 'N'], noun: 'answer' } };
 
 const GIFT_NAMES = giftColumns([]).map(c => c.name);
 const CHRISTMAS_NAMES = christmasColumns([]).map(c => c.name);
@@ -182,7 +187,9 @@ async function writeRows(path, names, rows) {
 
 export const loadGifts = (p, track = true) => readRows(giftsPath(p), GIFT_NAMES, track);
 export const saveGifts = (p, rows) => writeRows(giftsPath(p), GIFT_NAMES, rows);
-export const loadChristmas = (year, track = true) => readRows(christmasPath(year), CHRISTMAS_NAMES, track);
+// Gifts from before the Stocking Stuffer column read as N.
+export const loadChristmas = async (year, track = true) => (await readRows(christmasPath(year), CHRISTMAS_NAMES, track))
+    .map(r => ({ ...r, [STOCKING]: r[STOCKING] || 'N' }));
 export const saveChristmas = (year, rows) => writeRows(christmasPath(year), CHRISTMAS_NAMES, rows);
 
 const same = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();

@@ -5,7 +5,7 @@ import { esc, toast, money } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import {
-    saveData, christmasPath, christmasColumns, loadChristmas, saveChristmas, christmas, inDays, showDay, tally, isFor,
+    saveData, christmasPath, christmasColumns, CHRISTMAS_CHOICES, loadChristmas, saveChristmas, christmas, inDays, showDay, tally, isFor,
     newGuide, OPTION_COLUMNS, priceColumns, optionsPath, pricesPath, loadOptions, saveOptions, loadPrices, savePrices,
 } from '../gifts.js';
 import { tallyText } from './person.js';
@@ -96,7 +96,7 @@ export async function renderChristmas(el, data, year, onChanged) {
         <section>
             <h2>Gifts</h2>
             <p class="section-note">One row per gift. Status: Idea (not counted in the totals), Plan (still to buy), Bought,
-                Waiting to get (on the way), Received, Given — or type your own.</p>
+                Waiting to get (on the way), Received, Given — or type your own. Stocking Stuffer: Y or N.</p>
             <div id="x-table"></div>
         </section>
         <div id="x-guides"></div>
@@ -110,6 +110,7 @@ export async function renderChristmas(el, data, year, onChanged) {
     draw(rows);
     const table = recordTable(el.querySelector('#x-table'), {
         columns: christmasColumns(people),
+        choices: CHRISTMAS_CHOICES,
         rows,
         save: async r => { await saveChristmas(year, r); draw(r); },
     });

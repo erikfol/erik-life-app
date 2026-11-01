@@ -4,6 +4,7 @@
 .cat-badge.st-todo { background: var(--head); color: var(--blue-text); }
 .cat-badge.st-waiting { background: #fff8e1; color: #8a5a00; }
 .cat-badge.st-got { background: #e8f8ef; color: #1e7a46; }
+.cat-badge.ss-yes { background: #e8f8ef; color: #1e7a46; } /* Stocking Stuffer: Y */
 
 /* Coming up: a box per date (and Christmas) — its gifts this time, the totals, and what was given before */
 .occasion .occ-when { color: var(--muted); margin-top: 0; }
