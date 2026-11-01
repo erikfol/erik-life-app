@@ -3,7 +3,7 @@ import {
     loadAccounts, addAccount, updateAccount, removeAccount, moveAccount, loadPayments, loadActivity, ledger, saveLedger, estimatePayoff,
     interestModel, simulate, paymentFor, minimumOf, nextPaymentDate, plusMonths,
     ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate, aprText, impliedApr,
-    isCard, PAID_BACK, owesBack, setActivityPaidBack,
+    isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, maintenanceFileOf,
 } from '../loans.js';
 import { drawBars, drawLines } from '../charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
@@ -11,12 +11,16 @@ import { esc, money, sum, toast } from '../util.js';
 import { requireFolder } from '../app.js';
 import { amountDue, staleCards, notPaidBack, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
 import { dataTable, closeFilterMenu } from '../datatable.js';
+import { parseCSV, toCSV } from '../csv.js';
+import { readTracked, writeTracked } from '../../../shared/js/fileguard.js';
+import { recordTable } from '../../../shared/js/recordtable.js';
 import {
     MON, dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize,
     sameDay, sameAmount, dupText,
 } from './utilcommon.js';
 
 let editing = new Set();
+let feeTables = []; // the Annual maintenance fees tables on the page (each knows if it has unsaved edits)
 /** Loan/CC sub-tabs. An account shows on the tab its Type belongs to. */
 const TABS = [
     { id: 'cards', label: 'Credit Cards', type: 'Credit card', one: 'credit card', has: a => a.type === 'Credit card',
@@ -165,6 +169,7 @@ export default {
     async render(el) {
         if (!requireFolder(el)) return;
         editing = new Set();
+        feeTables = [];
         el.innerHTML = '<p class="muted">Loading your loans and cards…</p>';
         const tab = TABS.find(t => t.id === location.hash.split('/')[1]) || TABS[0];
         const accounts = (await loadAccounts()).filter(tab.has);
@@ -322,10 +327,11 @@ export default {
     },
 
     canLeave(unloading) {
-        if (!editing.size) return true;
+        if (!editing.size && !feeTables.some(t => t.hasUnsavedEdits())) return true;
         if (unloading) return false;
         if (!confirm('You have unsaved edits on a loan or card. Leave without saving?')) return false;
         editing = new Set();
+        feeTables = [];
         return true;
     },
 
@@ -334,6 +340,44 @@ export default {
         closeFilterMenu();
     },
 };
+
+// ── Annual maintenance fees (timeshares): one row per fee per year, kept for tracking only ──
+const FEE_COLUMNS = [
+    // a new fee starts in next year from September on (when next year's fees are billed), else this year
+    { name: 'Year', kind: 'suggest', default: () => String(new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)) },
+    { name: 'Fee', kind: 'suggest', suggestions: ['Operating Fee', 'Owner Club Dues', 'Property Tax Fee'] },
+    { name: 'Amount', kind: 'money' },
+    { name: 'Notes', kind: 'text' },
+];
+const FEE_NAMES = FEE_COLUMNS.map(c => c.name);
+
+/** Each year's total, with the change from the year before it: '2026 $1,400.00 · 2027 $1,476.14 (+5.4%)'. */
+function feeYears(rows) {
+    const by = new Map();
+    for (const r of rows) {
+        const y = String(r.Year).trim(), n = Number(String(r.Amount).replace(/[$,]/g, ''));
+        if (y && r.Amount !== '' && Number.isFinite(n)) by.set(y, (by.get(y) || 0) + n);
+    }
+    const years = [...by.keys()].sort();
+    if (!years.length) return '';
+    return 'Total by year: ' + years.map((y, i) => {
+        const prev = by.get(String(+y - 1)), n = by.get(y);
+        const change = prev > 0 && i ? ` <span class="${n > prev ? 'delta-bad' : 'delta-good'}">(${n >= prev ? '+' : '−'}${Math.abs((n - prev) / prev * 100).toFixed(1)}%)</span>` : '';
+        return `<strong>${esc(y)}</strong> ${esc(money(n))}${change}`;
+    }).join(' · ');
+}
+
+async function renderFees(el, yearsEl, account) {
+    const path = maintenanceFileOf(account);
+    const text = await readTracked(path);
+    const rows = text === null ? [] : parseCSV(text).rows.map(r => Object.fromEntries(FEE_NAMES.map(c => [c, r[c] ?? ''])));
+    yearsEl.innerHTML = feeYears(rows);
+    feeTables.push(recordTable(el, {
+        columns: FEE_COLUMNS,
+        rows,
+        save: async r => { await writeTracked(path, toCSV(FEE_NAMES, r)); yearsEl.innerHTML = feeYears(r); },
+    }));
+}
 
 /** Cards whose activity hasn't been updated in a while (staleCards), each with a button to mark it checked today. */
 function staleActivityBanners(all, t0) {
@@ -590,6 +634,11 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                         <div class="row"><button type="submit" class="primary">Save activity</button><button type="button" data-act-cancel>Cancel</button></div>
                     </form>
                 </div>
+                ${hasMaintenance(account) ? `<div>
+                    <h3 class="chart-title">Annual maintenance fees <span class="muted" style="font-weight:400">for tracking only: not added to the balance</span></h3>
+                    <p class="fee-years"></p>
+                    <div class="t-fees"></div>
+                </div>` : ''}
             </div>
         </div>
         <div class="edit-mode" hidden></div>
@@ -659,6 +708,8 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         sort: { col: 'date', dir: 'desc' },
         empty: 'No activity yet',
     });
+    if (hasMaintenance(account)) renderFees($('.t-fees'), $('.fee-years'), account);
+
     // Mark paid: sets that entry's Paid back? to Yes (Edit can change it back).
     $('.t-act').addEventListener('click', async e => {
         const b = e.target.closest('[data-paid-back]');

@@ -9,6 +9,8 @@
 // Loans (type 'Loan') also keep their terms (original amount, first payment, term, rate, monthly payment, escrow,
 // due day) and their payments CSV has Interest / Escrow / Principal columns: each payment pays the month's interest
 // (from your statement if you type it in, else balance × APR ÷ 12) and any escrow first; the rest is principal.
+// Timeshare loans also keep their annual maintenance fees, for tracking only (they don't change the balance):
+//   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Notes
 import * as fs from './fs.js';
 import { parseCSV, toCSV } from './csv.js';
 import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
@@ -50,6 +52,9 @@ const round2 = n => Math.round((n + Math.sign(n) * 1e-9) * 100) / 100;
 const moneyCell = n => (Number.isFinite(n) ? round2(n).toFixed(2) : '');
 const byDate = (a, b) => (a.date?.getTime() ?? Infinity) - (b.date?.getTime() ?? Infinity);
 const activityFileOf = a => a.activityFile || a.file.replace(/\.csv$/i, '') + '-activity.csv';
+/** Timeshares have an Annual maintenance fees table (kept next to the payments CSV). */
+export const hasMaintenance = a => isLoan(a) && a.loanKind === 'Timeshare';
+export const maintenanceFileOf = a => a.file.replace(/\.csv$/i, '') + '-maintenance.csv';
 
 /** Accounts in the order you set them up. [] if none yet. */
 export async function loadAccounts() {
