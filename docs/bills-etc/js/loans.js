@@ -1,7 +1,8 @@
 // Loans and credit cards you set up yourself. The list of accounts is kept in inputs/loans_cc/accounts.json
 // ({id, title, description, type, url, openingBalance, openingDate, file, activityFile}). Each account has two CSVs
 // next to it so they open in Excel too:
-//   payments  <id>.csv           Date, Min Payment, Payment, Before, After, Payment Made, Notes
+//   payments  <id>.csv           Date, Description, Min Payment, Payment, Before, After, Payment Made, Notes   (Description is
+//             only on credit cards, whose page shows payments and activity in one Activity table)
 //   activity  <id>-activity.csv  Date, Description, Type, Amount, Paid Back?, Notes   (charges, interest, fees, credits;
 //             Paid Back? is only on credit cards: Not yet / Yes / NA, like Home Heating's Paid CC Back?)
 // The balance is a running ledger: opening balance + activity − payments made, in date order. Before / After are
@@ -19,7 +20,8 @@ import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
 
 export const LOANS_DIR = 'inputs/loans_cc';
 const INDEX = `${LOANS_DIR}/accounts.json`;
-export const PAYMENT_COLS = ['Date', 'Min Payment', 'Payment', 'Before', 'After', 'Payment Made', 'Notes'];
+export const PAYMENT_COLS = ['Date', 'Description', 'Min Payment', 'Payment', 'Before', 'After', 'Payment Made', 'Notes'];
+const OTHER_PAYMENT_COLS = PAYMENT_COLS.filter(c => c !== 'Description');
 export const ACTIVITY_COLS = ['Date', 'Description', 'Type', 'Amount', 'Paid Back?', 'Notes'];
 const LOAN_ACTIVITY_COLS = ACTIVITY_COLS.filter(c => c !== 'Paid Back?');
 export const LOAN_PAYMENT_COLS = ['Date', 'Payment', 'Interest', 'Escrow', 'Principal', 'Before', 'After', 'Payment Made', 'Notes'];
@@ -129,7 +131,7 @@ export async function addAccount({ title, description, type, url, openingBalance
         file: `${LOANS_DIR}/${id}.csv`, activityFile: `${LOANS_DIR}/${id}-activity.csv`,
     };
     if (loan) Object.assign(account, cleanLoan(loan));
-    if ((await fs.readText(account.file)) == null) await fs.writeText(account.file, toCSV(isLoan(account) ? LOAN_PAYMENT_COLS : PAYMENT_COLS, []));
+    if ((await fs.readText(account.file)) == null) await fs.writeText(account.file, toCSV(isLoan(account) ? LOAN_PAYMENT_COLS : isCard(account) ? PAYMENT_COLS : OTHER_PAYMENT_COLS, []));
     if ((await fs.readText(account.activityFile)) == null) await fs.writeText(account.activityFile, toCSV(isCard(account) ? ACTIVITY_COLS : LOAN_ACTIVITY_COLS, []));
     accounts.push(account);
     await saveAccounts(accounts);
@@ -185,10 +187,11 @@ async function readRows(path) {
     return rows.map(r => name => get(r, name));
 }
 
-/** Payments, oldest first: {date, minPayment, payment, before, after, made, notes} (before/after as stored). */
+/** Payments, oldest first: {date, description, minPayment, payment, before, after, made, notes} (before/after as stored). */
 export async function loadPayments(account) {
     return (await readRows(account.file)).map(get => ({
         date: parseBillDate(get('Date')),
+        description: String(get('Description')).trim(),
         minPayment: parseMoney(get('Min Payment')),
         payment: parseMoney(get('Payment')),
         before: parseMoney(get('Before')),
@@ -217,7 +220,8 @@ export async function loadActivity(account) {
  * The running balance. Opening balance (or, for accounts set up before it existed, the first payment's stored Before),
  * then every activity entry and every payment that's been made, in date order (activity first on the same day).
  * Returns { opening, openingDate, payments (with before/after worked out; after is projected for ones not made yet),
- * activity (with balance), points [{date, balance, what}], balanceNow }.
+ * activity (with balance), points [{date, balance, what}], balanceNow }. Each payment and activity entry carries `seq`, its
+ * place in that order (a credit card's Activity table lists both, newest first).
  */
 export function ledger(account, payments, activity) {
     if (isLoan(account)) return loanLedger(account, payments, activity);
@@ -246,11 +250,11 @@ export function ledger(account, payments, activity) {
     const openAt = openingDate && firstDate ? (firstDate < openingDate ? firstDate : openingDate) : openingDate || firstDate;
     const points = openAt ? [{ date: openAt, balance: round2(bal), what: 'Opening balance' }] : [];
     const outPayments = [], outActivity = [];
-    for (const e of events) {
+    for (const [seq, e] of events.entries()) {
         if (e.kind === 'activity') {
             const a = e.item, amt = Number.isFinite(a.amount) ? a.amount * signOf(a.type) : 0;
             bal = round2(bal + amt);
-            outActivity.push({ ...a, signed: amt, balance: bal });
+            outActivity.push({ ...a, signed: amt, balance: bal, seq });
             if (a.date) points.push({ date: a.date, balance: bal, what: `${a.type}: ${a.description || ''}`.trim() });
         } else {
             const p = e.item, pay = Number.isFinite(p.payment) ? p.payment : 0;
@@ -259,11 +263,11 @@ export function ledger(account, payments, activity) {
                 const amount = Number.isFinite(p.payment) ? pay : Number.isFinite(p.minPayment) ? p.minPayment : 0;
                 const before = round2(start + interest), after = round2(before - amount);
                 planned = round2(planned + interest - amount);
-                outPayments.push({ ...p, before, after, projected: true, interest });
+                outPayments.push({ ...p, before, after, projected: true, interest, seq });
                 continue;
             }
             const before = bal, after = round2(bal - pay);
-            outPayments.push({ ...p, before, after });
+            outPayments.push({ ...p, before, after, seq });
             if (p.made) {
                 bal = round2(bal - pay);
                 if (p.date) points.push({ date: p.date, balance: bal, what: 'Payment' });
@@ -292,6 +296,7 @@ export async function savePayments(account, payments) {
     }
     const rows = [...payments].sort(byDate).map(p => ({
         Date: p.date ? sheetDate(p.date, false) : '',
+        Description: String(p.description || '').replace(/[\r\n]+/g, ' ').trim(),
         'Min Payment': moneyCell(p.minPayment),
         Payment: moneyCell(p.payment),
         Before: moneyCell(p.before),
@@ -299,7 +304,8 @@ export async function savePayments(account, payments) {
         'Payment Made': p.made ? 'Y' : 'N',
         Notes: String(p.notes || '').replace(/[\r\n]+/g, ' ').trim(),
     }));
-    await fs.writeText(account.file, toCSV(PAYMENT_COLS, rows));
+    // Description is written for cards (and kept if another account has one).
+    await fs.writeText(account.file, toCSV(isCard(account) || rows.some(r => r.Description) ? PAYMENT_COLS : OTHER_PAYMENT_COLS, rows));
 }
 
 /** Write an account's whole activity table, oldest first. Paid Back? is written for cards (and kept if a loan has one). */

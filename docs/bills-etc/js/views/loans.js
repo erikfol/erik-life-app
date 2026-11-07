@@ -22,7 +22,7 @@ let feeTables = []; // the Annual maintenance fees tables on the page (each know
 /** Loan/CC sub-tabs. An account shows on the tab its Type belongs to. */
 const TABS = [
     { id: 'cards', label: 'Credit Cards', type: 'Credit card', one: 'credit card', has: a => a.type === 'Credit card',
-        lead: 'Your credit cards. Each card has a payments table and an activity table (charges, interest, fees, credits); together with the opening balance they work out the balance.',
+        lead: 'Your credit cards. Each card has an activity table (charges, interest, fees, credits and payments), newest first; with the opening balance it works out the balance.',
         titleHint: 'e.g. Chase Freedom', empty: 'No credit cards yet. Press <strong>+ Add credit card</strong> to set up your first one.' },
     { id: 'loans', label: 'Loans', type: 'Loan', one: 'loan', has: a => a.type !== 'Credit card',
         lead: 'Your loans: mortgage, car, personal, student, timeshare. Enter the loan\'s terms and the balance from your latest statement; each payment you add is split into interest and principal for you.',
@@ -48,6 +48,8 @@ const statusBadge = p => {
 const paidBackBadge = v => (!v ? '' : `<span class="badge ${v === 'Yes' ? 'badge-ok' : v === 'NA' ? 'badge-neutral' : 'badge-over'}">${esc(v)}</span>`);
 /** What a new entry starts as: a charge isn't paid back yet; interest, fees and credits are NA. */
 const paidBackFor = type => (type === 'Charge' ? 'Not yet' : 'NA');
+/** Types in a credit card's Activity table: the activity types, and Payment (kept in the payments file). */
+const CARD_TYPES = [...ACTIVITY_TYPES.map(t => t.type), 'Payment'];
 const MON_LONG = d => `${MON[d.getMonth()]} ${d.getFullYear()}`;
 /** 38 → '3 years 2 months' */
 const duration = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} year${y === 1 ? '' : 's'}` : '', r ? `${r} month${r === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ') || '0 months'; };
@@ -528,6 +530,15 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
     const loan = isLoan(account), T = loan ? loanTerms(account) : null;
     // Cards have a "Paid back?" column on their activity (kept on a loan only if one was filled in).
     const showPaid = isCard(account) || rawActivity.some(a => a.paidBack);
+    // A credit card shows its payments and activity in one Activity table, newest first (the files stay separate).
+    // Same-day entries: the later one in the balance's order on top, so each row's balance follows from the one below.
+    const merged = isCard(account);
+    const entries = !merged ? [] : [
+        ...payments.map(p => ({ kind: 'payment', item: p, date: p.date, description: p.description || '', type: 'Payment',
+            signed: -(p.made ? p.payment : amountDue(p)), balance: p.after, notes: p.notes, seq: p.seq })),
+        ...activity.map(a => ({ kind: 'activity', item: a, date: a.date, description: a.description, type: a.type,
+            signed: a.signed, balance: a.balance, notes: a.notes, seq: a.seq })),
+    ].sort((x, y) => y.seq - x.seq);
     // A loan's progress counts from the original amount when you entered it, else from the opening balance.
     const startAmount = loan && Number.isFinite(T.original) ? T.original : L.opening;
     const paidOff = Number.isFinite(startAmount) && startAmount > 0 ? (startAmount - L.balanceNow) / startAmount : NaN;
@@ -604,7 +615,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 ${loan ? '' : card('Interest &amp; fees', money(interestFees),
                     `<span class="muted">${Number(account.apr) > 0 ? `<strong>${esc(aprText(account))} APR</strong>`
                         : Number.isFinite(impliedApr(account, L)) ? `<strong>~${impliedApr(account, L)}% APR</strong>, worked out from recent interest: add the real one in Edit` : 'APR not set: add it in Edit'}<br>`
-                    + `${activity.length} activity entr${activity.length === 1 ? 'y' : 'ies'}</span>`)}
+                    + `${(n => `${n} activity entr${n === 1 ? 'y' : 'ies'}`)(merged ? entries.length : activity.length)}</span>`)}
             </div>
             ${L.points.length > 1 ? '<h3 class="chart-title">Balance over time</h3><canvas class="c-bal" style="display:block;width:100%;height:200px;margin-bottom:14px"></canvas>' : ''}
             <div class="insights"></div>
@@ -614,7 +625,37 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
             </details>
             ${loan ? `<details class="planner schedule"><summary>📅 Payment schedule from here</summary><div class="schedule-body"></div></details>` : ''}
             <div class="loan-tables">
-                <div>
+                ${merged ? `<div>
+                    <h3 class="chart-title">Activity <span class="muted" style="font-weight:400">charges, interest, fees, credits and payments, newest first</span></h3>
+                    <div class="t-act short-table"></div>
+                    ${payments.some(p => p.projected) ? `<p class="note" style="margin-top:6px">Planned payments show the balance as if each one before it is made, with a month's interest each: ${esc(P.model?.text || interestModel(account, L).text)}.</p>` : ''}
+                    <div class="row" style="margin-top:10px"><button type="button" class="primary small" data-act-open>+ Add activity</button>
+                        <button type="button" class="primary small" data-pay-open>+ Add payment</button>
+                        <button type="button" class="small" data-edit-rows="act" title="Change or remove activity and payments">✎ Edit activity</button></div>
+                    <form class="add-bill act-form" hidden>
+                        <h3>Add activity</h3>
+                        <div class="add-grid">
+                            <label class="field">Date<input type="date" name="date" required></label>
+                            <label class="field">Type<select name="type">${CARD_TYPES.map(t => `<option>${t}</option>`).join('')}</select></label>
+                            <label class="field">Amount ($)<input type="number" name="amount" step="0.01" min="0"></label>
+                        </div>
+                        <div class="add-grid">
+                            <label class="field" style="grid-column:span 2">Description<input type="text" name="description" placeholder="e.g. Hotel stay, monthly interest, auto payment"></label>
+                            <label class="field">Notes<input type="text" name="notes" placeholder="optional"></label>
+                        </div>
+                        <div class="add-grid act-only">
+                            <label class="field">Paid back?<select name="paidBack">${PAID_BACK.map(v => `<option>${v}</option>`).join('')}</select></label>
+                            <span></span><span></span>
+                        </div>
+                        <div class="add-grid pay-only" hidden>
+                            <label class="field">Min payment ($)<input type="number" name="minPayment" step="0.01" placeholder="optional"></label>
+                            <label class="field">Payment made?<select name="made"><option value="N">N — not yet</option><option value="Y">Y — made</option></select></label>
+                            <span></span>
+                        </div>
+                        <p class="add-preview act-preview"></p>
+                        <div class="row"><button type="submit" class="primary">Save</button><button type="button" data-act-cancel>Cancel</button></div>
+                    </form>
+                </div>` : `<div>
                     <h3 class="chart-title">Payments</h3>
                     <div class="t-pay short-table"></div>
                     ${loan ? `<p class="note" style="margin-top:6px">Each payment pays the month's interest${T.escrow ? ' and escrow' : ''} first; the rest lowers the balance. Interest marked ~ is estimated (balance × ${esc(aprText(account, T.apr || 0))} ÷ 12): type the amount from your statement in Edit to make it exact.</p>`
@@ -660,7 +701,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                         </div>` : ''}
                         <div class="row"><button type="submit" class="primary">Save activity</button><button type="button" data-act-cancel>Cancel</button></div>
                     </form>
-                </div>
+                </div>`}
                 ${hasMaintenance(account) ? `<div>
                     <h3 class="chart-title">Annual maintenance fees <span class="muted" style="font-weight:400">for tracking only: not added to the balance</span></h3>
                     <p class="fee-years"></p>
@@ -704,6 +745,25 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         rowClass: p => (statusOf(p) === 'Planned' ? 'planned-row' : ''),
         empty: 'No payments yet',
     });
+    else if (merged) dataTable($('.t-act'), {
+        columns: [
+            dateCol('date', 'Date', r => r.date),
+            { id: 'desc', label: 'Description', value: r => r.description,
+                cell: r => `${esc(r.description)}${r.kind === 'payment' && r.item.minPayment > 0.005 ? ` <span class="muted">(min ${esc(money(r.item.minPayment))})</span>` : ''}` },
+            { id: 'type', label: 'Type', value: r => r.type, cell: r => `<span class="cat-badge${r.signed < 0 ? ' income' : ''}">${esc(r.type)}</span>` },
+            { id: 'amount', label: 'Amount', num: true, value: r => r.signed, text: v => (v < 0 ? '−' : '+') + money(Math.abs(v)),
+                tdClass: r => `nowrap ${r.signed < 0 ? 'income-amt' : 'expense-amt'}` },
+            { ...moneyCol('balance', 'Balance', r => r.balance), tdClass: r => `nowrap${r.kind === 'payment' && !r.item.made ? ' muted' : ''}` },
+            { id: 'made', label: 'Status', value: r => (r.kind === 'payment' ? statusOf(r.item) : ''), cell: r => (r.kind === 'payment' ? statusBadge(r.item) : '') },
+            { id: 'paid', label: 'Paid back?', value: r => (r.kind === 'payment' ? '' : r.item.paidBack), tdClass: () => 'nowrap',
+                cell: r => (r.kind === 'payment' ? '' : `${paidBackBadge(r.item.paidBack)}${owesBack(r.item) ? ` <button type="button" class="small primary" data-paid-back="${entries.indexOf(r)}">Mark paid</button>` : ''}`) },
+            { id: 'notes', label: 'Notes', value: r => r.notes, tdClass: () => 'note-text' },
+        ],
+        rows: entries,
+        sort: { col: 'date', dir: 'desc' },
+        rowClass: r => (r.kind === 'payment' && statusOf(r.item) === 'Planned' ? 'planned-row' : ''),
+        empty: 'No activity yet',
+    });
     else dataTable($('.t-pay'), {
         columns: [
             dateCol('date', 'Date', p => p.date),
@@ -719,7 +779,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         rowClass: p => (statusOf(p) === 'Planned' ? 'planned-row' : ''),
         empty: 'No payments yet',
     });
-    dataTable($('.t-act'), {
+    if (!merged) dataTable($('.t-act'), {
         columns: [
             dateCol('date', 'Date', a => a.date),
             { id: 'desc', label: 'Description', value: a => a.description },
@@ -741,7 +801,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
     $('.t-act').addEventListener('click', async e => {
         const b = e.target.closest('[data-paid-back]');
         if (!b) return;
-        const a = activity[+b.dataset.paidBack];
+        const a = merged ? entries[+b.dataset.paidBack].item : activity[+b.dataset.paidBack];
         b.disabled = true;
         try {
             await setActivityPaidBack(account, a, 'Yes');
@@ -768,96 +828,173 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         });
     };
 
-    // ── Add a payment: a month after the last one, same amounts ──
-    const pf = $('.pay-form'), prev = payments.filter(p => p.date).at(-1) || null;
-    const payPreview = () => {
-        if (loan) {
-            const d = dateOf(pf.date.value), pay = numOf(pf.payment.value), int = numOf(pf.interest.value);
-            if (!d || !Number.isFinite(pay)) { $('.pay-preview').textContent = ''; return; }
-            const trial = ledger(account, [...rawPayments, { date: d, payment: pay, interest: int, made: pf.made.value === 'Y', _new: true }], rawActivity);
-            const x = trial.payments.find(q => q._new);
-            $('.pay-preview').textContent = x ? `${x.interestTyped ? '' : 'about '}${money(x.interest)} interest${x.escrow > 0.005 ? ` · ${money(x.escrow)} escrow` : ''} · ${money(x.principal)} principal → balance ${money(x.after)}${pf.made.value === 'Y' ? '' : ' (once made)'}` : '';
-            return;
-        }
-        const d = dateOf(pf.date.value), pay = numOf(pf.payment.value), min = numOf(pf.minPayment.value);
-        if (!d) { $('.pay-preview').textContent = ''; return; }
-        const trial = ledger(account, [...rawPayments, { date: d, payment: pay, minPayment: min, made: pf.made.value === 'Y' }], rawActivity);
-        const p = trial.payments.find(x => x.date?.getTime() === d.getTime() && (x.payment === pay || (!Number.isFinite(pay) && x.minPayment === min)));
-        $('.pay-preview').textContent = p ? `balance before ${money(p.before)} · after ${money(p.after)}${pf.made.value === 'Y' ? '' : ' (once made)'}` : '';
-    };
-    $('[data-pay-open]').onclick = () => {
-        pf.reset();
-        if (loan) {
-            pf.date.value = isoDate(prev?.date ? (account.dueDay ? nextDueDate(account, prev.date) : addMonths(prev.date, 1)) : nextDue || new Date());
-            const amount = Number.isFinite(prev?.payment) ? prev.payment : monthlyDue;
-            if (Number.isFinite(amount)) pf.payment.value = amount.toFixed(2);
-        } else {
-            pf.date.value = isoDate(prev?.date ? addMonths(prev.date, 1) : new Date());
-            if (Number.isFinite(prev?.minPayment)) pf.minPayment.value = prev.minPayment;
-            if (Number.isFinite(prev?.payment)) pf.payment.value = prev.payment;
-        }
-        pf.hidden = false;
-        $('[data-pay-open]').hidden = true;
-        payPreview();
-        (loan ? pf.payment : pf.minPayment).focus();
-    };
-    $('[data-pay-cancel]').onclick = () => { pf.hidden = true; $('[data-pay-open]').hidden = false; };
-    pf.oninput = payPreview;
-    pf.onsubmit = async e => {
-        e.preventDefault();
-        if (loan) {
-            const date = dateOf(pf.date.value), payment = numOf(pf.payment.value), interest = numOf(pf.interest.value);
-            if (!date || !Number.isFinite(payment)) { toast('Enter the date and the payment', 'bad'); return; }
-            if (rawPayments.some(p => sameDay(p.date, date) && sameAmount(p.payment, payment))) { toast(dupText(date, payment, 'a payment on'), 'bad'); return; }
+    if (merged) bindCardForm();
+    else {
+        // ── Add a payment: a month after the last one, same amounts ──
+        const pf = $('.pay-form'), prev = payments.filter(p => p.date).at(-1) || null;
+        const payPreview = () => {
+            if (loan) {
+                const d = dateOf(pf.date.value), pay = numOf(pf.payment.value), int = numOf(pf.interest.value);
+                if (!d || !Number.isFinite(pay)) { $('.pay-preview').textContent = ''; return; }
+                const trial = ledger(account, [...rawPayments, { date: d, payment: pay, interest: int, made: pf.made.value === 'Y', _new: true }], rawActivity);
+                const x = trial.payments.find(q => q._new);
+                $('.pay-preview').textContent = x ? `${x.interestTyped ? '' : 'about '}${money(x.interest)} interest${x.escrow > 0.005 ? ` · ${money(x.escrow)} escrow` : ''} · ${money(x.principal)} principal → balance ${money(x.after)}${pf.made.value === 'Y' ? '' : ' (once made)'}` : '';
+                return;
+            }
+            const d = dateOf(pf.date.value), pay = numOf(pf.payment.value), min = numOf(pf.minPayment.value);
+            if (!d) { $('.pay-preview').textContent = ''; return; }
+            const trial = ledger(account, [...rawPayments, { date: d, payment: pay, minPayment: min, made: pf.made.value === 'Y' }], rawActivity);
+            const p = trial.payments.find(x => x.date?.getTime() === d.getTime() && (x.payment === pay || (!Number.isFinite(pay) && x.minPayment === min)));
+            $('.pay-preview').textContent = p ? `balance before ${money(p.before)} · after ${money(p.after)}${pf.made.value === 'Y' ? '' : ' (once made)'}` : '';
+        };
+        $('[data-pay-open]').onclick = () => {
+            pf.reset();
+            if (loan) {
+                pf.date.value = isoDate(prev?.date ? (account.dueDay ? nextDueDate(account, prev.date) : addMonths(prev.date, 1)) : nextDue || new Date());
+                const amount = Number.isFinite(prev?.payment) ? prev.payment : monthlyDue;
+                if (Number.isFinite(amount)) pf.payment.value = amount.toFixed(2);
+            } else {
+                pf.date.value = isoDate(prev?.date ? addMonths(prev.date, 1) : new Date());
+                if (Number.isFinite(prev?.minPayment)) pf.minPayment.value = prev.minPayment;
+                if (Number.isFinite(prev?.payment)) pf.payment.value = prev.payment;
+            }
+            pf.hidden = false;
+            $('[data-pay-open]').hidden = true;
+            payPreview();
+            (loan ? pf.payment : pf.minPayment).focus();
+        };
+        $('[data-pay-cancel]').onclick = () => { pf.hidden = true; $('[data-pay-open]').hidden = false; };
+        pf.oninput = payPreview;
+        pf.onsubmit = async e => {
+            e.preventDefault();
+            if (loan) {
+                const date = dateOf(pf.date.value), payment = numOf(pf.payment.value), interest = numOf(pf.interest.value);
+                if (!date || !Number.isFinite(payment)) { toast('Enter the date and the payment', 'bad'); return; }
+                if (rawPayments.some(p => sameDay(p.date, date) && sameAmount(p.payment, payment))) { toast(dupText(date, payment, 'a payment on'), 'bad'); return; }
+                try {
+                    await save([...strip(rawPayments), { date, payment, interest, made: pf.made.value === 'Y', notes: pf.notes.value }], strip(rawActivity));
+                    toast(`Added a ${money(payment)} payment to ${account.title}`, 'ok');
+                } catch (err) {
+                    toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+                }
+                return;
+            }
+            const date = dateOf(pf.date.value), payment = numOf(pf.payment.value), minPayment = numOf(pf.minPayment.value);
+            if (!date || !(Number.isFinite(payment) || Number.isFinite(minPayment))) { toast('Enter the date and the payment or the minimum', 'bad'); return; }
+            const amt = Number.isFinite(payment) ? payment : minPayment;
+            if (rawPayments.some(p => sameDay(p.date, date) && sameAmount(Number.isFinite(p.payment) ? p.payment : p.minPayment, amt))) { toast(dupText(date, amt, 'a payment on'), 'bad'); return; }
             try {
-                await save([...strip(rawPayments), { date, payment, interest, made: pf.made.value === 'Y', notes: pf.notes.value }], strip(rawActivity));
-                toast(`Added a ${money(payment)} payment to ${account.title}`, 'ok');
+                await save([...strip(rawPayments), { date, minPayment, payment, made: pf.made.value === 'Y', notes: pf.notes.value }], strip(rawActivity));
+                toast(`Added a ${money(Number.isFinite(payment) ? payment : minPayment)} payment to ${account.title}`, 'ok');
             } catch (err) {
                 toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
             }
-            return;
-        }
-        const date = dateOf(pf.date.value), payment = numOf(pf.payment.value), minPayment = numOf(pf.minPayment.value);
-        if (!date || !(Number.isFinite(payment) || Number.isFinite(minPayment))) { toast('Enter the date and the payment or the minimum', 'bad'); return; }
-        const amt = Number.isFinite(payment) ? payment : minPayment;
-        if (rawPayments.some(p => sameDay(p.date, date) && sameAmount(Number.isFinite(p.payment) ? p.payment : p.minPayment, amt))) { toast(dupText(date, amt, 'a payment on'), 'bad'); return; }
-        try {
-            await save([...strip(rawPayments), { date, minPayment, payment, made: pf.made.value === 'Y', notes: pf.notes.value }], strip(rawActivity));
-            toast(`Added a ${money(Number.isFinite(payment) ? payment : minPayment)} payment to ${account.title}`, 'ok');
-        } catch (err) {
-            toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
-        }
-    };
+        };
 
-    // ── Add activity ──
-    const af = $('.act-form');
-    // Paid back? follows the type (Charge → Not yet, else NA) until you pick it yourself.
-    if (af.paidBack) {
-        af.type.addEventListener('change', () => { if (!af.paidBack.dataset.picked) af.paidBack.value = paidBackFor(af.type.value); });
-        af.paidBack.addEventListener('change', () => { af.paidBack.dataset.picked = '1'; });
-    }
-    $('[data-act-open]').onclick = () => {
-        af.reset();
-        af.date.value = isoDate(new Date());
-        if (af.paidBack) { af.paidBack.value = paidBackFor(af.type.value); delete af.paidBack.dataset.picked; }
-        af.hidden = false;
-        $('[data-act-open]').hidden = true;
-        af.amount.focus();
-    };
-    $('[data-act-cancel]').onclick = () => { af.hidden = true; $('[data-act-open]').hidden = false; };
-    af.onsubmit = async e => {
-        e.preventDefault();
-        const date = dateOf(af.date.value), amount = numOf(af.amount.value);
-        if (!date || !Number.isFinite(amount)) { toast('Enter the date and the amount', 'bad'); return; }
-        if (rawActivity.some(a => sameDay(a.date, date) && sameAmount(a.amount, Math.abs(amount)))) { toast(dupText(date, Math.abs(amount), 'activity on'), 'bad'); return; }
-        try {
-            await save(strip(rawPayments), [...strip(rawActivity), { date, type: af.type.value, amount: Math.abs(amount), description: af.description.value,
-                paidBack: af.paidBack ? af.paidBack.value : '', notes: af.notes.value }]);
-            toast(`Added ${af.type.value.toLowerCase()} of ${money(Math.abs(amount))} to ${account.title}`, 'ok');
-        } catch (err) {
-            toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+        // ── Add activity ──
+        const af = $('.act-form');
+        // Paid back? follows the type (Charge → Not yet, else NA) until you pick it yourself.
+        if (af.paidBack) {
+            af.type.addEventListener('change', () => { if (!af.paidBack.dataset.picked) af.paidBack.value = paidBackFor(af.type.value); });
+            af.paidBack.addEventListener('change', () => { af.paidBack.dataset.picked = '1'; });
         }
-    };
+        $('[data-act-open]').onclick = () => {
+            af.reset();
+            af.date.value = isoDate(new Date());
+            if (af.paidBack) { af.paidBack.value = paidBackFor(af.type.value); delete af.paidBack.dataset.picked; }
+            af.hidden = false;
+            $('[data-act-open]').hidden = true;
+            af.amount.focus();
+        };
+        $('[data-act-cancel]').onclick = () => { af.hidden = true; $('[data-act-open]').hidden = false; };
+        af.onsubmit = async e => {
+            e.preventDefault();
+            const date = dateOf(af.date.value), amount = numOf(af.amount.value);
+            if (!date || !Number.isFinite(amount)) { toast('Enter the date and the amount', 'bad'); return; }
+            if (rawActivity.some(a => sameDay(a.date, date) && sameAmount(a.amount, Math.abs(amount)))) { toast(dupText(date, Math.abs(amount), 'activity on'), 'bad'); return; }
+            try {
+                await save(strip(rawPayments), [...strip(rawActivity), { date, type: af.type.value, amount: Math.abs(amount), description: af.description.value,
+                    paidBack: af.paidBack ? af.paidBack.value : '', notes: af.notes.value }]);
+                toast(`Added ${af.type.value.toLowerCase()} of ${money(Math.abs(amount))} to ${account.title}`, 'ok');
+            } catch (err) {
+                toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+            }
+        };
+    }
+
+    // ── Credit card: one Add form for activity and payments (a payment starts a month after the last one, same amounts) ──
+    function bindCardForm() {
+        const af = $('.act-form'), prev = payments.filter(p => p.date).at(-1) || null;
+        const isPay = () => af.type.value === 'Payment';
+        const buttons = () => [$('[data-act-open]'), $('[data-pay-open]')];
+        const preview = () => {
+            const d = dateOf(af.date.value), amt = numOf(af.amount.value), min = numOf(af.minPayment.value), out = $('.act-preview');
+            if (!d || !(Number.isFinite(amt) || (isPay() && Number.isFinite(min)))) { out.textContent = ''; return; }
+            if (isPay()) {
+                const trial = ledger(account, [...rawPayments, { date: d, payment: amt, minPayment: min, made: af.made.value === 'Y', _new: true }], rawActivity);
+                const p = trial.payments.find(x => x._new);
+                out.textContent = p ? `balance before ${money(p.before)} · after ${money(p.after)}${af.made.value === 'Y' ? '' : ' (once made)'}` : '';
+            } else {
+                const trial = ledger(account, rawPayments, [...rawActivity, { date: d, type: af.type.value, amount: Math.abs(amt), _new: true }]);
+                const a = trial.activity.find(x => x._new);
+                out.textContent = a ? `balance after ${money(a.balance)}` : '';
+            }
+        };
+        // Payment shows Min payment and Payment made?; the other types Paid back?, which follows the type
+        // (Charge → Not yet, else NA) until you pick it yourself.
+        const syncType = () => {
+            af.querySelector('h3').textContent = isPay() ? 'Add a payment' : 'Add activity';
+            af.querySelector('.act-only').hidden = isPay();
+            af.querySelector('.pay-only').hidden = !isPay();
+            if (!af.paidBack.dataset.picked) af.paidBack.value = paidBackFor(af.type.value);
+            preview();
+        };
+        const open = type => {
+            af.reset();
+            delete af.paidBack.dataset.picked;
+            af.type.value = type;
+            if (type === 'Payment') {
+                af.date.value = isoDate(prev?.date ? addMonths(prev.date, 1) : new Date());
+                if (Number.isFinite(prev?.minPayment)) af.minPayment.value = prev.minPayment;
+                if (Number.isFinite(prev?.payment)) af.amount.value = prev.payment;
+            } else af.date.value = isoDate(new Date());
+            af.hidden = false;
+            buttons().forEach(b => { b.hidden = true; });
+            syncType();
+            af.amount.focus();
+        };
+        $('[data-act-open]').onclick = () => open('Charge');
+        $('[data-pay-open]').onclick = () => open('Payment');
+        $('[data-act-cancel]').onclick = () => { af.hidden = true; buttons().forEach(b => { b.hidden = false; }); };
+        af.type.addEventListener('change', syncType);
+        af.paidBack.addEventListener('change', () => { af.paidBack.dataset.picked = '1'; });
+        af.oninput = preview;
+        af.onsubmit = async e => {
+            e.preventDefault();
+            const date = dateOf(af.date.value), amount = numOf(af.amount.value), description = af.description.value, notes = af.notes.value;
+            if (isPay()) {
+                const minPayment = numOf(af.minPayment.value);
+                if (!date || !(Number.isFinite(amount) || Number.isFinite(minPayment))) { toast('Enter the date and the payment or the minimum', 'bad'); return; }
+                const amt = Number.isFinite(amount) ? amount : minPayment;
+                if (rawPayments.some(p => sameDay(p.date, date) && sameAmount(Number.isFinite(p.payment) ? p.payment : p.minPayment, amt))) { toast(dupText(date, amt, 'a payment on'), 'bad'); return; }
+                try {
+                    await save([...strip(rawPayments), { date, description, minPayment, payment: amount, made: af.made.value === 'Y', notes }], strip(rawActivity));
+                    toast(`Added a ${money(amt)} payment to ${account.title}`, 'ok');
+                } catch (err) {
+                    toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+                }
+                return;
+            }
+            if (!date || !Number.isFinite(amount)) { toast('Enter the date and the amount', 'bad'); return; }
+            if (rawActivity.some(a => sameDay(a.date, date) && sameAmount(a.amount, Math.abs(amount)))) { toast(dupText(date, Math.abs(amount), 'activity on'), 'bad'); return; }
+            try {
+                await save(strip(rawPayments), [...strip(rawActivity), { date, type: af.type.value, amount: Math.abs(amount), description, paidBack: af.paidBack.value, notes }]);
+                toast(`Added ${af.type.value.toLowerCase()} of ${money(Math.abs(amount))} to ${account.title}`, 'ok');
+            } catch (err) {
+                toast(`Save failed: ${err.message}. Is the file open in Excel?`, 'bad');
+            }
+        };
+    }
 
     // ── Payment schedule from here (loans): your monthly payment, month by month, until it's paid off ──
     if (loan) {
@@ -927,6 +1064,23 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         <td><input type="text" data-k="notes" value="${esc(a.notes || '')}"></td>
         <td><button type="button" class="small danger" data-del title="Remove this row">✕</button></td>
     </tr>`;
+    // A credit card's grid: activity and payments in one table, newest first. Min payment and Made are for payments,
+    // Paid back? for the other types (the cells that don't apply to a row's type are hidden).
+    const cardRow = (x = {}) => `<tr data-kind="${x.type === 'Payment' ? 'payment' : 'activity'}">
+        <td><input type="date" data-k="date" value="${x.date ? isoDate(x.date) : ''}"></td>
+        <td><input type="text" data-k="description" value="${esc(x.description || '')}"></td>
+        <td><select data-k="type">${CARD_TYPES.map(t => `<option${t === x.type ? ' selected' : ''}>${t}</option>`).join('')}</select></td>
+        <td><input type="number" step="0.01" data-k="amount" value="${Number.isFinite(x.amount) ? x.amount : ''}"></td>
+        <td class="pay-only"><input type="number" step="0.01" data-k="minPayment" value="${Number.isFinite(x.minPayment) ? x.minPayment : ''}"></td>
+        <td class="pay-only"><select data-k="made"><option${x.made ? '' : ' selected'}>N</option><option${x.made ? ' selected' : ''}>Y</option></select></td>
+        <td class="act-only"><select data-k="paidBack">${[...(PAID_BACK.includes(x.paidBack || '') ? [] : [x.paidBack || '']), ...PAID_BACK]
+            .map(v => `<option value="${esc(v)}"${v === (x.paidBack || '') ? ' selected' : ''}>${esc(v || '–')}</option>`).join('')}</select></td>
+        <td><input type="text" data-k="notes" value="${esc(x.notes || '')}"></td>
+        <td><button type="button" class="small danger" data-del title="Remove this row">✕</button></td>
+    </tr>`;
+    const cardGridRows = () => entries.map(({ kind, item }) => cardRow(kind === 'payment'
+        ? { type: 'Payment', date: item.date, description: item.description, amount: item.payment, minPayment: item.minPayment, made: item.made, notes: item.notes }
+        : { type: item.type, date: item.date, description: item.description, amount: item.amount, paidBack: item.paidBack, notes: item.notes })).join('');
     $('[data-edit]').onclick = () => {
         setOpen(true);
         editing.add(account.id);
@@ -959,6 +1113,17 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 <label class="field">Credit limit ($)<input type="number" step="0.01" min="0" name="creditLimit" value="${Number(account.creditLimit) > 0 ? account.creditLimit : ''}" placeholder="optional"></label>
                 <span class="muted" style="align-self:end;font-size:0.85em;padding-bottom:8px">Available credit = credit limit − balance now.</span>
             </div>`}
+            ${merged ? `<h3 class="chart-title">Activity <span class="muted" style="font-weight:400">newest first; Min payment and Made are for payments, Paid back? for the rest</span></h3>
+            <div class="table-wrap loan-grid"><table class="sheet-table act-grid card-grid">
+                <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Min payment</th><th>Made</th><th>Paid back?</th><th>Notes</th><th></th></tr></thead>
+                <tbody>${cardGridRows()}</tbody>
+            </table></div>
+            <div class="row" style="margin-top:8px">
+                <button type="button" class="small" data-add-act-row>+ Add activity row</button>
+                <button type="button" class="small" data-add-pay-row>+ Add payment row</button>
+                <span class="spacer"></span>
+                <button type="button" class="small danger" data-remove-account>Remove account</button>
+            </div>` : `
             <h3 class="chart-title">Payments <span class="muted" style="font-weight:400">${loan ? 'Interest and escrow from your statement are optional; blank interest is estimated' : 'Before and After are worked out from the balance'}</span></h3>
             <div class="table-wrap loan-grid"><table class="sheet-table pay-grid">
                 <thead><tr>${loan ? '<th>Date</th><th>Payment</th><th>Interest</th><th>Escrow</th><th>Made</th><th>Notes</th><th></th>' : '<th>Date</th><th>Min payment</th><th>Payment</th><th>Made</th><th>Notes</th><th></th>'}</tr></thead>
@@ -974,7 +1139,7 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
                 <button type="button" class="small" data-add-act-row>+ Add activity row</button>
                 <span class="spacer"></span>
                 <button type="button" class="small danger" data-remove-account>Remove account</button>
-            </div>
+            </div>`}
             <div class="row" style="margin-top:12px">
                 <button type="button" class="primary" data-save>Save changes</button>
                 <button type="button" data-cancel>Cancel</button>
@@ -989,8 +1154,27 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
         ed.querySelector(b.dataset.editRows === 'pay' ? '.pay-grid' : '.act-grid').closest('.table-wrap').previousElementSibling
             .scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+    const cells = (tr, k) => tr.querySelector(`[data-k="${k}"]`).value;
+    // A card's grid: a row switched to or from Payment shows that type's cells (a blank Paid back? follows the type).
+    ed.addEventListener('change', e => {
+        const sel = e.target.closest('.card-grid [data-k="type"]');
+        if (!sel) return;
+        const tr = sel.closest('tr'), pb = tr.querySelector('[data-k="paidBack"]');
+        tr.dataset.kind = sel.value === 'Payment' ? 'payment' : 'activity';
+        if (sel.value !== 'Payment' && !pb.value) pb.value = paidBackFor(sel.value);
+    });
     ed.addEventListener('click', async e => {
-        if (e.target.closest('[data-add-pay-row]')) {
+        if (merged && e.target.closest('[data-add-pay-row], [data-add-act-row]')) {
+            // New rows go at the top (the grid is newest first). A payment: a month after the latest one, same amounts.
+            const body = ed.querySelector('.card-grid tbody');
+            if (e.target.closest('[data-add-pay-row]')) {
+                const last = [...body.rows].filter(tr => cells(tr, 'type') === 'Payment').map(tr => ({ tr, d: dateOf(cells(tr, 'date')) }))
+                    .filter(x => x.d).sort((a, b) => b.d - a.d)[0];
+                body.insertAdjacentHTML('afterbegin', cardRow({ type: 'Payment', date: last ? addMonths(last.d, 1) : new Date(),
+                    amount: last ? numOf(cells(last.tr, 'amount')) : NaN, minPayment: last ? numOf(cells(last.tr, 'minPayment')) : NaN }));
+            } else body.insertAdjacentHTML('afterbegin', cardRow({ date: new Date(), type: 'Charge', paidBack: paidBackFor('Charge') }));
+            body.rows[0].querySelector('[data-k="amount"]').focus();
+        } else if (e.target.closest('[data-add-pay-row]')) {
             const lastRow = [...ed.querySelectorAll('.pay-grid tbody tr')].at(-1);
             const v = k => lastRow?.querySelector(`[data-k="${k}"]`)?.value ?? '';
             const d = dateOf(v('date'));
@@ -1011,15 +1195,20 @@ function renderAccount(sec, account, rawPayments, rawActivity, { first, last, re
             toast(`Removed ${account.title}`, 'ok');
             rerender();
         } else if (e.target.closest('[data-save]')) {
-            const cells = (tr, k) => tr.querySelector(`[data-k="${k}"]`).value;
-            const pays = [...ed.querySelectorAll('.pay-grid tbody tr')].map(tr => (loan ? {
+            // A card's one grid is newest first: read it oldest first, so entries on the same day keep their order in the files.
+            const cardRows = merged ? [...ed.querySelectorAll('.card-grid tbody tr')].reverse() : [];
+            const isPayRow = tr => cells(tr, 'type') === 'Payment';
+            const pays = (merged ? cardRows.filter(isPayRow) : [...ed.querySelectorAll('.pay-grid tbody tr')]).map(tr => (loan ? {
                 date: dateOf(cells(tr, 'date')), payment: numOf(cells(tr, 'payment')), interest: numOf(cells(tr, 'interest')),
                 escrow: numOf(cells(tr, 'escrow')), made: cells(tr, 'made') === 'Y', notes: cells(tr, 'notes'),
+            } : merged ? {
+                date: dateOf(cells(tr, 'date')), description: cells(tr, 'description'), minPayment: numOf(cells(tr, 'minPayment')),
+                payment: numOf(cells(tr, 'amount')), made: cells(tr, 'made') === 'Y', notes: cells(tr, 'notes'),
             } : {
                 date: dateOf(cells(tr, 'date')), minPayment: numOf(cells(tr, 'minPayment')), payment: numOf(cells(tr, 'payment')),
                 made: cells(tr, 'made') === 'Y', notes: cells(tr, 'notes'),
-            })).filter(p => p.date || Number.isFinite(p.payment) || Number.isFinite(p.minPayment) || p.notes);
-            const acts = [...ed.querySelectorAll('.act-grid tbody tr')].map(tr => ({
+            })).filter(p => p.date || Number.isFinite(p.payment) || Number.isFinite(p.minPayment) || p.notes || p.description);
+            const acts = (merged ? cardRows.filter(tr => !isPayRow(tr)) : [...ed.querySelectorAll('.act-grid tbody tr')]).map(tr => ({
                 date: dateOf(cells(tr, 'date')), description: cells(tr, 'description'), type: cells(tr, 'type'),
                 amount: Math.abs(numOf(cells(tr, 'amount'))), paidBack: tr.querySelector('[data-k="paidBack"]')?.value ?? '', notes: cells(tr, 'notes'),
             })).filter(a => a.date || Number.isFinite(a.amount) || a.description || a.notes);
@@ -1239,7 +1428,7 @@ function renderPlanner(sec, account, L, P, rerender, { rawPayments, rawActivity,
             const owed = r2(bal + (model.rate ? r2(bal * model.rate) : model.flat));
             const amount = k === s.months - 1 ? Math.round(owed * 100) / 100 : pay;
             const escrow = isLoan(account) ? loanTerms(account).escrow : 0; // a loan payment also carries its escrow
-            rows.push({ date, minPayment: future[k]?.minPayment ?? minimum, payment: Math.round((Math.min(pay, amount) + escrow) * 100) / 100, made: false, notes: future[k]?.notes || '' });
+            rows.push({ date, description: future[k]?.description || '', minPayment: future[k]?.minPayment ?? minimum, payment: Math.round((Math.min(pay, amount) + escrow) * 100) / 100, made: false, notes: future[k]?.notes || '' });
             bal = owed - Math.min(pay, amount);
         }
         return {
