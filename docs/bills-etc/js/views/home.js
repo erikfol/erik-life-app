@@ -4,7 +4,7 @@ import { ollamaSettings, pingOllama, aiEnabled, setAiEnabled } from '../ollama.j
 import { PATHS, readTable, readBankCsv, keyOf } from '../data.js';
 import { parseCSV } from '../csv.js';
 import { parseDate, yearMonth, monthLabel } from '../dates.js';
-import { backfill, processCurrentMonth, planClose, closeMonth } from '../workflow.js';
+import { backfill, processCurrentMonth, planClose, closeMonth, currentMonthChanges, openMonth, routeBankFile } from '../workflow.js';
 import { esc, money, toast } from '../util.js';
 import { refreshStatus } from '../app.js';
 import { dataTable, closeFilterMenu } from '../datatable.js';
@@ -32,27 +32,39 @@ async function folderStatus() {
     return {
         master: master ? { rows: master.rows.length, months: monthsOf(master.rows) } : null,
         past, current,
+        changes: await currentMonthChanges(), // the current-month file's rows This Month doesn't show yet
         processed: await fs.exists(PATHS.processed),
         config: await fs.exists(PATHS.config),
     };
 }
 
+/** Banner for files not added because an older month is still open (importFiles' `blocked`). */
+const blockedHtml = blocked => !blocked.length ? '' : `<div class="banner bad"><strong>Didn't add ${blocked.map(b => esc(b.name)).join(', ')}</strong>:
+    ${esc(monthLabel(blocked[0].open))} is still open. When you've finished fixing its categories, close it with <strong>Close month</strong> below, then add ${blocked.length === 1 ? 'this file' : 'these files'} again.</div>`;
+
+/** Whether the current-month file has changes This Month doesn't show yet (Refresh loads them). */
+const currentStale = ch => !!ch && (!ch.processed || ch.added > 0 || ch.gone > 0);
+
 function statusHtml(st) {
     const pending = st.past.filter(f => f.pending);
     const thisYm = yearMonth(new Date());
     const cur = st.current[0];
+    const ch = currentStale(st.changes) ? st.changes : null;
+    const waiting = pending.reduce((a, f) => a + f.pending, 0) + (ch ? Math.max(ch.added, ch.gone) : 0);
+    const files = pending.length + (ch ? 1 : 0);
     return `
         <div class="cards" style="margin:14px 0">
             <div class="card"><div class="label">History</div>
                 <div class="value" style="font-size:1.2em">${st.master ? esc(rangeLabel(st.master.months)) : 'Empty'}</div>
                 <div class="sub">${st.master ? `${st.master.rows.toLocaleString()} transactions` : 'Add bank files to start'}</div></div>
             <div class="card"><div class="label">Waiting to load</div>
-                <div class="value" style="font-size:1.2em;color:${pending.length ? 'var(--orange)' : 'var(--green)'}">${pending.length ? `${pending.reduce((a, f) => a + f.pending, 0)} rows` : 'Nothing'}</div>
-                <div class="sub">${pending.length ? `in ${pending.length} file(s); click Refresh` : 'all bank files are loaded'}</div></div>
+                <div class="value" style="font-size:1.2em;color:${files ? 'var(--orange)' : 'var(--green)'}">${files ? `${waiting} row${waiting === 1 ? '' : 's'}` : 'Nothing'}</div>
+                <div class="sub">${files ? `in ${files} file(s); click Refresh` : 'all bank files are loaded'}</div></div>
             <div class="card"><div class="label">Current month</div>
                 <div class="value" style="font-size:1.2em">${cur ? esc(rangeLabel(cur.months)) : 'None'}</div>
                 <div class="sub">${cur ? esc(cur.name) : 'add this month’s export to see a projection'}</div></div>
         </div>
+        ${ch ? `<div class="banner">${ch.processed ? `<code>${esc(ch.file)}</code> has changed since it was last loaded (${[ch.added && `${ch.added} new row${ch.added === 1 ? '' : 's'}`, ch.gone && `${ch.gone} row${ch.gone === 1 ? '' : 's'} no longer in it, e.g. pending charges that have posted`].filter(Boolean).join(', ')}), so This Month doesn't show it yet.` : `<code>${esc(ch.file)}</code> hasn't been loaded yet.`} Click <strong>Refresh</strong> to load it; your edits are kept.</div>` : ''}
         ${cur && cur.months.length && cur.months.at(-1) < thisYm ? `<div class="banner">The current-month file is for ${esc(rangeLabel(cur.months))}, which has ended. When you've finished fixing its categories, ${st.processed ? 'close it with <strong>Close month</strong> below' : 'click Refresh, then close it with <strong>Close month</strong>'}.</div>` : ''}
         ${st.current.length > 1 ? `<div class="banner bad">There are ${st.current.length} files in <code>${PATHS.currentMonth}/</code>; keep only one.</div>` : ''}
         ${st.processed ? `<div class="row" style="margin:0 0 12px"><button id="close-month"${cur && cur.months.length && cur.months.at(-1) < thisYm ? ' class="primary"' : ''}>Close month…</button>
@@ -65,10 +77,15 @@ function statusHtml(st) {
         </details>`;
 }
 
-/** Route picked CSVs: a file whose newest date is in this calendar month is the current month; the rest are past months. */
+/**
+ * Route picked CSVs by the newest month in each (routeBankFile): the month that's still open (not closed yet)
+ * or else this calendar month → the current month; this calendar month while an older month is still open →
+ * not added (close that month first); anything else → past months, straight into the history.
+ */
 async function importFiles(files, log) {
     const thisYm = yearMonth(new Date());
-    const result = { past: [], current: null, skipped: [] };
+    let openYm = await openMonth();
+    const result = { past: [], current: null, skipped: [], blocked: [] };
     for (const f of files) {
         const text = await f.text();
         const { columns, rows } = parseCSV(text);
@@ -77,14 +94,21 @@ async function importFiles(files, log) {
         const yms = monthsOf(rows);
         if (!yms.length) { log(`Skipped ${f.name}: no readable dates.`, 'err'); result.skipped.push(f.name); continue; }
 
-        if (yms.at(-1) === thisYm) {
+        const route = routeBankFile(yms.at(-1), openYm, thisYm);
+        if (route === 'blocked') {
+            log(`Didn't add ${f.name}: it's for ${monthLabel(yms.at(-1))}, but ${monthLabel(openYm)} is still open. Close ${monthLabel(openYm)} first (Close month), then add this file again.`, 'err');
+            result.blocked.push({ name: f.name, open: openYm });
+            continue;
+        }
+        if (route === 'current') {
             const existing = await fs.listFiles(PATHS.currentMonth);
             const others = existing.filter(n => n !== f.name);
-            if (others.length && !confirm(`${f.name} is for this month. Replace ${others.join(', ')} in inputs/current_month/ with it?`)) continue;
+            if (others.length && !confirm(`${f.name} is for ${monthLabel(yms.at(-1))}, the current month. Replace ${others.join(', ')} in inputs/current_month/ with it? Your edits are kept.`)) continue;
             for (const n of others) await fs.removeFile(`${PATHS.currentMonth}/${n}`);
             await fs.writeText(`${PATHS.currentMonth}/${f.name}`, text);
             log(`${f.name} → current month (${rangeLabel(yms)})`, 'ok');
             result.current = f.name;
+            openYm = yms.at(-1);
         } else {
             const dest = `${PATHS.pastMonths}/${f.name}`;
             const old = await fs.readText(dest);
@@ -205,7 +229,7 @@ const home = {
         };
 
         /** Load pending past-month rows (and the current month, if asked), then show a summary. */
-        const load = async ({ current = false, skipped = [] } = {}, useAI = !!el.querySelector('#use-ai')?.checked) => {
+        const load = async ({ current = false, skipped = [], blocked = [] } = {}, useAI = !!el.querySelector('#use-ai')?.checked) => {
             busy = true;
             running = new AbortController();
             const signal = running.signal;
@@ -220,7 +244,7 @@ const home = {
                         result(`<div class="banner bad"><strong>Didn't load: AI isn't available</strong> (${st.ok ? `model <code>${esc(ollamaSettings.model)}</code> isn't installed` : esc(st.error)}). See Local AI below.
                             You can also load without AI: merchants you've categorized before use your history, and new ones get keyword rules.
                             <div class="row" style="margin-top:10px"><button class="primary" id="no-ai">Load without AI</button></div></div>`);
-                        el.querySelector('#no-ai').onclick = () => load({ current, skipped }, false);
+                        el.querySelector('#no-ai').onclick = () => load({ current, skipped, blocked }, false);
                         return;
                     }
                 }
@@ -236,7 +260,8 @@ const home = {
                     else html += `<div class="banner bad">Couldn't process the current month; see Details below.</div>`;
                 }
                 if (skipped.length) html += `<div class="banner bad">Skipped ${skipped.map(esc).join(', ')}: not a bank export (needs Date, Description and Amount columns).</div>`;
-                result(html || '<div class="banner ok">Everything is already loaded. Nothing new found.</div>');
+                html += blockedHtml(blocked);
+                result(html ||'<div class="banner ok">Everything is already loaded. Nothing new found.</div>');
             } catch (e) {
                 if (e.name === 'AbortError') {
                     log('Cancelled. Finished rows were saved.', 'err');
@@ -301,9 +326,9 @@ const home = {
 
         el.querySelector('#refresh').onclick = async () => {
             logEl.textContent = '';
-            // Process the current month only if it hasn't been yet; edits in the processed file are kept either way.
-            const hasCurrent = (await fs.listFiles(PATHS.currentMonth)).length === 1;
-            load({ current: hasCurrent && !(await fs.exists(PATHS.processed)) });
+            // Process the current month if it hasn't been yet, or its bank file has changed since (e.g. a newer export
+            // copied into the folder); edits in the processed file are kept either way.
+            load({ current: currentStale(await currentMonthChanges()) });
         };
 
         const fileIn = el.querySelector('#file-in');
@@ -315,8 +340,12 @@ const home = {
             logEl.textContent = '';
             try {
                 const r = await importFiles(files, log);
-                if (!r.past.length && !r.current) { result('<div class="banner bad">No files were added; see Details below.</div>'); el.querySelector('#log-wrap').open = true; return; }
-                await load({ current: !!r.current, skipped: r.skipped });
+                if (!r.past.length && !r.current) {
+                    result(r.blocked.length && !r.skipped.length ? blockedHtml(r.blocked) : '<div class="banner bad">No files were added; see Details below.</div>');
+                    if (!r.blocked.length || r.skipped.length) el.querySelector('#log-wrap').open = true;
+                    return;
+                }
+                await load({ current: !!r.current, skipped: r.skipped, blocked: r.blocked });
             } catch (e) {
                 result(`<div class="banner bad">${esc(e.message)}</div>`);
             }

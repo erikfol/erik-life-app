@@ -2,7 +2,7 @@ import { PATHS, readTable, loadConfig, parseConfig, keyOf } from '../data.js';
 import { computeProjection, statusBadge } from '../finance.js';
 import { parseBills, hasBills, billMatcher, schedColumn, paymentsByMonth, billMonth, firstPaid, allTransactions, STATUS } from '../bills.js';
 import { leftToSpend, savePlan } from '../plan.js';
-import { lastSources } from '../workflow.js';
+import { lastSources, currentMonthChanges } from '../workflow.js';
 import { MONTH_NAMES, parseDate, yearMonth } from '../dates.js';
 import { esc, money, toast } from '../util.js';
 import { requireFolder } from '../app.js';
@@ -43,7 +43,9 @@ async function loadProjection() {
     const proj = computeProjection({ config: parseConfig(cfg), rows: processed.rows, masterRows: master?.rows, today, exclude, fixedTotal });
     const plan = bills ? leftToSpend({ cfg, rows: all, ym: yearMonth(today), bills, match, dataThrough: latest, today: now, ended }) : null;
     const updated = await lastBankUpdate();
-    return { ...proj, ended, bills, match, plan, dataThrough: latest, updated };
+    const ch = await currentMonthChanges();
+    const changes = ch?.processed && (ch.added || ch.gone) ? ch : null; // the bank file has rows this page doesn't show
+    return { ...proj, ended, bills, match, plan, dataThrough: latest, updated, changes };
 }
 
 const SOURCE_TAGS = {
@@ -197,7 +199,10 @@ export default {
                 <button id="reload">Refresh</button>
             </div>
             <p class="lead">${p.ended ? 'Completed month: totals are actual, not projected.' : `Day ${p.daysElapsed} of ${p.daysInMonth} · ${p.pctMonth}% through the month`}${p.dataThrough ? ` · bank data through ${esc(shortDay(p.dataThrough))}` : ''}</p>
-            ${p.ended ? `<div class="banner">This file is for ${esc(label)}, which has ended. Add this month's bank export on <a href="#home">Setup</a> to see a live projection, or close ${esc(label)} with <strong>Close month</strong> on <a href="#home">Setup</a>.</div>` : ''}
+            ${p.changes ? `<div class="banner bad"><strong>Your bank file has changed since this page's data was loaded</strong>
+                (${[p.changes.added && `${p.changes.added} new row${p.changes.added === 1 ? '' : 's'}`, p.changes.gone && `${p.changes.gone} row${p.changes.gone === 1 ? '' : 's'} no longer in it, e.g. pending charges that have posted`].filter(Boolean).join(', ')}), so they aren't shown here yet.
+                Click <strong>Refresh</strong> on <a href="#home">Setup</a> to load them; your edits are kept.</div>` : ''}
+            ${p.ended ? `<div class="banner">This file is for ${esc(label)}, which has ended. When you've finished fixing its categories, close it with <strong>Close month</strong> on <a href="#home">Setup</a>, then add this month's bank export there to see a live projection.</div>` : ''}
 
             ${p.plan ? planHtml(p) : `<div class="banner">Set up your scheduled bills on the <a href="#bills">Bills</a> page to see how much you have left to spend this month.</div>`}
 

@@ -120,13 +120,17 @@ export async function processCurrentMonth({ useAI, log, signal }) {
     const bank = await readBankCsv(`${PATHS.currentMonth}/${files[0]}`);
 
     // Lookup order: processed file (manual edits) → history → AI cache → AI (if enabled) → rules.
+    // Identical rows (same day, description and amount, e.g. three $9.99 charges) each keep their own edits:
+    // a key holds its processed rows in order and each matching bank row takes the next one.
     const processedLookup = new Map();
     const processed = await readTable(PATHS.processed);
     if (processed) {
         for (const p of processed.rows) {
-            processedLookup.set(keyOf(p), { category: String(p['AI Category'] ?? '').trim(), merchant: String(p['Cleaned Merchant'] ?? '').trim(), notes: p.Notes ?? '' });
+            const k = keyOf(p);
+            if (!processedLookup.has(k)) processedLookup.set(k, []);
+            processedLookup.get(k).push({ category: String(p['AI Category'] ?? '').trim(), merchant: String(p['Cleaned Merchant'] ?? '').trim(), notes: p.Notes ?? '' });
         }
-        log(`Loaded ${processedLookup.size} row(s) from processed file (manual edits preserved).`, 'dim');
+        log(`Loaded ${processed.rows.length} row(s) from processed file (manual edits preserved).`, 'dim');
     }
     const cache = (await readTable(PATHS.cache)) || { columns: [...CACHE_COLS], rows: [] };
     const cacheLookup = new Map(cache.rows.map(c => [keyOf(c), { category: c['AI Category'], merchant: c['Cleaned Merchant'] }]));
@@ -142,7 +146,7 @@ export async function processCurrentMonth({ useAI, log, signal }) {
         for (const row of bank.rows) {
             const key = keyOf(row);
             let hit, source;
-            if ((hit = processedLookup.get(key))) source = 'edited';
+            if ((hit = processedLookup.get(key)?.shift())) source = 'edited';
             else if ((hit = historyLookup(lookup, row.Description))) source = hit.source;
             else if ((hit = cacheLookup.get(key))) source = 'cache';
             else {
@@ -178,6 +182,56 @@ export async function processCurrentMonth({ useAI, log, signal }) {
     const projection = computeProjection({ config, rows: out, masterRows: master?.rows });
     log(`Day ${projection.daysElapsed} of ${projection.daysInMonth}. Projected ${projection.surplus >= 0 ? 'surplus' : 'deficit'}: ${money(projection.surplus, true)}`, 'ok');
     return projection;
+}
+
+/** Count of each row key (identical rows count separately). */
+function keyCounts(rows) {
+    const m = new Map();
+    for (const r of rows) { const k = keyOf(r); m.set(k, (m.get(k) || 0) + 1); }
+    return m;
+}
+
+/**
+ * How the bank file in inputs/current_month differs from the processed file (what This Month shows):
+ * `added` = its rows that aren't loaded yet; `gone` = loaded rows it no longer has (a pending charge that has
+ * since posted under its real name). `months` = the months the file covers. null = no single file there.
+ */
+export async function currentMonthChanges() {
+    const files = await fs.listFiles(PATHS.currentMonth);
+    if (files.length !== 1) return null;
+    const bank = await readBankCsv(`${PATHS.currentMonth}/${files[0]}`);
+    const months = [...new Set(bank.rows.map(r => parseDate(r.Date)).filter(Boolean).map(yearMonth))].sort();
+    const processed = await readTable(PATHS.processed);
+    if (!processed) return { file: files[0], months, processed: false, added: bank.rows.length, gone: 0 };
+    const b = keyCounts(bank.rows), p = keyCounts(processed.rows);
+    let added = 0, gone = 0;
+    for (const [k, n] of b) added += Math.max(0, n - (p.get(k) || 0));
+    for (const [k, n] of p) gone += Math.max(0, n - (b.get(k) || 0));
+    return { file: files[0], months, processed: true, added, gone };
+}
+
+/**
+ * The month that's still open (its bank file is in inputs/current_month, or its processed file hasn't been
+ * archived by Close month yet), as 'YYYY-MM', or ''.
+ */
+export async function openMonth() {
+    const ch = await currentMonthChanges();
+    if (ch?.months.length) return ch.months.at(-1);
+    const processed = await readTable(PATHS.processed);
+    const dates = (processed?.rows || []).map(r => parseDate(r.Date)).filter(Boolean);
+    return dates.length ? yearMonth(dates.sort((a, b) => b - a)[0]) : '';
+}
+
+/**
+ * Where an added bank file goes, from the newest month it has: 'current' = a newer export of the month that's
+ * still open, or this calendar month's export when no older month is open; 'blocked' = this calendar month's
+ * export while an older month is still open (adding it would replace that month's file and drop its edits, so
+ * that month has to be closed first); 'past' = anything else (straight into the history).
+ */
+export function routeBankFile(fileYm, openYm, thisYm) {
+    if (openYm && fileYm === openYm) return 'current';
+    if (fileYm === thisYm) return openYm && openYm < thisYm ? 'blocked' : 'current';
+    return 'past';
 }
 
 // ── Step 4: close the month ──────────────────────────────────────────────────
