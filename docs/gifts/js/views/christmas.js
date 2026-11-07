@@ -1,12 +1,14 @@
 // Christmas: one list per year (#christmas/<year>, a pill for each year, "＋ Add year" #christmas/add) — who's getting
 // what, with links, prices and status — with the year's totals, a By person table that also lists who was on the year
-// before's list but has nothing yet, and the year's buying guides (a summary, the options, and a price watch).
+// before's list but has nothing yet, and the year's buying guides (a summary, the options, their specs side by side,
+// and a price watch).
 import { esc, toast, money } from '../../../bills-etc/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import {
     saveData, christmasPath, christmasColumns, CHRISTMAS_CHOICES, loadChristmas, saveChristmas, christmas, inDays, showDay, tally, isFor,
     newGuide, OPTION_COLUMNS, priceColumns, optionsPath, pricesPath, loadOptions, saveOptions, loadPrices, savePrices,
+    specsPath, loadSpecs, saveSpecs, specColumns,
 } from '../gifts.js';
 import { tallyText } from './person.js';
 import { christmasLevel } from '../alerts.js'; // the banner's colour, shared with the Home page
@@ -148,20 +150,25 @@ export async function renderChristmas(el, data, year, onChanged) {
 
 /**
  * One buying guide: its summary (an information box whose name is the guide's title; Edit can remove the guide), the
- * options compared, and the price watch. data.guides is kept up to date as it's saved.
+ * options compared, their specs (a column per option), and the price watch. data.guides is kept up to date as it's saved.
  */
 async function renderGuide(sec, data, g) {
-    const [options, prices] = await Promise.all([loadOptions(g), loadPrices(g)]);
+    let [options, prices, specs] = await Promise.all([loadOptions(g), loadPrices(g), loadSpecs(g)]);
     sec.innerHTML = `
         <h2><span data-title></span> <span class="sub">buying guide</span></h2>
         <div data-info></div>
         <h3 class="guide-h">Options</h3>
         <div data-options></div>
+        <h3 class="guide-h">Specs</h3>
+        <p class="section-note">A row for each spec and a column for each option in Options (an option you add there gets a
+            column here).</p>
+        <div class="guide-specs" data-specs></div>
         <h3 class="guide-h">Price watch</h3>
         <p class="section-note">When you see a price, put it in Price Seen with where and when: Deal says Buy now (at or under
             Buy Now At), Great deal, Good deal, or Wait.</p>
         <div data-prices></div>
-        <p class="muted guide-files">Saved in <code>${esc(optionsPath(g))}</code> and <code>${esc(pricesPath(g))}</code>.</p>`;
+        <p class="muted guide-files">Saved in <code>${esc(optionsPath(g))}</code>, <code>${esc(specsPath(g))}</code> and
+            <code>${esc(pricesPath(g))}</code>.</p>`;
     const title = () => { sec.querySelector('[data-title]').textContent = g.title; };
     title();
     const box = infoBox(sec.querySelector('[data-info]'), {
@@ -177,7 +184,7 @@ async function renderGuide(sec, data, g) {
             title();
         },
         remove: async () => {
-            if (!confirm(`Remove the “${g.title}” buying guide?\n\nIts tables (${optionsPath(g)}, ${pricesPath(g)}) are kept in your folder.`)) return;
+            if (!confirm(`Remove the “${g.title}” buying guide?\n\nIts tables (${optionsPath(g)}, ${specsPath(g)}, ${pricesPath(g)}) are kept in your folder.`)) return;
             const list = data.guides.filter(x => x.id !== g.id);
             try {
                 await saveData({ ...data, guides: list });
@@ -187,17 +194,41 @@ async function renderGuide(sec, data, g) {
             toast(`Removed “${g.title}”`, 'ok');
         },
     });
+    const items = () => options.map(r => r.Item).filter(Boolean);
+    const specsEl = sec.querySelector('[data-specs]');
+    let specsTable, specNames = '';
+    const drawSpecs = () => {
+        const columns = specColumns(items(), specs);
+        specNames = columns.map(c => c.name).join('|');
+        specsTable = recordTable(specsEl, {
+            columns,
+            rows: specs.rows,
+            save: async rows => {
+                const names = columns.map(c => c.name);
+                await saveSpecs(g, names, rows);
+                specs = { columns: names, rows };
+            },
+        });
+    };
+    drawSpecs();
     const optionsTable = recordTable(sec.querySelector('[data-options]'), {
         columns: OPTION_COLUMNS,
         rows: options,
-        save: r => saveOptions(g, r),
+        save: async r => {
+            await saveOptions(g, r);
+            options = r;
+            // A new or renamed option gets its column (unless the specs are being edited: then on the next visit).
+            const changed = specColumns(items(), specs).map(c => c.name).join('|') !== specNames;
+            if (changed && !specsTable.hasUnsavedEdits()) drawSpecs();
+        },
     });
     const pricesTable = recordTable(sec.querySelector('[data-prices]'), {
-        columns: priceColumns(options.map(r => r.Item).filter(Boolean)),
+        columns: priceColumns(items()),
         rows: prices,
         save: r => savePrices(g, r),
     });
-    checks.push(() => sec.isConnected && (box.hasUnsavedEdits() || optionsTable.hasUnsavedEdits() || pricesTable.hasUnsavedEdits()));
+    checks.push(() => sec.isConnected && (box.hasUnsavedEdits() || optionsTable.hasUnsavedEdits() || specsTable.hasUnsavedEdits()
+        || pricesTable.hasUnsavedEdits()));
 }
 
 /** "＋ Add year": the year after the newest list (this year's if there's none for it yet). */

@@ -256,3 +256,26 @@ export const loadOptions = g => readRows(optionsPath(g), OPTION_NAMES, true);
 export const saveOptions = (g, rows) => writeRows(optionsPath(g), OPTION_NAMES, rows);
 export const loadPrices = g => readRows(pricesPath(g), PRICE_NAMES, true);
 export const savePrices = (g, rows) => writeRows(pricesPath(g), PRICE_NAMES, rows);
+
+// Specs: one row per spec (CPU, RAM, …) and one column per option, so a spec is added as a row in the app and an
+// option added to the Options table gets its own column. A column that isn't an option (e.g. what they have now, to
+// compare with) stays while anything is in it.
+export const SPEC = 'Spec';
+export const specsPath = g => `${GIFTS_DIR}/guide-${g.id}-specs.csv`;
+
+/** The specs table as saved: { columns: the file's columns (Spec first), rows }. */
+export async function loadSpecs(g) {
+    const text = await readTracked(specsPath(g));
+    return text === null ? { columns: [SPEC], rows: [] } : parseCSV(text);
+}
+export const saveSpecs = (g, columns, rows) => writeRows(specsPath(g), columns, rows);
+
+/** Spec, then a column per option (`items`, in the Options order), then the file's other columns that hold something. */
+export function specColumns(items, specs) {
+    const names = [...new Set(items.map(i => String(i).trim()).filter(i => i && i !== SPEC))];
+    const kept = specs.columns.filter(c => c && c !== SPEC && !names.includes(c) && specs.rows.some(r => String(r[c] ?? '').trim()));
+    return [
+        { name: SPEC, kind: 'suggest' },
+        ...[...names, ...kept].map(name => ({ name, kind: 'suggest' })),
+    ];
+}
