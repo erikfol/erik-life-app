@@ -201,3 +201,90 @@ export async function syncAvailable(balance) {
     if (!data?.available || Math.abs((data.available.value ?? NaN) - balance) < 0.005) return;
     await changeSavings((R, info) => { R[info.available.rec][1] = sheetDollars(balance); R[info.available.rec][2] = longDate(new Date()); });
 }
+
+// ── Money to move: paid from checking for a bucket (e.g. a credit card charge for the heat bill), still to move out of
+// savings. Marking items moved does the bookkeeping: one transfer per destination, in the transfer log and as a
+// Withdrawal in the account activity, and each bucket's balance lowered by its items.
+export const MOVE_PATH = 'inputs/savings/to_move.csv';
+export const MOVE_COLS = ['Date', 'Bucket', 'Description', 'Amount', 'To', 'Moved'];
+/** The items as saved ([] before the first): [{ Date: 'YYYY-MM-DD', Bucket, Description, Amount, To, Moved: 'YYYY-MM-DD', or '' while still to move }]. */
+export async function loadMoves() {
+    const text = await fs.readText(MOVE_PATH);
+    if (text == null) return [];
+    return parseCSV(text).rows.map(r => Object.fromEntries(MOVE_COLS.map(c => [c, trim(r[c])])));
+}
+export const saveMoves = rows => fs.writeText(MOVE_PATH, toCSV(MOVE_COLS, rows));
+/** An item's amount (always positive), 0 if blank. */
+export const moveAmount = r => { const n = Math.abs(parseMoney(r.Amount)); return Number.isFinite(n) ? n : 0; };
+/** Items still to move, a group per bucket (biggest first): [{ bucket, rows, total }]. */
+export function movesByBucket(rows) {
+    const by = new Map();
+    for (const r of rows.filter(x => !x.Moved)) {
+        const k = r.Bucket.toLowerCase();
+        if (!by.has(k)) by.set(k, { bucket: r.Bucket, rows: [] });
+        by.get(k).rows.push(r);
+    }
+    return [...by.values()].map(g => ({ ...g, total: round2(g.rows.reduce((t, r) => t + moveAmount(r), 0)) })).sort((a, b) => b.total - a.total);
+}
+const dayOf = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+const dollars = n => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Move `items` (rows from loadMoves, not moved yet) out of savings on `date` ('YYYY-MM-DD'). For each destination (To):
+ * one "From Save to …" row in the transfer log and one Withdrawal in the account activity, for the items' total; each
+ * bucket's balance goes down by its items (its date stays: it's the last paycheck deposit); the items get Moved = date.
+ * `opening`: the account activity's starting balance (saved with it if it isn't yet). If a step fails, the error's
+ * `done` lists the steps already saved.
+ */
+export async function moveMoney(items, date, opening) {
+    const data = await loadSavings();
+    if (!data) throw new Error(`${SAVINGS_PATH} not found`);
+    const bucketOf = name => data.buckets.find(b => b.group !== 'past' && b.name.toLowerCase() === name.toLowerCase());
+    const missing = [...new Set(items.map(r => r.Bucket))].filter(n => !bucketOf(n));
+    if (missing.length) throw Object.assign(new Error(`${missing.join(', ')} isn't a bucket in Where the money is any more: change the item's bucket first`), { done: [] });
+    const groups = [...items.reduce((m, r) => { const to = r.To || 'Checking'; if (!m.has(to)) m.set(to, []); m.get(to).push(r); return m; }, new Map())]
+        .map(([to, rows]) => {
+            const total = round2(rows.reduce((t, r) => t + moveAmount(r), 0));
+            const buckets = movesByBucket(rows);
+            const text = buckets.map(g => `${g.bucket} ${dollars(g.total)}: ${g.rows.map(r => `${r.Description || 'no description'} ${dollars(moveAmount(r))}`).join('; ')}`).join(' · ');
+            return { to, rows, total, text };
+        });
+    const done = [];
+    try {
+        await changeSavings((R, info) => {
+            for (const g of movesByBucket(items)) {
+                const b = info.buckets.find(x => x.group !== 'past' && x.name.toLowerCase() === g.bucket.toLowerCase());
+                R[b.rec][1] = sheetDollars(round2((Number.isFinite(b.balance) ? b.balance : 0) - g.total));
+            }
+            if (info.transferHeader >= 0) {
+                R.splice(info.transferHeader + 1, 0, ...groups.map(g => transferCells({ kind: `From Save to ${g.to}`, amount: g.total, date: dayOf(date), confirmed: true, description: `Money to move · ${g.text}` })));
+            }
+        });
+        done.push(`took it off the bucket${movesByBucket(items).length === 1 ? '' : 's'} and logged the transfer`);
+        // new entries go at the top of the activity (the latest of the day)
+        const rows = [...groups.map(g => ({ Date: date, Description: `Transfer to ${g.to}`, Type: 'Withdrawal', Amount: g.total.toFixed(2), Notes: `Money to move · ${g.text}` })), ...await loadActivity()];
+        await saveActivity(rows);
+        done.push('added the withdrawal to Account activity');
+        const settings = await loadSettings();
+        if (!settings?.opening) await saveSettings({ opening });
+        await syncAvailable(savingsLedger(settings?.opening || opening, rows).balance);
+        const all = await loadMoves(), left = [...items];
+        for (const r of all) {
+            const k = left.findIndex(x => !r.Moved && MOVE_COLS.every(c => x[c] === r[c]));
+            if (k >= 0) { r.Moved = date; left.splice(k, 1); }
+        }
+        await saveMoves(all);
+    } catch (err) {
+        err.done = done;
+        throw err;
+    }
+    return groups;
+}
+
+/** A bucket was renamed in Edit buckets: its items still to move follow it. */
+export async function renameMoveBucket(from, to) {
+    const all = await loadMoves();
+    let n = 0;
+    for (const r of all) if (!r.Moved && r.Bucket.toLowerCase() === from.toLowerCase()) { r.Bucket = to; n++; }
+    if (n) await saveMoves(all);
+}

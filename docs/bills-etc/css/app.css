@@ -458,6 +458,13 @@ details.bucket-group > summary { cursor: pointer; margin-bottom: 8px; }
 .deposit-btn { padding: 2px 8px; font-size: 0.85em; color: var(--green); border-color: #bfe8cf; background: #f2fbf5; font-family: Consolas, 'SF Mono', monospace; }
 .deposit-btn:hover { background: #dff5e7; }
 .due-tag { color: var(--orange); font-weight: 600; font-size: 0.95em; }
+/* Savings → Where the money is: money to move out of savings */
+.move-box { border: 1px solid #f0e08a; background: #fffdf2; border-radius: 8px; padding: 8px 14px 12px; margin: 6px 0 14px; }
+.move-table td:first-child, .move-table th:first-child { width: 28px; text-align: center; }
+.move-bar { gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.move-bar input[type=date] { width: 150px; }
+.move-tag { color: #8a6d00; font-weight: 600; font-size: 0.95em; }
+.b-notes.b-moves { background: #fffbe0; border-radius: 6px; margin-bottom: 4px; }
 /* Small tabs inside a utility (Electric: Bills / Mini-Splits) */
 .pillnav { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
 .pillnav a { padding: 5px 14px; border-radius: 16px; background: var(--head); color: #555; text-decoration: none; font-size: 0.88em; border: 1px solid var(--line-strong); }

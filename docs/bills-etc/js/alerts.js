@@ -4,7 +4,7 @@
 // would start the Bills Etc app on the Home page, so nothing here may.
 import * as fs from './fs.js';
 import { PATHS } from './data.js';
-import { loadSavings, loadActivity as loadSavingsActivity, loadSettings } from './savings.js';
+import { loadSavings, loadActivity as loadSavingsActivity, loadSettings, loadMoves, movesByBucket } from './savings.js';
 import { loadElectric } from './electric.js';
 import { loadWater, nextQuarter } from './water.js';
 import { loadDeliveries } from './heating.js';
@@ -105,6 +105,12 @@ async function savingsItems(t0) {
     if (a.days >= STALE_DAYS) {
         out.push({ level: a.days >= VERY_STALE_DAYS ? 'stale' : 'aging', where, href,
             text: `<strong>Account activity not updated</strong> · ${a.lastEntry ? `last entry ${esc(dLong(a.lastEntry))}` : 'no entries yet'}${a.checked ? `, checked ${esc(dLong(a.checked))}` : ''}${Number.isFinite(a.days) ? ` (${days(a.days)})` : ''}` });
+    }
+    // Money to move out of savings (paid from checking for a bucket), as the Savings banner: yellow until marked moved
+    const moves = movesByBucket(await loadMoves());
+    if (moves.length) {
+        out.push({ level: 'aging', where, href,
+            text: `<strong>Money to move out of savings</strong> · ${esc(money(sum(moves.map(g => g.total))))}: ${moves.map(g => `${esc(g.bucket)} ${esc(money(g.total))}`).join(', ')}` });
     }
     return out;
 }

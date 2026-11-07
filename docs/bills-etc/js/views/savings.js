@@ -5,7 +5,9 @@
 import {
     loadSavings, changeSavings, bucketCells, transferCells, sheetDollars, longDate, SAVINGS_PATH,
     loadActivity, saveActivity, ACTIVITY_COLUMNS, ACTIVITY_TYPES, ACTIVITY_PATH, savingsLedger, loadSettings, saveSettings, syncAvailable,
+    loadMoves, saveMoves, moveAmount, movesByBucket, moveMoney, renameMoveBucket, MOVE_PATH,
 } from '../savings.js';
+import { loadAccounts, loadActivity as loadCardActivity, isCard } from '../loans.js';
 import { PATHS, readTable } from '../data.js';
 import { normalizeMaster, monthlyBreakdown } from '../finance.js';
 import { yearMonth } from '../dates.js';
@@ -32,6 +34,20 @@ let activityTable = null; // the account activity table
 const daysAgo = d => Math.round((today() - d) / DAY);
 const amountText = v => (Number.isFinite(v) ? money(v) : '–');
 
+/**
+ * Credit card charges marked paid back in the last 6 months, newest first: the ones a money-to-move item can be filled
+ * in from (you paid the card from checking, so the bucket's money goes to checking).
+ */
+async function paidBackCharges() {
+    try {
+        const since = plusDays(today(), -183);
+        const lists = await Promise.all((await loadAccounts()).filter(isCard).map(async a => (await loadCardActivity(a))
+            .filter(x => x.paidBack === 'Yes' && /^charge$/i.test(x.type) && x.date && x.date >= since && Number.isFinite(x.amount))
+            .map(x => ({ ...x, card: a.title }))));
+        return lists.flat().sort((a, b) => b.date - a.date);
+    } catch { return []; }
+}
+
 /** Average monthly spending over the last six complete months, from your transaction history (NaN if none). */
 async function averageSpending() {
     try {
@@ -52,7 +68,7 @@ export default {
             el.innerHTML = `<h1 class="page">Savings</h1><div class="banner">No savings sheet found. This page reads <code>${esc(SAVINGS_PATH)}</code> in your erik-life-app folder.</div>`;
             return;
         }
-        const [spending, activity, settings] = await Promise.all([averageSpending(), loadActivity(), loadSettings()]);
+        const [spending, activity, settings, moves, paidCharges] = await Promise.all([averageSpending(), loadActivity(), loadSettings(), loadMoves(), paidBackCharges()]);
         const { available, buckets, transfers, totals } = data;
         // What's in the account: the starting balance (until one is saved, the sheet's Available In Account) plus deposits
         // minus withdrawals.
@@ -67,6 +83,10 @@ export default {
         const t0 = today(), yearAgo = new Date(t0.getFullYear() - 1, t0.getMonth(), t0.getDate());
         const recent = transfers.filter(t => t.date && t.date >= yearAgo);
         const movedYear = sum(recent.map(t => t.amount).filter(Number.isFinite));
+        // Money to move: paid from checking for a bucket, still in savings (oldest first, the order you paid them)
+        const pending = moves.filter(r => !r.Moved).sort((a, b) => (a.Date || '9999').localeCompare(b.Date || '9999'));
+        const toMove = movesByBucket(moves), toMoveTotal = sum(toMove.map(g => g.total));
+        const toMoveOf = b => toMove.find(g => g.bucket.toLowerCase() === b.name.toLowerCase());
 
         el.innerHTML = `
             <div class="row dash-head">
@@ -104,6 +124,7 @@ export default {
             <section>
                 <h2>Where the money is <span class="sub">click a bucket to see its notes</span>
                     <span class="spacer"></span><button type="button" class="small" id="b-edit">✎ Edit buckets</button></h2>
+                <div id="moves" class="move-box"></div>
                 <div id="buckets"></div>
                 <div id="b-editor" hidden></div>
             </section>
@@ -180,7 +201,10 @@ export default {
             ? `<div class="banner updated-${act.days >= VERY_STALE_DAYS ? 'stale' : 'aging'} row"><span><strong>Account activity not updated in ${act.days >= VERY_STALE_DAYS ? VERY_STALE_DAYS : STALE_DAYS}+ days</strong> · ${actText}</span>
                 <span class="spacer"></span><button type="button" class="small" id="act-checked" title="You looked at the account and there's nothing new to add. Saves today's date; no entry is added.">✓ Checked – no new activity</button></div>`
             : `<div class="banner ok">✓ <strong>Account activity up to date</strong> · ${actText}</div>`;
-        $('#status').innerHTML = depositBanner + actBanner;
+        $('#status').innerHTML = depositBanner + actBanner + (!pending.length ? '' : `<div class="banner updated-aging row"><span>💸 <strong>Money to move out of savings: ${esc(money(toMoveTotal))}</strong>
+                · ${toMove.map(g => `${esc(g.bucket)} ${esc(money(g.total))} (${g.rows.length} item${g.rows.length === 1 ? '' : 's'})`).join(', ')}, paid from checking</span>
+                <span class="spacer"></span><button type="button" class="small" id="move-go">See the list</button></div>`);
+        if ($('#move-go')) $('#move-go').onclick = () => $('#moves').scrollIntoView({ behavior: 'smooth', block: 'start' });
         const checkedBtn = $('#act-checked');
         if (checkedBtn) checkedBtn.onclick = async () => {
             checkedBtn.disabled = true;
@@ -309,8 +333,9 @@ export default {
                     <span class="b-check">${b.group === 'active' && b.perCheck > 0
                         ? `<button type="button" class="small deposit-btn" data-deposit="${b.rec}" title="Add one paycheck deposit: +${esc(money(b.perCheck))} and the date moves 2 weeks to ${b.updated ? esc(dLong(plusDays(b.updated, EVERY))) : 'today'}">+${esc(money(b.perCheck))}</button>`
                         : Number.isFinite(b.perCheck) && b.perCheck > 0 ? `+${esc(money(b.perCheck))}/check` : '<span class="muted">–</span>'}</span>
-                    <span class="b-date muted">${b.updated ? esc(dLong(b.updated)) : ''}${depositsDue(b) ? `<br><span class="due-tag">${depositsDue(b)} due</span>` : ''}</span>
+                    <span class="b-date muted">${b.updated ? esc(dLong(b.updated)) : ''}${depositsDue(b) ? `<br><span class="due-tag">${depositsDue(b)} due</span>` : ''}${toMoveOf(b) ? `<br><span class="move-tag" title="Paid from checking, still to move out of savings">${esc(money(toMoveOf(b).total))} to move</span>` : ''}</span>
                 </summary>
+                ${toMoveOf(b) ? `<div class="b-notes b-moves">💸 <strong>To move out of savings:</strong> ${toMoveOf(b).rows.map(r => `${esc(r.Description || 'no description')} ${esc(money(moveAmount(r)))}${dateOf(r.Date) ? ` <span class="muted">(${esc(dLong(dateOf(r.Date)))})</span>` : ''}`).join(' · ')}</div>` : ''}
                 <div class="b-notes">${b.notes ? esc(b.notes).replace(/\r?\n/g, '<br>') : '<span class="muted">No notes.</span>'}</div>
             </details>`;
         $('#buckets').innerHTML = GROUPS.map(g => {
@@ -342,8 +367,170 @@ export default {
             deposit([{ b, n: 1 }], `${b.name}: +${money(b.perCheck)} (now ${money((Number.isFinite(b.balance) ? b.balance : 0) + b.perCheck)}, dated ${dLong(to)})`);
         });
 
+        // ── Money to move: tick what you moved (one transfer for all of them) and Mark moved; add, change or remove items ──
+        const moved = moves.filter(r => r.Moved).sort((a, b) => b.Moved.localeCompare(a.Moved) || (b.Date || '').localeCompare(a.Date || ''));
+        const dayText = iso => (dateOf(iso) ? esc(dLong(dateOf(iso))) : '<span class="muted">no date</span>');
+        const mv = $('#moves');
+        mv.innerHTML = `
+            <h3 class="chart-title" style="margin-top:4px">💸 Money to move <span class="muted" style="font-weight:400">paid from checking for a bucket, still to move out of savings · kept in <code>${esc(MOVE_PATH)}</code></span></h3>
+            ${pending.length ? `<div class="table-wrap"><table class="filter-table move-table">
+                <thead><tr><th><input type="checkbox" id="move-all" checked title="Select all"></th><th>Paid from checking</th><th>Bucket</th><th>What for</th><th class="num">Amount</th><th>To</th><th></th></tr></thead>
+                <tbody>${pending.map((r, k) => `<tr>
+                    <td><input type="checkbox" data-pick="${k}" checked></td>
+                    <td class="nowrap">${dayText(r.Date)}</td>
+                    <td>${esc(r.Bucket)}</td>
+                    <td class="note-text">${esc(r.Description)}</td>
+                    <td class="amt nowrap">${esc(money(moveAmount(r)))}</td>
+                    <td>${esc(r.To || 'Checking')}</td>
+                    <td class="nowrap"><button type="button" class="small" data-move-edit="${k}" title="Change this item">✎</button>
+                        <button type="button" class="small danger" data-move-del="${k}" title="Remove this item (nothing else changes)">✕</button></td>
+                </tr>`).join('')}</tbody>
+                <tfoot><tr class="total-row"><td></td><td colspan="3"><strong>Total</strong></td><td class="amt"><strong>${esc(money(toMoveTotal))}</strong></td><td colspan="2"></td></tr></tfoot>
+            </table></div>
+            <div class="row move-bar">
+                <span id="move-sel"></span>
+                <span class="spacer"></span>
+                <label class="row" style="gap:6px">Moved on <input type="date" id="move-date" value="${isoDate(today())}"></label>
+                <button type="button" class="primary small" id="move-mark">✓ Mark moved</button>
+            </div>
+            <p class="muted" style="font-size:0.85em;margin:4px 0 10px">Mark moved takes the selected items off their buckets, logs one transfer in <em>Money moved out of savings</em> and adds one
+                Withdrawal to <em>Account activity</em>, so you don't add that withdrawal from the bank too. Do the transfer at your bank as well.</p>`
+            : '<p class="muted" style="margin:0 0 8px">Nothing waiting to move. When you pay something from checking that a bucket was saving for, add it here.</p>'}
+            <div class="row"><button type="button" class="small" id="move-add">+ Add money to move</button></div>
+            <form id="move-form" class="add-bill" hidden style="margin-top:10px">
+                <h3>Add money to move</h3>
+                ${paidCharges.length ? `<label class="field" style="margin-bottom:12px">Fill in from a card charge you marked paid back <span class="muted">(optional)</span>
+                    <select name="charge"><option value="">–</option></select></label>` : ''}
+                <div class="add-grid">
+                    <label class="field">Paid from checking on<input type="date" name="date" required></label>
+                    <label class="field">Bucket<select name="bucket"></select></label>
+                    <label class="field">Amount ($)<input type="number" name="amount" step="0.01" min="0" required></label>
+                </div>
+                <div class="add-grid">
+                    <label class="field" style="grid-column:span 2">What for<input type="text" name="description" placeholder="e.g. Heatable delivery, paid off the BJ's card"></label>
+                    <label class="field">Move to<input type="text" name="to" list="t-dests" placeholder="Checking"></label>
+                </div>
+                <div class="row"><button type="submit" class="primary">Save</button><button type="button" id="move-cancel">Cancel</button></div>
+            </form>
+            ${moved.length ? `<details class="bucket-group" style="margin-top:10px"><summary><strong>Moved</strong> <span class="muted">(${moved.length})</span></summary>
+                <div class="table-wrap short-table"><table class="filter-table move-table">
+                    <thead><tr><th>Moved on</th><th>Paid from checking</th><th>Bucket</th><th>What for</th><th class="num">Amount</th><th>To</th></tr></thead>
+                    <tbody>${moved.map(r => `<tr><td class="nowrap">${dayText(r.Moved)}</td><td class="nowrap">${dayText(r.Date)}</td><td>${esc(r.Bucket)}</td>
+                        <td class="note-text">${esc(r.Description)}</td><td class="amt nowrap">${esc(money(moveAmount(r)))}</td><td>${esc(r.To || 'Checking')}</td></tr>`).join('')}</tbody>
+                </table></div></details>` : ''}`;
+        const picked = () => [...mv.querySelectorAll('[data-pick]')].filter(c => c.checked).map(c => pending[+c.dataset.pick]);
+        const showPicked = () => {
+            const list = picked(), sel = mv.querySelector('#move-sel'), mark = mv.querySelector('#move-mark');
+            if (!sel) return;
+            sel.innerHTML = list.length ? `<strong>${list.length} of ${pending.length}</strong> selected · <strong>${esc(money(sum(list.map(moveAmount))))}</strong>` : '<span class="muted">Tick the items you moved</span>';
+            mark.disabled = !list.length;
+            mv.querySelector('#move-all').checked = list.length === pending.length;
+        };
+        showPicked();
+        mv.addEventListener('change', e => {
+            if (e.target.id === 'move-all') mv.querySelectorAll('[data-pick]').forEach(c => { c.checked = e.target.checked; });
+            if (e.target.id === 'move-all' || e.target.dataset.pick != null) showPicked();
+        });
+        const unsaved = () => (editing && editing !== 'moves') || activityTable?.hasUnsavedEdits();
+        // Mark moved: the bookkeeping for the ticked items (see moveMoney), after you confirm what it will change
+        const markBtn = mv.querySelector('#move-mark');
+        if (markBtn) markBtn.onclick = async () => {
+            const list = picked(), date = mv.querySelector('#move-date').value, day = dateOf(date);
+            if (!list.length) return;
+            if (!day) { toast('Pick the day you moved it', 'bad'); return; }
+            const total = sum(list.map(moveAmount)), groups = movesByBucket(list);
+            const dests = [...new Set(list.map(r => r.To || 'Checking'))];
+            const lines = groups.map(g => {
+                const b = live.find(x => x.name.toLowerCase() === g.bucket.toLowerCase());
+                return `• ${g.bucket}: ${b && Number.isFinite(b.balance) ? `${money(b.balance)} → ${money(b.balance - g.total)}` : `− ${money(g.total)}`} (${g.rows.length} item${g.rows.length === 1 ? '' : 's'})`;
+            }).join('\n');
+            if (!confirm(`Move ${money(total)} out of savings to ${dests.join(' and ')} on ${dLong(day)}?\n\n${lines}\n`
+                + `• ${dests.length === 1 ? `"From Save to ${dests[0]}" ${money(total)}` : `${dests.length} transfers`} in Money moved out of savings\n`
+                + `• ${dests.length === 1 ? `a ${money(total)} Withdrawal` : `${dests.length} Withdrawals`} in Account activity (don't add ${dests.length === 1 ? 'it' : 'them'} again from the bank)`)) return;
+            if (unsaved() && !confirm('You have unsaved savings edits. Mark these moved and lose them?')) return;
+            markBtn.disabled = true;
+            try {
+                await moveMoney(list, date, opening);
+                editing = null;
+                activityTable = null;
+                toast(`Moved ${money(total)} to ${dests.join(' and ')}: ${groups.map(g => `${g.bucket} − ${money(g.total)}`).join(', ')}`, 'ok');
+            } catch (err) {
+                toast(`Save failed: ${err.message}.${err.done?.length ? ` Already saved: ${err.done.join(', ')}.` : ''} Is a file open in Excel?`, 'bad');
+            }
+            await reload();
+        };
+        // Add / change an item
+        const mf = mv.querySelector('#move-form');
+        let editingItem = null; // the item being changed, or null for a new one
+        const bucketOptions = current => {
+            const names = live.map(b => b.name);
+            if (current && !names.some(n => n.toLowerCase() === current.toLowerCase())) names.unshift(current); // a bucket since renamed or removed
+            mf.bucket.innerHTML = names.map(n => `<option${n === current ? ' selected' : ''}>${esc(n)}</option>`).join('');
+        };
+        // card charges not already in the list (same amount, and its description in the item's)
+        const charges = paidCharges.filter(c => !moves.some(m => Math.abs(moveAmount(m) - c.amount) < 0.005 && m.Description.toLowerCase().includes(c.description.toLowerCase())));
+        if (mf.charge) {
+            mf.charge.innerHTML = `<option value="">${charges.length ? '–' : '– none left to add –'}</option>`
+                + charges.map((c, k) => `<option value="${k}">${esc(c.card)} · ${esc(dLong(c.date))} · ${esc(c.description || 'charge')} · ${esc(money(c.amount))}</option>`).join('');
+            mf.charge.onchange = () => {
+                const c = charges[+mf.charge.value];
+                if (!c || mf.charge.value === '') return;
+                mf.amount.value = c.amount.toFixed(2);
+                mf.description.value = `${c.description || 'Charge'} (${c.card}, charged ${dLong(c.date)})`;
+                // the bucket the same kind of charge went to before
+                const same = [...moves].reverse().find(m => c.description && m.Description.toLowerCase().startsWith(c.description.toLowerCase()));
+                if (same) bucketOptions(same.Bucket);
+            };
+        }
+        const openForm = item => {
+            editingItem = item;
+            editing = 'moves';
+            mf.reset();
+            mf.querySelector('h3').textContent = item ? 'Change money to move' : 'Add money to move';
+            if (mf.charge) mf.charge.closest('label').hidden = !!item;
+            mf.date.value = item?.Date || isoDate(today());
+            bucketOptions(item ? item.Bucket : [...moves].reverse()[0]?.Bucket || live[0]?.name);
+            mf.amount.value = item ? moveAmount(item).toFixed(2) : '';
+            mf.description.value = item?.Description || '';
+            mf.to.value = item?.To || 'Checking';
+            mf.hidden = false;
+            mv.querySelector('#move-add').hidden = true;
+            (item ? mf.amount : mf.charge || mf.amount).focus();
+        };
+        mv.querySelector('#move-add').onclick = () => openForm(null);
+        mv.querySelector('#move-cancel').onclick = () => { editing = null; mf.hidden = true; mv.querySelector('#move-add').hidden = false; };
+        mv.querySelectorAll('[data-move-edit]').forEach(b => { b.onclick = () => { openForm(pending[+b.dataset.moveEdit]); mf.scrollIntoView({ block: 'nearest' }); }; });
+        const saveMovesAndReload = async (rows, msg) => {
+            try {
+                await saveMoves(rows);
+                editing = null;
+                toast(msg, 'ok');
+                await reload();
+            } catch (err) {
+                toast(`Save failed: ${err.message}. Is ${MOVE_PATH} open in Excel?`, 'bad');
+            }
+        };
+        mf.onsubmit = async e => {
+            e.preventDefault();
+            const amount = numOf(mf.amount.value), date = mf.date.value, to = mf.to.value.trim() || 'Checking';
+            if (!dateOf(date) || !(amount > 0) || !mf.bucket.value) { toast('Enter the date, the bucket and the amount', 'bad'); return; }
+            const item = { Date: date, Bucket: mf.bucket.value, Description: mf.description.value.trim(), Amount: amount.toFixed(2), To: to, Moved: '' };
+            if (!editingItem && pending.some(r => r.Bucket === item.Bucket && Math.abs(moveAmount(r) - amount) < 0.005)) {
+                if (!confirm(`${item.Bucket} already has ${money(amount)} to move. Add another one?`)) return;
+            }
+            const rows = editingItem ? moves.map(r => (r === editingItem ? item : r)) : [...moves, item];
+            await saveMovesAndReload(rows, `${editingItem ? 'Changed' : 'Added'}: ${money(amount)} to move from ${item.Bucket}`);
+        };
+        mv.querySelectorAll('[data-move-del]').forEach(b => {
+            b.onclick = async () => {
+                const r = pending[+b.dataset.moveDel];
+                if (!confirm(`Remove "${r.Description || r.Bucket}" (${money(moveAmount(r))}) from Money to move? Nothing else changes.`)) return;
+                await saveMovesAndReload(moves.filter(x => x !== r), `Removed ${money(moveAmount(r))} from Money to move`);
+            };
+        });
+
         // ── Each paycheck ──
-        const checks = buckets.filter(b => b.group === 'active' && b.perCheck > 0).sort((a, b) => b.perCheck - a.perCheck);
+        const checks =buckets.filter(b => b.group === 'active' && b.perCheck > 0).sort((a, b) => b.perCheck - a.perCheck);
         const maxCheck = Math.max(1, ...checks.map(b => b.perCheck));
         $('#per-check').innerHTML = `<div class="bucket-list">${checks.map(b => `
             <div class="bucket-row static">
@@ -477,6 +664,10 @@ export default {
                 if (names.some((n, i) => names.indexOf(n) !== i)) { toast('Two buckets have the same name', 'bad'); return; }
                 const kept = new Set(rows.filter(r => r.rec != null).map(r => r.rec));
                 const removed = live.filter(b => !kept.has(b.rec)).map(b => b.rec);
+                // a renamed bucket's money to move goes with it
+                const renamed = rows.filter(r => r.rec != null).map(r => ({ from: buckets.find(x => x.rec === r.rec).name, to: r.name }))
+                    .filter(x => x.from !== x.to && toMoveOf({ name: x.from }));
+                const after = renamed.length ? async () => { for (const x of renamed) await renameMoveBucket(x.from, x.to); } : null;
                 await save((R, info) => {
                     for (const r of rows.filter(x => x.rec != null)) {
                         const old = R[r.rec];
@@ -497,7 +688,7 @@ export default {
                     for (const rec of [...removed].sort((a, b) => b - a)) R.splice(rec, 1);
                     const shift = removed.filter(rec => rec < at).length;
                     R.splice(at - shift, 0, ...fresh);
-                }, 'Saved your buckets');
+                }, 'Saved your buckets', after);
             }
         });
 
