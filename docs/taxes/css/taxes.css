@@ -1,0 +1,4 @@
+/* Taxes: a plain "for your information" banner (not counted on the Home page), and the year pills under the title */
+.banner.info { background: #eef4ff; color: #1f4e8c; border-color: #cfe0fb; }
+.banner.info a, .banner.ok a { color: inherit; }
+h1.page + .pillnav { margin-top: 10px; }

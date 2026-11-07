@@ -59,8 +59,8 @@ const numberOf = v => {
  *   choices: { [name]: { list: string[], noun: 'location', add: async name => void } } for 'choice' columns
  *            (without add the list is fixed: no "＋ New …" option)
  *   filesDir: the folder for 'files' columns without their own dir
- *   rowActions: [{ label, title, run: async row => void }] — a button for each entry in the read-only view (e.g. move
- *            an appointment to the records); run gets the entry as saved
+ *   rowActions: [{ label, title, run: async row => void, show?: row => bool }] — a button for each entry in the read-only
+ *            view (e.g. move an appointment to the records); run gets the entry as saved; show leaves it off entries it's false for
  * Rows are shown in the order they're saved in. Editing starts in the order the read-only view shows (so a column sort
  * can be kept), ↑ ↓ move a row, and a new entry goes at the top of a table with dates (the bottom of one without).
  * Returns { hasUnsavedEdits() }.
@@ -184,8 +184,8 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         tools.querySelector('[data-edit]').onclick = startEdit;
         // a last column with each entry's buttons (rowActions)
         const actionCol = rowActions.length ? [{ id: '_actions', label: '', plain: true, value: () => '', tdClass: () => 'row-actions',
-            cell: r => rowActions.map((a, k) => `<button type="button" class="small" data-row-action="${k}" data-row="${state.rows.indexOf(r)}"
-                title="${esc(a.title || '')}">${esc(a.label)}</button>`).join(' ') }] : [];
+            cell: r => rowActions.map((a, k) => (a.show && !a.show(r) ? '' : `<button type="button" class="small" data-row-action="${k}" data-row="${state.rows.indexOf(r)}"
+                title="${esc(a.title || '')}">${esc(a.label)}</button>`)).join(' ') }] : [];
         dataTable(readEl, {
             columns: [...cols.map(column), ...actionCol],
             rows: state.rows,

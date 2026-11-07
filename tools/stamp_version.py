@@ -40,6 +40,7 @@ APPS = {
     'kid-lunches': ('kid-lunches-version', SHARED + ['dinner-planner/css/dinner.css']),  # the Dinner Planner's calendar look
     'career': ('career-version', BASIC),
     'gifts': ('gifts-version', BASIC),
+    'taxes': ('taxes-version', BASIC + ['bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
     '401k': ('401k-version', SHARED + ['vehicles/css/vehicles.css', 'bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # + the 📱 phone copy; Bills Etc's charts and cards
 }
 
