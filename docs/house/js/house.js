@@ -261,7 +261,7 @@ export const areaInfo = (h, a, box = areaBoxes(a)[0]) => h.areas?.[a.id]?.[box.k
 // Used until house.json is first saved.
 const STARTING_HOUSES = [{ id: 'home', name: 'Home', info: blank(FIELDS) }];
 
-/** track: false for read-only use (the phone copy), so the save guard keeps the version this page is editing. */
+/** track: false for read-only use, so the save guard keeps the version this page is editing. */
 export async function loadHouses(track = true) {
     const text = track ? await readTracked(HOUSE_PATH) : await fs.readText(HOUSE_PATH);
     if (text === null) return structuredClone(STARTING_HOUSES);
@@ -271,7 +271,6 @@ export async function loadHouses(track = true) {
 
 export async function saveHouses(list) {
     await writeTracked(HOUSE_PATH, JSON.stringify({ houses: list }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /** A new house with a unique id made from its name. */
@@ -336,7 +335,6 @@ async function readRows(path, cols, track) {
 
 async function writeRows(path, cols, rows) {
     await writeTracked(path, toCSV(cols.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /** One of an area's `tables` (t) on house `h`: its file, and its rows (the calculated columns aren't saved). */

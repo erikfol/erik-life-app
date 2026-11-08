@@ -31,7 +31,6 @@ export async function loadPlan(track = true) {
 
 export async function savePlan(plan) {
     await writeTracked(PLAN_PATH, JSON.stringify(plan, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
@@ -87,7 +86,6 @@ async function loadCsv(path, columns, track, missing = []) {
 
 async function saveCsv(path, columns, rows) {
     await writeTracked(path, toCSV(columns.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 export const loadBalances = (track = true) => loadCsv(BALANCES_PATH, BALANCE_COLUMNS, track);

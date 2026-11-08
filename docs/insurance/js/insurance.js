@@ -20,7 +20,7 @@ const STARTING_POLICIES = [
     { id: 'boat', name: 'Boat', info: blankInfo() },
 ];
 
-/** track: false for read-only use (the phone copy), so the save guard keeps the version this page is editing. */
+/** track: false for read-only use, so the save guard keeps the version this page is editing. */
 export async function loadPolicies(track = true) {
     const text = track ? await readTracked(INSURANCE_PATH) : await fs.readText(INSURANCE_PATH);
     if (text === null) return structuredClone(STARTING_POLICIES);
@@ -30,7 +30,6 @@ export async function loadPolicies(track = true) {
 
 export async function savePolicies(list) {
     await writeTracked(INSURANCE_PATH, JSON.stringify({ policies: list }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 /** A new policy with a unique id made from its name. */
@@ -70,5 +69,4 @@ export async function loadRecords(p, track = true) {
 
 export async function saveRecords(p, rows) {
     await writeTracked(recordsPath(p), toCSV(RECORD_COLUMNS.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved'));
 }

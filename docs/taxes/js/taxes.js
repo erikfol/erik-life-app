@@ -53,7 +53,6 @@ export async function loadData(track = true) {
 
 export async function saveData(data) {
     await writeTracked(DATA_PATH, JSON.stringify(data, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 // ── Tax returns: one row a tax year ──────────────────────────────────────────
@@ -123,7 +122,6 @@ async function loadCsv(path, columns, track, missing = []) {
 }
 async function saveCsv(path, columns, rows) {
     await writeTracked(path, toCSV(columns.filter(c => !c.calc).map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved'));
 }
 export const loadReturns = (track = true) => loadCsv(RETURNS_PATH, RETURN_COLUMNS, track);
 export const saveReturns = rows => saveCsv(RETURNS_PATH, RETURN_COLUMNS, rows);

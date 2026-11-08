@@ -15,7 +15,7 @@ const blankInfo = () => FIELDS.map(label => ({ label, value: '' }));
 // Used until pets.json is first saved.
 const STARTING_PETS = ['Jackie', 'Castle', 'Kona', 'Cosmo', 'Peaches'].map(name => ({ id: name.toLowerCase(), name, info: blankInfo() }));
 
-/** track: false for read-only use (the phone copy), so the save guard keeps the version this page is editing. */
+/** track: false for read-only use, so the save guard keeps the version this page is editing. */
 export async function loadPets(track = true) {
     const text = track ? await readTracked(PETS_PATH) : await fs.readText(PETS_PATH);
     if (text === null) return structuredClone(STARTING_PETS);
@@ -25,7 +25,6 @@ export async function loadPets(track = true) {
 
 export async function savePets(list) {
     await writeTracked(PETS_PATH, JSON.stringify({ pets: list }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /** A new pet with a unique id made from its name. */
@@ -39,7 +38,6 @@ export function newPet(list, name) {
 /**
  * Age on `today` from a Birthday typed as 2018-03-05, 3/5/2018, Mar 5 2018, March 2018, 3/2018 or just 2018:
  * '8 years, 7 months' ('about 8 years' when only the year is known); null if it can't be read or is in the future.
- * Uses nothing outside itself: the phone copy (shared/js/phonecopy.js) embeds it as text.
  */
 export function ageText(birthday, today = new Date()) {
     const s = String(birthday ?? '').trim();
@@ -91,7 +89,6 @@ export async function loadRecords(p, track = true) {
 
 export async function saveRecords(p, rows) {
     await writeTracked(recordsPath(p), toCSV(RECORD_COLUMNS.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 // Future appointments: one CSV per pet next to its records.
@@ -114,14 +111,12 @@ export async function loadAppointments(p, track = true) {
 
 export async function saveAppointments(p, rows) {
     await writeTracked(appointmentsPath(p), toCSV(APPOINTMENT_COLUMNS.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /**
  * The banner at the top of a pet's page: the next appointment on or after `today` (rows with a YYYY-MM-DD Date).
  * { level: 'none' } (red) when there isn't one, 'soon' (yellow) when it's within 14 days, else 'later' (green);
  * with next (the row) and days (0 = today).
- * Uses nothing outside itself: the phone copy (shared/js/phonecopy.js) embeds it as text.
  */
 export function appointmentStatus(rows, today = new Date()) {
     const SOON_DAYS = 14;

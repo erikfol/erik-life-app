@@ -23,7 +23,6 @@ export async function load() {
 
 async function save() {
     await writeTracked(PATH, JSON.stringify(menu, null, 2));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 const pad = n => String(n).padStart(2, '0');

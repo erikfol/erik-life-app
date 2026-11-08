@@ -82,7 +82,6 @@ export async function renderGallery(el, dir, { noun = 'photo', onChange, compact
                 await fs.writeText(`${dir}/${name}`, f);
             }
             toast(`Added ${plural(files.length)}`, 'ok');
-            window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
         } catch (err) {
             toast(`Couldn't add ${noun}s: ${err.message}`, 'bad');
         }

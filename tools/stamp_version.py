@@ -17,31 +17,26 @@ DOCS = Path(__file__).resolve().parent.parent / 'docs'
 SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
           'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
           'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js',
-          'shared/js/phonecopy.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js', 'shared/js/lightbox.js',
-          'shared/js/infolinks.js', 'health/js/records.js', 'vehicles/js/vehicles.js', 'house/js/house.js', 'pets/js/pets.js',
-          'dinner-planner/js/store.js', 'kid-lunches/js/store.js', 'kid-lunches/js/school.js', '401k/js/401k.js']  # the phone copy reads every app's data
-# A section without the 📱 phone copy: the Home sections' table and information box.
-BASIC = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
-         'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
-         'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js', 'shared/js/recordtable.js',
-         'shared/js/navcolors.js', 'shared/js/lightbox.js', 'shared/js/infolinks.js', 'vehicles/css/vehicles.css']
+          'shared/js/recordtable.js', 'shared/js/navcolors.js', 'shared/js/lightbox.js', 'shared/js/infolinks.js']
+# The Home sections' table and information box.
+BASIC = SHARED + ['vehicles/css/vehicles.css']
 APPS = {
     'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/dropbox.js', 'shared/js/fileguard.js',
                                        'shared/js/infobox.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js',
                                        'shared/js/lightbox.js']),  # Forgettable Subs uses the Home sections' table; fs.js uses Dropbox
-    'health': ('health-version', SHARED + ['vehicles/css/vehicles.css']),  # the General information box's styles
+    'health': ('health-version', SHARED + ['vehicles/css/vehicles.css', 'pets/js/pets.js']),  # the General information box's styles; Pets' appointment status
     'vehicles': ('vehicles-version', SHARED),
-    'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
+    'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/vehicles.js', 'vehicles/js/views/gallery.js',
                                          'vehicles/js/views/places.js', 'vehicles/js/views/guides.js']),  # Vehicles' views (+ guide text formatting)
-    'insurance': ('insurance-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js',
+    'insurance': ('insurance-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/vehicles.js', 'vehicles/js/views/gallery.js',
                                                  'vehicles/js/views/places.js']),  # Vehicles' views
     'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
-    'dinner-planner': ('dinner-planner-version', SHARED),  # its own page + the 📱 phone copy; catalog.json/seed.json are fetched no-cache
+    'dinner-planner': ('dinner-planner-version', SHARED),  # catalog.json/seed.json are fetched no-cache
     'kid-lunches': ('kid-lunches-version', SHARED + ['dinner-planner/css/dinner.css']),  # the Dinner Planner's calendar look
     'career': ('career-version', BASIC),
     'gifts': ('gifts-version', BASIC),
     'taxes': ('taxes-version', BASIC + ['bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
-    '401k': ('401k-version', SHARED + ['vehicles/css/vehicles.css', 'bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # + the 📱 phone copy; Bills Etc's charts and cards
+    '401k': ('401k-version', SHARED + ['vehicles/css/vehicles.css', 'bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
 }
 
 

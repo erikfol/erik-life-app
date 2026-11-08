@@ -40,7 +40,7 @@ const STARTING_VEHICLES = [
         info: blankInfo('boat', { Year: '1996', Make: 'Four Winns', Model: '205 Sundowner' }) },
 ];
 
-/** track: false for read-only use (the phone copy), so the save guard keeps the version this page is editing. */
+/** track: false for read-only use, so the save guard keeps the version this page is editing. */
 export async function loadVehicles(track = true) {
     const text = track ? await readTracked(VEHICLES_PATH) : await fs.readText(VEHICLES_PATH);
     if (text === null) return structuredClone(STARTING_VEHICLES);
@@ -50,7 +50,6 @@ export async function loadVehicles(track = true) {
 
 export async function saveVehicles(list) {
     await writeTracked(VEHICLES_PATH, JSON.stringify({ vehicles: list }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /** A new vehicle with a unique id made from its name. */
@@ -103,7 +102,6 @@ async function loadRows(path, cols, track) {
 
 async function saveRows(path, cols, rows) {
     await writeTracked(path, toCSV(cols.map(c => c.name), rows));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 export const loadMaintenance = (v, track = true) => loadRows(maintenancePath(v), maintenanceColumns(v), track);

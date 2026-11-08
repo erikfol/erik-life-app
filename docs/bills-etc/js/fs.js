@@ -86,7 +86,7 @@ export async function rememberedFolder() {
     return { handle, granted, moved };
 }
 
-/** Remember another folder handle under `key` (e.g. where the phone copy goes). */
+/** Remember another folder handle under `key` (e.g. where backups go). */
 export async function rememberHandle(key, handle) {
     try { await idbOp('readwrite', s => s.put(handle, key)); } catch { /* not remembered; fine */ }
 }

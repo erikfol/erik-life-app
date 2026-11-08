@@ -6,7 +6,6 @@ import { esc } from '../../bills-etc/js/util.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
-import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import * as overview from './views/overview.js';
 import * as plan from './views/plan.js';
 
@@ -41,7 +40,6 @@ async function route(force = false) {
 }
 
 window.addEventListener('hashchange', () => route());
-setupPhoneCopy(document.getElementById('phone-copy'));
 window.addEventListener('beforeunload', e => {
     if (hasUnsavedEdits()) { e.preventDefault(); e.returnValue = ''; }
 });

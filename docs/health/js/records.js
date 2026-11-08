@@ -103,7 +103,7 @@ function accountBalance(rows) {
 
 /**
  * Rows of a section's file ([] when it doesn't exist yet); columns the file lacks read as blank.
- * track: false for read-only use (the phone copy), so the save guard keeps the version this page is editing.
+ * track: false for read-only use, so the save guard keeps the version this page is editing.
  */
 export async function loadRecords(section, track = true) {
     const text = track ? await readTracked(section.path) : await fs.readText(section.path);
@@ -113,7 +113,6 @@ export async function loadRecords(section, track = true) {
 
 export async function saveRecords(section, rows) {
     await writeTracked(section.path, toCSV(names(section), rows));
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 /**
@@ -132,7 +131,6 @@ export async function loadAccounts(section, track = true) {
 
 export async function saveAccounts(section, list) {
     await writeTracked(section.accounts, JSON.stringify({ accounts: list }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -156,7 +154,7 @@ export const accountSection = (section, account) => ({ ...section, path: `${HEAL
  * url, hint }] } }. A section not saved yet starts with its `info` fields, blank. links: websites next to the box's
  * heading with their sign-in hints, like a Loan/CC card's (kept in inputs/, never in the code: the site is public); a
  * section saved when it had one link holds { linkText, url, hint }, read as a list of one.
- * track: false for read-only use (the phone copy).
+ * track: false for read-only use.
  */
 export async function loadInfo(track = true) {
     const text = track ? await readTracked(INFO_PATH) : await fs.readText(INFO_PATH);
@@ -171,7 +169,6 @@ export async function loadInfo(track = true) {
 
 export async function saveInfo(data) {
     await writeTracked(INFO_PATH, JSON.stringify({ sections: data.sections, links: data.links }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved')); // the phone copy (shared/js/phonecopy.js) updates itself
 }
 
 export async function loadLocations() {

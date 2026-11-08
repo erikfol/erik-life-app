@@ -35,7 +35,6 @@ export async function loadData(track = true) {
 export async function saveData(data) {
     const years = [...new Set(data.christmasYears)].sort();
     await writeTracked(GIFTS_PATH, JSON.stringify({ ...data, christmasYears: years }, null, 2) + '\n');
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 /** A new person with a unique id made from their name. */
@@ -178,7 +177,6 @@ async function readRows(path, names, track) {
 
 async function writeRows(path, names, rows) {
     await writeTracked(path, toCSV(names, rows));
-    window.dispatchEvent(new Event('data-saved'));
 }
 
 export const loadGifts = (p, track = true) => readRows(giftsPath(p), GIFT_NAMES, track);

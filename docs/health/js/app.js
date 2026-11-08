@@ -7,7 +7,6 @@ import { SECTIONS } from './records.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
-import { setupPhoneCopy } from '../../shared/js/phonecopy.js';
 import { renderSection, hasUnsavedEdits, forget } from './views/section.js';
 
 const viewEl = document.getElementById('view');
@@ -41,8 +40,6 @@ window.addEventListener('hashchange', () => route());
 window.addEventListener('beforeunload', e => {
     if (hasUnsavedEdits()) { e.preventDefault(); e.returnValue = ''; }
 });
-
-setupPhoneCopy(document.getElementById('phone-copy'));
 
 (async () => {
     if (fs.isSupported()) await fs.rememberedFolder().catch(() => null);
