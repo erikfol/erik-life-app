@@ -6,6 +6,7 @@ import * as dbx from './dropbox.js';
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc } from '../../bills-etc/js/util.js';
 import { backupPanel } from './backup.js';
+import { assistantPanel } from './assistant/panel.js';
 
 // The sections that have red / yellow banners (the others have none), by their folder.
 const ALERTS = {
@@ -81,5 +82,6 @@ const drawDropbox = () => {
 };
 drawDropbox();
 connect();
+assistantPanel(document.getElementById('assistant'), ALERTS);
 // Back from a section (the browser may show this page as it was): count again, since something may have changed.
 window.addEventListener('pageshow', e => { if (e.persisted && fs.folder()) connected(); });

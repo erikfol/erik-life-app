@@ -13,8 +13,8 @@
     </script>
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261107151359";
-        const FILES = ["401k/js/401k.js", "401k/js/alerts.js", "bills-etc/js/alerts.js", "bills-etc/js/charts.js", "bills-etc/js/csv.js", "bills-etc/js/data.js", "bills-etc/js/datatable.js", "bills-etc/js/dates.js", "bills-etc/js/electric.js", "bills-etc/js/filtermenu.js", "bills-etc/js/fs.js", "bills-etc/js/heating.js", "bills-etc/js/loans.js", "bills-etc/js/propane.js", "bills-etc/js/savings.js", "bills-etc/js/sheet.js", "bills-etc/js/taxes.js", "bills-etc/js/util.js", "bills-etc/js/views/sheeteditor.js", "bills-etc/js/views/taxes.js", "bills-etc/js/views/utilcommon.js", "bills-etc/js/views/water.js", "bills-etc/js/water.js", "gifts/js/alerts.js", "gifts/js/gifts.js", "health/js/alerts.js", "health/js/records.js", "house/js/alerts.js", "house/js/house.js", "pets/js/alerts.js", "pets/js/pets.js", "shared/js/backup.js", "shared/js/dropbox.js", "shared/js/fileguard.js", "shared/js/home.js", "taxes/js/alerts.js", "taxes/js/taxes.js", "vehicles/js/alerts.js", "vehicles/js/vehicles.js"];
+        const VERSION = "20261108210450";
+        const FILES = ["401k/js/401k.js", "401k/js/alerts.js", "bills-etc/js/alerts.js", "bills-etc/js/bills.js", "bills-etc/js/charts.js", "bills-etc/js/csv.js", "bills-etc/js/data.js", "bills-etc/js/datatable.js", "bills-etc/js/dates.js", "bills-etc/js/electric.js", "bills-etc/js/filtermenu.js", "bills-etc/js/finance.js", "bills-etc/js/fs.js", "bills-etc/js/heating.js", "bills-etc/js/loans.js", "bills-etc/js/merchants.js", "bills-etc/js/propane.js", "bills-etc/js/rules.js", "bills-etc/js/savings.js", "bills-etc/js/sheet.js", "bills-etc/js/taxes.js", "bills-etc/js/util.js", "bills-etc/js/views/sheeteditor.js", "bills-etc/js/views/taxes.js", "bills-etc/js/views/utilcommon.js", "bills-etc/js/views/water.js", "bills-etc/js/water.js", "gifts/js/alerts.js", "gifts/js/gifts.js", "health/js/alerts.js", "health/js/records.js", "house/js/alerts.js", "house/js/house.js", "pets/js/alerts.js", "pets/js/pets.js", "shared/js/assistant/chat.js", "shared/js/assistant/panel.js", "shared/js/assistant/scrub.js", "shared/js/assistant/sources.js", "shared/js/assistant/tools.js", "shared/js/backup.js", "shared/js/dropbox.js", "shared/js/fileguard.js", "shared/js/home.js", "taxes/js/alerts.js", "taxes/js/taxes.js", "vehicles/js/alerts.js", "vehicles/js/vehicles.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('home-version') !== VERSION) {
@@ -49,7 +49,7 @@
             padding: 12px 24px;
         }
         .brand { font-weight: 700; font-size: 1.15em; letter-spacing: -0.3px; }
-        main { max-width: 1100px; margin: 28px auto; padding: 0 16px 60px; }
+        main { max-width: 1100px; margin: 28px auto; padding: 0 16px 100px; }
         h1 { font-size: 1.5em; margin-bottom: 6px; }
         p.lead { color: var(--muted); margin-bottom: 22px; }
         .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
@@ -98,6 +98,31 @@
         }
         .backup button:disabled { opacity: 0.7; cursor: default; }
         .dropbox button.primary, .alerts-note button.primary, .backup button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+        /* The assistant along the bottom of the page (shared/js/assistant/panel.js) */
+        .assistant { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid #dde1e8; box-shadow: 0 -2px 12px rgba(0,0,0,0.08); }
+        .as-inner { max-width: 1100px; margin: 0 auto; padding: 10px 16px; }
+        .as-bar, .as-keyrow { display: flex; gap: 8px; }
+        .as-bar input, .as-keyrow input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid #ccd; border-radius: 8px; background: var(--surface); color: var(--text); }
+        .as-bar button, .as-keyrow button, .as-actions button { font: inherit; border: 1px solid #ccd; border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+        .as-bar button, .as-keyrow button { padding: 9px 18px; flex-shrink: 0; }
+        .as-bar button.primary, .as-keyrow button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+        .as-bar button:disabled, .as-keyrow button:disabled { opacity: 0.6; cursor: default; }
+        .as-log { display: flex; flex-direction: column; max-height: min(60vh, 520px); margin-bottom: 10px; }
+        .as-log[hidden] { display: none; }
+        .as-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid #eceff4; margin-bottom: 8px; }
+        .as-note { color: var(--muted); font-size: 0.8em; }
+        .as-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .as-actions button { font-size: 0.82em; padding: 3px 9px; }
+        .as-messages { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px; }
+        .as-msg { max-width: 85%; padding: 9px 13px; border-radius: 12px; line-height: 1.45; font-size: 0.95em; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .as-msg.you { align-self: flex-end; background: var(--blue); color: #fff; }
+        .as-msg.bot { align-self: flex-start; background: #eef1f6; }
+        .as-msg.status { align-self: flex-start; color: var(--muted); font-style: italic; padding: 2px 4px; }
+        .as-msg.error { align-self: flex-start; background: #fdecea; color: #a8322a; border: 1px solid #f5c6c0; }
+        .as-setup { background: #f5f7fa; border-radius: 10px; padding: 12px 16px; font-size: 0.92em; line-height: 1.5; }
+        .as-setup ol { margin: 6px 0 10px 20px; }
+        .as-keymsg { color: #a8322a; margin-top: 6px; font-size: 0.9em; min-height: 1em; }
+        @media (max-width: 640px) { .as-note { display: none; } .as-head { justify-content: flex-end; } .as-msg { max-width: 92%; } }
     </style>
 </head>
 <body>
@@ -161,5 +186,6 @@
         <div class="backup" id="backup" hidden></div>
         <p class="dropbox" id="dropbox" hidden></p>
     </main>
+    <div class="assistant" id="assistant"></div>
 </body>
 </html>
