@@ -13,7 +13,7 @@
     </script>
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261108211735";
+        const VERSION = "20261108212834";
         const FILES = ["401k/js/401k.js", "401k/js/alerts.js", "bills-etc/js/alerts.js", "bills-etc/js/bills.js", "bills-etc/js/charts.js", "bills-etc/js/csv.js", "bills-etc/js/data.js", "bills-etc/js/datatable.js", "bills-etc/js/dates.js", "bills-etc/js/electric.js", "bills-etc/js/filtermenu.js", "bills-etc/js/finance.js", "bills-etc/js/fs.js", "bills-etc/js/heating.js", "bills-etc/js/loans.js", "bills-etc/js/merchants.js", "bills-etc/js/propane.js", "bills-etc/js/rules.js", "bills-etc/js/savings.js", "bills-etc/js/sheet.js", "bills-etc/js/taxes.js", "bills-etc/js/util.js", "bills-etc/js/views/sheeteditor.js", "bills-etc/js/views/taxes.js", "bills-etc/js/views/utilcommon.js", "bills-etc/js/views/water.js", "bills-etc/js/water.js", "gifts/js/alerts.js", "gifts/js/gifts.js", "health/js/alerts.js", "health/js/records.js", "house/js/alerts.js", "house/js/house.js", "pets/js/alerts.js", "pets/js/pets.js", "shared/js/assistant/chat.js", "shared/js/assistant/credits.js", "shared/js/assistant/panel.js", "shared/js/assistant/scrub.js", "shared/js/assistant/sources.js", "shared/js/assistant/tools.js", "shared/js/backup.js", "shared/js/dropbox.js", "shared/js/fileguard.js", "shared/js/home.js", "taxes/js/alerts.js", "taxes/js/taxes.js", "vehicles/js/alerts.js", "vehicles/js/vehicles.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
@@ -65,8 +65,7 @@
             transition: box-shadow 0.15s, transform 0.15s;
         }
         .app:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.12); transform: translateY(-2px); }
-        .app h2 { font-size: 1.15em; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px; }
-        .app p { color: var(--muted); font-size: 0.9em; line-height: 1.4; }
+        .app h2 { font-size: 1.15em; display: flex; align-items: flex-start; gap: 8px; }
         /* How many red and yellow banners a section has now (shared/js/home.js) */
         .alerts { margin-left: auto; display: flex; gap: 5px; flex-shrink: 0; }
         .count {
@@ -142,51 +141,39 @@
         <div class="apps">
             <a class="app" href="bills-etc/">
                 <h2><span>Bills Etc</span><span class="alerts"></span></h2>
-                <p>Checking, bills, savings, utilities, loans and credit cards.</p>
             </a>
             <a class="app" href="401k/">
                 <h2><span>401(k)</span><span class="alerts"></span></h2>
-                <p>The balance over time, what you and your employer put in against the IRS limit, the plan, investments and documents.</p>
             </a>
             <a class="app" href="taxes/">
                 <h2><span>Taxes</span><span class="alerts"></span></h2>
-                <p>Each year's return and refund, the filing deadline, the documents to gather and things to remember for the next return.</p>
             </a>
             <a class="app" href="health/">
                 <h2><span>Health</span><span class="alerts"></span></h2>
-                <p>General health, dental and eye records, and the HSA.</p>
             </a>
             <a class="app" href="vehicles/">
                 <h2><span>Vehicles</span><span class="alerts"></span></h2>
-                <p>Vehicle information and maintenance for the Accord and the Four Winns.</p>
             </a>
             <a class="app" href="house/">
                 <h2><span>House</span><span class="alerts"></span></h2>
-                <p>House information, service companies and photos; heating/cooling, septic, inside and outside records.</p>
             </a>
             <a class="app" href="pets/">
                 <h2><span>Pets</span><span class="alerts"></span></h2>
-                <p>General information and records for Jackie, Castle, Kona, Cosmo and Peaches.</p>
             </a>
             <a class="app" href="insurance/">
                 <h2><span>Insurance</span><span class="alerts"></span></h2>
-                <p>Policies, contacts, documents and records for home, auto, boat and more.</p>
             </a>
             <a class="app" href="dinner-planner/">
                 <h2><span>Dinner Planner</span><span class="alerts"></span></h2>
-                <p>Plan dinners on a calendar, keep your meals and ingredients, and get ideas and a shopping list.</p>
             </a>
             <a class="app" href="kid-lunches/">
                 <h2><span>Kid Lunches</span><span class="alerts"></span></h2>
-                <p>Plan the kids' lunches on a calendar, with a box for each kid on every day.</p>
             </a>
             <a class="app" href="gifts/">
                 <h2><span>Gifts, Bday, Anniversary</span><span class="alerts"></span></h2>
-                <p>Birthdays and anniversaries coming up, what you've given and plan to give, and a Christmas list for each year.</p>
             </a>
             <a class="app" href="career/">
                 <h2><span>Working Career</span><span class="alerts"></span></h2>
-                <p>Work history, skills, education, references and the job search, and a resume builder that fits a resume to a job posting.</p>
             </a>
         </div>
         <div class="backup" id="backup" hidden></div>
