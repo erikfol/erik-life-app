@@ -3,6 +3,7 @@
 // summary and what the lookups in tools.js return, all of it already through the privacy filter.
 import * as fs from '../../../bills-etc/js/fs.js';
 import { TOOLS, runTool, describeTool } from './tools.js';
+import { costOf } from './credits.js';
 
 export const ENV_PATH = 'inputs/assistant/.env';
 const DEFAULT_MODEL = 'claude-haiku-5-5';
@@ -115,31 +116,38 @@ async function callClaude({ key, model }, body) {
 /**
  * The answer to `question`, as text. Earlier turns ([{ q, a }]) go along as plain text. While lookups run, messages only
  * ever get added to (Claude's replies go back exactly as they came), which the API requires of its thinking blocks.
+ * onSpend gets what the question cost in dollars, even if a later step failed: the earlier calls were still billed.
  */
-export async function ask({ settings, ctx, history, question, onStatus }) {
+export async function ask({ settings, ctx, history, question, onStatus, onSpend }) {
     const system = systemPrompt(ctx);
     const messages = [
         ...history.slice(-MAX_TURNS_KEPT).flatMap(t => [{ role: 'user', content: t.q }, { role: 'assistant', content: t.a }]),
         { role: 'user', content: question },
     ];
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-        const reply = await callClaude(settings, {
-            max_tokens: 8000, system, tools: TOOLS, messages, cache_control: { type: 'ephemeral' }, output_config: { effort: 'medium' },
-        });
-        const text = (reply.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
-        if (reply.stop_reason === 'refusal') throw new Error('Claude declined to answer that. Try asking another way.');
-        if (reply.stop_reason === 'max_tokens') return `${text || 'That answer was too long to finish.'}\n\n(Cut off: try asking for less at once.)`;
-        if (reply.stop_reason !== 'tool_use') return text || 'I couldn\'t come up with an answer. Try asking another way.';
-        messages.push({ role: 'assistant', content: reply.content });
-        const uses = reply.content.filter(b => b.type === 'tool_use');
-        onStatus?.(describeTool(uses[0]));
-        messages.push({
-            role: 'user',
-            content: uses.map(u => {
-                try { return { type: 'tool_result', tool_use_id: u.id, content: runTool(ctx, u.name, u.input) }; }
-                catch (e) { return { type: 'tool_result', tool_use_id: u.id, content: e.message, is_error: true }; }
-            }),
-        });
+    let cost = 0;
+    try {
+        for (let round = 0; round < MAX_ROUNDS; round++) {
+            const reply = await callClaude(settings, {
+                max_tokens: 8000, system, tools: TOOLS, messages, cache_control: { type: 'ephemeral' }, output_config: { effort: 'medium' },
+            });
+            cost += costOf(settings.model, reply.usage);
+            const text = (reply.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+            if (reply.stop_reason === 'refusal') throw new Error('Claude declined to answer that. Try asking another way.');
+            if (reply.stop_reason === 'max_tokens') return `${text || 'That answer was too long to finish.'}\n\n(Cut off: try asking for less at once.)`;
+            if (reply.stop_reason !== 'tool_use') return text || 'I couldn\'t come up with an answer. Try asking another way.';
+            messages.push({ role: 'assistant', content: reply.content });
+            const uses = reply.content.filter(b => b.type === 'tool_use');
+            onStatus?.(describeTool(uses[0]));
+            messages.push({
+                role: 'user',
+                content: uses.map(u => {
+                    try { return { type: 'tool_result', tool_use_id: u.id, content: runTool(ctx, u.name, u.input) }; }
+                    catch (e) { return { type: 'tool_result', tool_use_id: u.id, content: e.message, is_error: true }; }
+                }),
+            });
+        }
+        throw new Error('That took too many lookups. Try asking something more specific.');
+    } finally {
+        if (cost) onSpend?.(cost);
     }
-    throw new Error('That took too many lookups. Try asking something more specific.');
 }

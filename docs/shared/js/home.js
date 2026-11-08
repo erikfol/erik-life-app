@@ -44,11 +44,13 @@ async function countAll() {
 // ── The folder (this computer) or Dropbox (a tablet or phone) the counts and the backup line are read from ──
 const note = document.getElementById('alerts-note');
 const backup = backupPanel(document.getElementById('backup'));
-const connected = () => { backup.refresh(); return countAll(); };
+const assistant = assistantPanel(document.getElementById('assistant'), ALERTS);
+const connected = () => { backup.refresh(); assistant.refresh(); return countAll(); };
 
 async function connect() {
     note.hidden = true;
     backup.refresh();
+    assistant.refresh();
     if (fs.folder()) return connected(); // signed in to Dropbox on this device
     if (!fs.isSupported()) return; // a tablet or phone: sign in with Dropbox below first
     const rem = await fs.rememberedFolder().catch(() => null);
@@ -82,6 +84,5 @@ const drawDropbox = () => {
 };
 drawDropbox();
 connect();
-assistantPanel(document.getElementById('assistant'), ALERTS);
 // Back from a section (the browser may show this page as it was): count again, since something may have changed.
 window.addEventListener('pageshow', e => { if (e.persisted && fs.folder()) connected(); });
