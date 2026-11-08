@@ -9,6 +9,39 @@ const el = (tag, cls, text) => {
     return e;
 };
 
+const BILLING_URL = 'https://console.anthropic.com/settings/billing';
+function billingLink() {
+    const a = el('a', '', 'console.anthropic.com');
+    a.href = BILLING_URL;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    return a;
+}
+/** `text` (the app's own words, never an answer) in `target`, with console.anthropic.com as a link to your billing page. */
+const linked = (target, text) => text.split('console.anthropic.com').forEach((part, i) => { if (i) target.append(billingLink()); target.append(part); });
+
+const HINTS = [
+    ['Good things to ask', [
+        'What’s due or overdue right now?',
+        'How much did we spend on groceries last month?',
+        'When was the last oil change?',
+        'Which credit card has the highest balance?',
+    ]],
+    ['Good to know', [
+        'Follow-ups work, like “and last year?”',
+        'After changing something in the app, press New chat so it reads the latest.',
+        'It can only read. It can’t change anything in the app.',
+        'It can’t see photos or scanned invoices.',
+        'Passwords, account numbers and similar details are hidden from it on purpose.',
+        'It can make mistakes, so check anything important on its page.',
+    ]],
+    ['If something goes wrong', [
+        'Out of credits: add more at console.anthropic.com. It can’t see your balance, but that page shows it.',
+        '“Rejected the API key”: press Change key and paste it again.',
+        '“Busy” or “too many requests”: wait a minute, then ask again.',
+    ]],
+];
+
 /** `alertsMap`: each section's alerts.js loader, as on the Home page. */
 export function assistantPanel(root, alertsMap) {
     const inner = el('div', 'as-inner');
@@ -35,7 +68,13 @@ export function assistantPanel(root, alertsMap) {
     const send = el('button', 'primary', 'Ask');
     send.type = 'submit';
     form.append(input, send);
-    inner.append(log, form);
+    const foot = el('div', 'as-foot');
+    const credits = el('span');
+    linked(credits, 'Out of credits? Check your balance or add more at console.anthropic.com.');
+    const hintsButton = el('button', '', 'Hints');
+    hintsButton.type = 'button';
+    foot.append(credits, hintsButton);
+    inner.append(log, form, foot);
     root.append(inner);
 
     let chat = null;    // chat.js, loaded with the first question
@@ -47,6 +86,25 @@ export function assistantPanel(root, alertsMap) {
     const open = () => { log.hidden = false; };
     const toEnd = () => { messages.scrollTop = messages.scrollHeight; };
     const add = (cls, text) => { const m = el('div', `as-msg ${cls}`, text); messages.append(m); open(); toEnd(); return m; };
+    const showError = text => { linked(add('error', ''), text); toEnd(); };
+
+    function toggleHints() {
+        const showing = messages.querySelector('.as-hints');
+        if (showing) {
+            showing.remove();
+            if (!messages.childElementCount) log.hidden = true;
+            return;
+        }
+        const box = el('div', 'as-hints');
+        for (const [title, lines] of HINTS) {
+            const list = el('ul');
+            for (const line of lines) { const li = el('li'); linked(li, line); list.append(li); }
+            box.append(el('strong', '', title), list);
+        }
+        messages.append(box);
+        open();
+        messages.scrollTop = box.offsetTop - messages.offsetTop; // from the first hint
+    }
 
     /** An answer, as text, with [[code]] turned into a link if it's one of the app's pages (and dropped if it isn't). */
     function showAnswer(target, text) {
@@ -141,7 +199,7 @@ export function assistantPanel(root, alertsMap) {
             toEnd();
         } catch (e) {
             status?.remove();
-            add('error', e.message);
+            showError(e.message);
         } finally {
             busy = false;
             send.disabled = false;
@@ -154,7 +212,8 @@ export function assistantPanel(root, alertsMap) {
         if (q) submit(q);
     };
     input.addEventListener('focus', () => { if (messages.childElementCount) open(); });
-    close.onclick = () => { log.hidden = true; };
+    close.onclick = () => { messages.querySelector('.as-hints')?.remove(); log.hidden = true; };
+    hintsButton.onclick = toggleHints;
     newChat.onclick = () => { if (busy) return; messages.textContent = ''; history = []; ctx = null; waiting = ''; input.focus(); };
     changeKey.onclick = () => { waiting = ''; showSetup(); };
     // Back from a section (the browser may show this page as it was): something may have changed.

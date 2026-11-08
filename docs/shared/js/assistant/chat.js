@@ -79,8 +79,9 @@ ${[...ctx.sources.values()].map(sourceLine).join('\n')}`;
 }
 
 function explain(status, detail) {
+    if (/credit balance/i.test(detail)) return 'Your Claude API credits have run out. Add more at console.anthropic.com under Billing, then ask again.';
+    if (status === 402) return 'There’s a billing problem with your Claude account. Check console.anthropic.com under Billing.';
     if (status === 401) return 'Claude rejected the API key. Use Change key to paste it again.';
-    if (status === 400 && /credit balance/i.test(detail)) return 'Your Claude API credits have run out. You can add more at console.anthropic.com under Billing.';
     if (status === 404) return `Claude doesn't recognize that model. Check ASSISTANT_MODEL in ${ENV_PATH}.`;
     if (status === 429) return 'Too many requests for the moment. Wait a minute and try again.';
     if (status >= 500) return 'Claude is busy right now. Try again in a minute.';
