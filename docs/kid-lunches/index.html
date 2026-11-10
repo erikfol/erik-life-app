@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="css/lunches.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261108214504";
+        const VERSION = "20261110113118";
         const FILES = ["css/lunches.css", "js/app.js", "js/school.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/datatable.js", "../bills-etc/js/dates.js", "../bills-etc/js/filtermenu.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/dropbox.js", "../shared/js/fileguard.js", "../shared/js/folder.js", "../shared/js/infobox.js", "../shared/js/recordtable.js", "../shared/js/navcolors.js", "../shared/js/lightbox.js", "../shared/js/infolinks.js", "../dinner-planner/css/dinner.css"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
@@ -54,6 +54,7 @@
                     <button class="btn view-btn active" data-view="week">Week</button>
                     <button class="btn view-btn" data-view="month">Month</button>
                 </div>
+                <button class="btn" id="open-eats" title="What each kid eats and leaves, from what you've marked">📊 What they eat</button>
                 <button class="btn" id="open-school">🏫 School menu</button>
                 <button class="btn" id="open-box">✎ Box</button>
                 <button class="btn" data-open-kids>✎ Kids</button>
@@ -63,14 +64,17 @@
             </div>
             <div id="no-kids" class="banner" hidden>No kids yet. <button class="link" data-open-kids>Add them</button> and each one gets a lunch box on every day.</div>
             <div id="calendar"></div>
-            <p class="hint">Click a day to build each kid's lunch box. ✨ Fill empty days packs a suggested lunch for every kid who doesn't have one yet, on the days left this week (skipping days the school is closed). ✎ Box sets what can go in each part. 🏫 School menu shows what the school is serving each day. School days only: Saturday and Sunday aren't shown.</p>
+            <p class="hint">Click a day to build each kid's lunch box. ✨ Fill empty days packs a suggested lunch for every kid who doesn't have one yet, on the days left this week (skipping days the school is closed). ✎ Box sets what can go in each part. 🏫 School menu shows what the school is serving each day. After school, 🍽 What they ate on the day marks each item ✓ ate it, ½ some or ✗ didn't eat; 📊 What they eat adds it up. School days only: Saturday and Sunday aren't shown.</p>
 
             <!-- Day editor -->
             <dialog id="day-dialog">
                 <form id="day-form" method="dialog">
                     <div class="day-head">
                         <h2 id="day-dialog-title"></h2>
-                        <button type="button" class="btn" id="day-suggest">✨ Suggest</button>
+                        <span class="day-head-btns">
+                            <button type="button" class="btn" id="day-eaten" title="Save this lunch, then mark what they ate of it">🍽 What they ate</button>
+                            <button type="button" class="btn" id="day-suggest">✨ Suggest</button>
+                        </span>
                     </div>
                     <p class="hint">✨ Suggest fills every part you haven't picked yourself, mostly with things they haven't had lately. Press it again for different picks.</p>
                     <div id="day-school"></div>
@@ -80,6 +84,31 @@
                         <span class="spacer"></span>
                         <button type="button" class="btn" data-close>Cancel</button>
                         <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- What they ate of a day's lunch -->
+            <dialog id="eaten-dialog">
+                <form id="eaten-form" method="dialog">
+                    <h2 id="eaten-title"></h2>
+                    <p class="hint">Mark each thing: ✓ ate it, ½ ate some, ✗ didn't eat it. Press a mark again to clear it. Anything left unmarked doesn't count either way.</p>
+                    <div id="eaten-kids"></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close>Cancel</button>
+                        <button type="submit" class="btn primary">Save</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <!-- What each kid eats and leaves, added up -->
+            <dialog id="eats-dialog">
+                <form method="dialog">
+                    <h2>What they eat</h2>
+                    <p class="hint">Everything you've marked in 🍽 What they ate, from what each kid eats most to what they leave. Eaten counts ½ Some as half.</p>
+                    <div id="eats-kids"></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close>Close</button>
                     </div>
                 </form>
             </dialog>

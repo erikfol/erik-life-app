@@ -104,14 +104,20 @@ function renderCalendar() {
             const lunch = e[kid];
             const head = `<span class="kid-lunch ${kidClass(i)}"><span class="kid">${esc(kid)}</span>`;
             if (state.view === 'month') {
-                const items = lunch && store.COMPARTMENTS.flatMap(c => lunch[c.id] || []).join(', ');
+                const items = lunch && store.COMPARTMENTS.flatMap(c => (lunch[c.id] || []).map(n => {
+                    const e = store.eatenInfo(store.eatenOf(lunch, c.id, n));
+                    return e ? `${e.mark} ${n}` : n;
+                })).join(', ');
                 return lunch ? `${head}<span class="lunch">${esc(items || lunch.note)}</span></span>` : '';
             }
             if (!lunch) return `${head}<span class="empty">${key < today ? '—' : '+ Add lunch'}</span></span>`;
-            const box = store.COMPARTMENTS.some(c => lunch[c.id]) ? miniBox(lunch, key) : '';
+            const box = hasItems(lunch) ? miniBox(lunch, key) : '';
             return `${head}${box}${lunch.note ? `<span class="meal-note">${esc(lunch.note)}</span>` : ''}</span>`;
         }).join('');
-        return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${schoolLunch(key)}</div>`;
+        // From the day itself on, a way to mark what came back eaten.
+        const eaten = state.view === 'week' && key <= today && state.kids.some(kid => hasItems(e[kid]))
+            ? `<button type="button" class="eaten-btn" data-eaten="${key}" title="Mark what they ate of their lunch">🍽 What they ate</button>` : '';
+        return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${schoolLunch(key)}${eaten}</div>`;
     }).join('');
 }
 
@@ -139,12 +145,21 @@ const boxHtml = (part, cls = '', tag = 'div') => `<${tag} class="box ${cls}">${s
 const SCHOOL_LUNCH = 'School lunch';
 const isSchoolLunch = name => store.sameName(name, SCHOOL_LUNCH);
 
-/** A kid's lunch drawn as the box, each item in its part; School lunch says what the school is serving. */
+/** Whether a kid's lunch has anything in the box (not just a note). */
+const hasItems = lunch => !!lunch && store.COMPARTMENTS.some(c => lunch[c.id]);
+
+/** A kid's lunch drawn as the box, each item in its part with what they ate of it (✓ ½ ✗); School lunch says what the
+ *  school is serving. */
 const miniBox = (lunch, date) => boxHtml(c => `<span class="comp ${c.id}" title="${esc(c.name)}">${(lunch[c.id] || []).map(n => {
-    if (!isSchoolLunch(n)) return esc(n);
-    const dish = school.dayMenu(date)?.items?.[0]?.name;
-    return `🏫 ${esc(SCHOOL_LUNCH)}${dish ? `<span class="school-dish">${esc(dish)}</span>` : ''}`;
-}).join('<br>')}</span>`, 'mini', 'span');
+    const e = store.eatenInfo(store.eatenOf(lunch, c.id, n));
+    const mark = e ? `<span class="mark ${e.id}" title="${esc(e.label)}">${e.mark}</span>` : '';
+    let label = esc(n);
+    if (isSchoolLunch(n)) {
+        const dish = school.dayMenu(date)?.items?.[0]?.name;
+        label = `🏫 ${esc(SCHOOL_LUNCH)}${dish ? `<span class="school-dish">${esc(dish)}</span>` : ''}`;
+    }
+    return `<span class="item${e ? ` ate-${e.id}` : ''}">${mark}${label}</span>`;
+}).join('')}</span>`, 'mini', 'span');
 
 function shiftCursor(dir) {
     const c = state.cursor;
@@ -186,6 +201,7 @@ function openDay(date) {
     form.dataset.date = date;
     $('#day-dialog-title').textContent = fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     $('#day-school').innerHTML = schoolLunch(date, true);
+    $('#day-eaten').hidden = date > todayKey(); // what they ate, from the day itself on
     $('#kid-fields').innerHTML = state.kids.map((kid, i) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
             <legend>${esc(kid)}</legend>
             ${buildBox(kid, e[kid], date)}
@@ -383,16 +399,18 @@ async function fillWeek() {
         : 'Nothing to pack yet. Add the kids and what goes in each part (✎ Kids, ✎ Box).');
 }
 
-async function saveDay(ev) {
-    ev.preventDefault();
+/** Save the day dialog; false when an item typed in can't go where it was typed. What they ate stays marked for the
+ *  items still in the lunch. */
+async function saveDayForm() {
     const form = $('#day-form');
-    if (!$$('.new-item', form).every(addTyped)) return; // typed but not added with Enter yet
+    if (!$$('.new-item', form).every(addTyped)) return false; // typed but not added with Enter yet
+    const saved = state.days[form.dataset.date] || {};
     const lunches = {};
     const newItems = {};
     for (const field of $$('.kid-field', form)) {
         const kid = state.kids[field.dataset.kid];
         const chips = (c, sel) => $$(`[data-comp="${c.id}"] .chip${sel}`, field).map(b => b.dataset.item);
-        lunches[kid] = { note: $('.kid-note', field).value };
+        lunches[kid] = { note: $('.kid-note', field).value, ate: saved[kid]?.ate };
         newItems[kid] = {};
         for (const c of store.COMPARTMENTS) {
             lunches[kid][c.id] = chips(c, '.active');
@@ -402,12 +420,126 @@ async function saveDay(ev) {
     await store.setDay(form.dataset.date, lunches, newItems);
     $('#day-dialog').close();
     reload();
+    return true;
+}
+
+async function saveDay(ev) {
+    ev.preventDefault();
+    await saveDayForm();
+}
+
+/** 🍽 What they ate, from the day dialog: saves the lunch as it is, then marks it. */
+async function eatenFromDay() {
+    const date = $('#day-form').dataset.date;
+    if (await saveDayForm()) openEaten(date);
 }
 
 async function clearDay() {
     await store.setDay($('#day-form').dataset.date, {});
     $('#day-dialog').close();
     reload();
+}
+
+// ---------- what they ate ----------
+
+/** One item of a kid's lunch with its marks: ✓ ate it, ½ some, ✗ didn't eat. */
+function eatRow(lunch, c, item) {
+    const now = store.eatenOf(lunch, c.id, item);
+    return `<div class="eat-row" data-part="${c.id}" data-item="${esc(item)}">
+        <span class="eat-item"><span class="eat-part">${esc(c.name)}</span>${isSchoolLunch(item) ? '🏫 ' : ''}${esc(item)}</span>
+        <span class="btn-group">${store.EATEN.map(e => `<button type="button" class="btn small eat-mark ${e.id}${now === e.id ? ' active' : ''}"`
+            + ` data-mark="${e.id}" aria-pressed="${now === e.id}">${e.mark} ${esc(e.label)}</button>`).join('')}</span>
+    </div>`;
+}
+
+/** Mark what each kid ate of that day's lunch, item by item. */
+function openEaten(date) {
+    const e = state.days[date] || {};
+    const kids = state.kids.map((kid, i) => ({ kid, i, lunch: e[kid] })).filter(k => hasItems(k.lunch));
+    if (!kids.length) return toast('Nothing was packed that day.');
+    const form = $('#eaten-form');
+    form.dataset.date = date;
+    $('#eaten-title').textContent = `What they ate · ${fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric' })}`;
+    $('#eaten-kids').innerHTML = kids.map(({ kid, i, lunch }) => `<fieldset class="kid-field ${kidClass(i)}" data-kid="${i}">
+            <legend>${esc(kid)}</legend>
+            <div><button type="button" class="btn small" data-all-ate>✓ Ate it all</button></div>
+            ${store.COMPARTMENTS.flatMap(c => (lunch[c.id] || []).map(item => eatRow(lunch, c, item))).join('')}
+            ${lunch.note ? `<p class="hint">Note: ${esc(lunch.note)}</p>` : ''}
+        </fieldset>`).join('');
+    $('#eaten-dialog').showModal();
+}
+
+/** Mark an item (or clear it, `mark` null). */
+function setMark(row, mark) {
+    for (const b of $$('.eat-mark', row)) {
+        const on = b.dataset.mark === mark;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+    }
+}
+
+async function saveEaten(ev) {
+    ev.preventDefault();
+    const form = $('#eaten-form');
+    const ate = {};
+    for (const field of $$('.kid-field', form)) {
+        const marks = ate[state.kids[field.dataset.kid]] = {};
+        for (const row of $$('.eat-row', field)) {
+            const on = $('.eat-mark.active', row);
+            if (on) (marks[row.dataset.part] ||= {})[row.dataset.item] = on.dataset.mark;
+        }
+    }
+    await store.setEaten(form.dataset.date, ate);
+    $('#eaten-dialog').close();
+    reload();
+}
+
+/** 📊 What they eat: for each kid, everything marked at least once, from what they eat most to least. ½ Some counts as
+ *  half eaten. */
+function openEats() {
+    if (!state.kids.length) return openKids();
+    const today = todayKey();
+    $('#eats-kids').innerHTML = state.kids.map((kid, i) => {
+        const tally = new Map();
+        let packed = 0;
+        let marked = 0;
+        for (const [date, e] of Object.entries(state.days)) {
+            const lunch = e[kid];
+            if (date > today || !hasItems(lunch)) continue;
+            packed++;
+            if (lunch.ate) marked++;
+            for (const c of store.COMPARTMENTS) {
+                for (const item of lunch[c.id] || []) {
+                    const mark = store.eatenOf(lunch, c.id, item);
+                    if (!mark) continue;
+                    const key = item.toLowerCase();
+                    if (!tally.has(key)) tally.set(key, { item, yes: 0, some: 0, no: 0 });
+                    tally.get(key)[mark]++;
+                }
+            }
+        }
+        const rows = [...tally.values()]
+            .map(t => ({ ...t, n: t.yes + t.some + t.no }))
+            .map(t => ({ ...t, eaten: (t.yes + t.some / 2) / t.n }))
+            .sort((a, b) => b.eaten - a.eaten || b.n - a.n || a.item.localeCompare(b.item));
+        const level = x => (x >= 0.75 ? 'good' : x >= 0.4 ? 'mid' : 'bad');
+        const count = (n, id) => `<td class="count">${n ? `<span class="ate-${id}">${n}</span>` : '<span class="muted">–</span>'}</td>`;
+        const table = rows.length ? `<div class="table-wrap"><table class="eats">
+                <thead><tr><th>Item</th>${store.EATEN.map(e => `<th class="count" title="${esc(e.label)}">${e.mark}<span class="word"> ${esc(e.short)}</span></th>`).join('')}<th>Eaten</th></tr></thead>
+                <tbody>${rows.map(r => `<tr>
+                    <td>${isSchoolLunch(r.item) ? '🏫 ' : ''}${esc(r.item)}</td>
+                    ${store.EATEN.map(e => count(r[e.id], e.id)).join('')}
+                    <td class="eaten-cell"><span class="eaten-bar ${level(r.eaten)}"><span style="width:${Math.round(r.eaten * 100)}%"></span></span>${Math.round(r.eaten * 100)}%</td>
+                </tr>`).join('')}</tbody>
+            </table></div>`
+            : '<p class="hint">Nothing marked yet.</p>';
+        return `<fieldset class="kid-field ${kidClass(i)}">
+            <legend>${esc(kid)}</legend>
+            <p class="hint">Marked ${marked} of ${packed} lunch${packed === 1 ? '' : 'es'} so far.</p>
+            ${table}
+        </fieldset>`;
+    }).join('');
+    $('#eats-dialog').showModal();
 }
 
 // ---------- box dialog ----------
@@ -525,6 +657,8 @@ function wire() {
         renderCalendar();
     }));
     $('#calendar').onclick = ev => {
+        const eaten = ev.target.closest('[data-eaten]');
+        if (eaten) return openEaten(eaten.dataset.eaten);
         const day = ev.target.closest('.day');
         if (day) openDay(day.dataset.date);
     };
@@ -542,6 +676,15 @@ function wire() {
         pickChip(chip, !chip.classList.contains('active'));
     };
     $('#day-suggest').onclick = suggestDay;
+    $('#day-eaten').onclick = guard(eatenFromDay);
+    $('#eaten-kids').onclick = ev => {
+        const mark = ev.target.closest('.eat-mark');
+        if (mark) return setMark(mark.closest('.eat-row'), mark.classList.contains('active') ? null : mark.dataset.mark);
+        const all = ev.target.closest('[data-all-ate]');
+        if (all) $$('.eat-row', all.closest('.kid-field')).forEach(row => setMark(row, 'yes'));
+    };
+    $('#eaten-form').onsubmit = guard(saveEaten);
+    $('#open-eats').onclick = openEats;
     $('#fill-week').onclick = guard(fillWeek);
     $('#kid-fields').onkeydown = ev => {
         if (ev.key === 'Enter' && ev.target.classList.contains('new-item')) {

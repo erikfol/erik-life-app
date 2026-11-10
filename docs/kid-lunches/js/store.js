@@ -21,6 +21,14 @@ export const COMPARTMENTS = [
 ];
 const STARTING_ITEMS = { circle: ['Yogurt', 'Apple sauce'] }; // only these go in the circle; a new kid starts with this
 
+/** How much of an item a kid ate, marked after school (lunch.ate). */
+export const EATEN = [
+    { id: 'yes', mark: '✓', label: 'Ate it', short: 'Ate', text: 'ate' },
+    { id: 'some', mark: '½', label: 'Some', short: 'Some', text: 'ate some' },
+    { id: 'no', mark: '✗', label: "Didn't eat", short: "Didn't", text: "didn't eat" },
+];
+export const eatenInfo = id => EATEN.find(e => e.id === id);
+
 const FIXED = ['Date', 'Day'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -40,17 +48,31 @@ function uniqueNames(list, max = 60) {
     return out;
 }
 
-/** A kid's lunch: { square: [items], …, note }, keeping only what's filled in; null when nothing is. */
+/** A kid's lunch: { square: [items], …, note, ate }, keeping only what's filled in; null when nothing is. `ate` is how
+ *  much of each item they ate, { part: { item: 'yes' | 'some' | 'no' } }, for items still in that part. */
 function cleanLunch(input) {
     const lunch = {};
+    const ate = {};
     for (const c of COMPARTMENTS) {
         const items = uniqueNames(input?.[c.id]);
-        if (items.length) lunch[c.id] = items;
+        if (!items.length) continue;
+        lunch[c.id] = items;
+        const marks = input?.ate?.[c.id];
+        if (!marks || typeof marks !== 'object') continue;
+        for (const item of items) {
+            const key = Object.keys(marks).find(k => sameName(k, item));
+            if (key && eatenInfo(marks[key])) (ate[c.id] ||= {})[item] = marks[key];
+        }
     }
     const note = clean(input?.note, 200);
     if (note) lunch.note = note;
-    return Object.keys(lunch).length ? lunch : null;
+    if (!Object.keys(lunch).length) return null;
+    if (Object.keys(ate).length) lunch.ate = ate;
+    return lunch;
 }
+
+/** How much a kid ate of one item in one part of their lunch: an EATEN id, or undefined when it isn't marked. */
+export const eatenOf = (lunch, part, item) => lunch?.ate?.[part]?.[item];
 
 function cleanDb(input) {
     const kids = uniqueNames(input.kids, 40);
@@ -105,10 +127,14 @@ async function save() {
     }
 }
 
-/** One kid's lunch as text: "Gray square: Turkey sandwich; Circle: Yogurt; Note: …". */
+/** One kid's lunch as text: "Gray square: Turkey sandwich (ate); Circle: Yogurt (didn't eat); Note: …". */
 export function lunchText(lunch) {
     if (!lunch) return '';
-    const parts = COMPARTMENTS.filter(c => lunch[c.id]).map(c => `${c.name}: ${lunch[c.id].join(', ')}`);
+    const withEaten = (c, item) => {
+        const e = eatenInfo(eatenOf(lunch, c.id, item));
+        return e ? `${item} (${e.text})` : item;
+    };
+    const parts = COMPARTMENTS.filter(c => lunch[c.id]).map(c => `${c.name}: ${lunch[c.id].map(n => withEaten(c, n)).join(', ')}`);
     if (lunch.note) parts.push(`Note: ${lunch.note}`);
     return parts.join('; ');
 }
@@ -137,7 +163,7 @@ async function change(fn) {
 
 // ---------- changes (each one saves) ----------
 
-/** One day's lunches, { kid: lunch }; newItems { kid: { compartment: [names] } } typed while building them join that
+/** One day's lunches, { kid: lunch } (what they ate, `ate`, is kept for items still in the lunch); newItems { kid: { compartment: [names] } } typed while building them join that
  *  kid's lists. */
 export function setDay(date, lunches, newItems = {}) {
     if (!DATE_RE.test(date)) throw new Error('Bad date');
@@ -152,6 +178,19 @@ export function setDay(date, lunches, newItems = {}) {
         }
         if (Object.keys(day).length) db.days[date] = day;
         else delete db.days[date];
+    });
+}
+
+/** What the kids ate on a day: { kid: { part: { item: 'yes' | 'some' | 'no' } } }, replacing the marks of every kid
+ *  given; items not marked are left out. */
+export function setEaten(date, ate) {
+    if (!db.days[date]) throw new Error('Nothing was packed that day');
+    return change(() => {
+        const day = db.days[date];
+        for (const kid of db.kids) {
+            if (!day[kid] || !ate[kid]) continue;
+            day[kid] = cleanLunch({ ...day[kid], ate: ate[kid] });
+        }
     });
 }
 

@@ -120,6 +120,67 @@
 .dp .school-load { display: flex; gap: 8px; }
 .dp .school-load .btn { flex: 0 0 auto; }
 
+/* What they ate: a mark on each item on the calendar (readable on every part's color), the 🍽 button on a day, and the
+   dialogs to mark it and add it up. */
+.dp .box.mini .item { display: block; }
+.dp .mark {
+    display: inline-block;
+    min-width: 1.35em;
+    margin-right: 3px;
+    padding: 0 2px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: .9em;
+    font-weight: 700;
+    line-height: 1.35em;
+    text-align: center;
+    vertical-align: 1px;
+}
+.dp .mark.yes { background: var(--green); }
+.dp .mark.some { background: var(--orange); }
+.dp .mark.no { background: var(--red); }
+.dp .box.mini .item.ate-no { text-decoration: line-through; }
+.dp .box.mini .item.ate-no .mark { text-decoration: none; }
+.dp .eaten-btn {
+    align-self: flex-end;
+    margin-top: auto;
+    padding: 3px 10px;
+    border: 1px solid var(--dp-border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: .78rem;
+    cursor: pointer;
+}
+.dp .school ~ .eaten-btn { margin-top: 0; } /* the school lunch already sits at the bottom */
+.dp .eaten-btn:hover { color: var(--dp-accent); border-color: var(--dp-accent); }
+.dp .day-head-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.dp #eaten-dialog { width: min(1000px, calc(100vw - 32px)); }
+.dp #eaten-kids, .dp #eats-kids { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; align-items: start; }
+.dp .eat-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.dp .eat-item { font-weight: 600; overflow-wrap: anywhere; }
+.dp .eat-part { display: block; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); }
+.dp .eat-mark.active.yes { background: var(--green); border-color: var(--green); color: #fff; }
+.dp .eat-mark.active.some { background: var(--orange); border-color: var(--orange); color: #fff; }
+.dp .eat-mark.active.no { background: var(--red); border-color: var(--red); color: #fff; }
+
+.dp #eats-dialog { width: min(1000px, calc(100vw - 32px)); }
+.dp #eats-kids fieldset { min-width: 0; } /* a fieldset won't shrink below its table otherwise; the table scrolls instead */
+.dp table.eats td, .dp table.eats th { padding: 6px 8px; }
+.dp table.eats th { white-space: nowrap; }
+.dp table.eats .count { text-align: center; }
+.dp table.eats .ate-yes { color: var(--green); font-weight: 700; }
+.dp table.eats .ate-some { color: var(--orange); font-weight: 700; }
+.dp table.eats .ate-no { color: var(--red); font-weight: 700; }
+.dp table.eats .eaten-cell { white-space: nowrap; }
+.dp .eaten-bar { display: inline-block; width: 60px; height: 8px; margin-right: 6px; border-radius: 4px; background: var(--line-strong); overflow: hidden; vertical-align: middle; }
+.dp .eaten-bar > span { display: block; height: 100%; }
+.dp .eaten-bar.good > span { background: var(--green); }
+.dp .eaten-bar.mid > span { background: var(--orange); }
+.dp .eaten-bar.bad > span { background: var(--red); }
+
 .dp #no-kids { margin-bottom: 12px; }
 /* The day dialog puts the kids side by side (one under the other when the window is too narrow for that). */
 .dp #day-dialog { width: min(1240px, calc(100vw - 32px)); }
@@ -137,4 +198,8 @@
     .dp .cal-week .box.mini { max-width: 280px; }
     .dp .cal-month .kid-lunch .kid { display: none; } /* the color says whose it is */
     .dp .box .tray { grid-template-rows: minmax(110px, auto) minmax(80px, auto); }
+    .dp .cal-week .eaten-btn { margin-left: auto; }
+    .dp #eaten-kids, .dp #eats-kids { grid-template-columns: 1fr; }
+    .dp table.eats td, .dp table.eats th { padding: 6px 5px; }
+    .dp table.eats th .word, .dp table.eats .eaten-bar { display: none; } /* just ✓ ½ ✗ and the % */
 }
