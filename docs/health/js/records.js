@@ -31,6 +31,8 @@ const RECORD_COLUMNS = [
     { name: 'Additional Notes', kind: 'text' },
     { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
+// Dental's Records also have an estimate of the out-of-pocket cost, next to what was actually paid.
+const DENTAL_RECORD_COLUMNS = RECORD_COLUMNS.flatMap(c => (c.name === 'Total Cost' ? [c, { name: 'Out of Pocket (est)', kind: 'money' }] : [c]));
 /** The Records' Paid? dropdown (for the record table's choices). */
 export const PAID_CHOICES = { 'Paid?': { list: ['Paid', 'Not paid'], noun: 'status' } };
 
@@ -58,7 +60,7 @@ export const SECTIONS = [
         ] },
         appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,
-        info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: RECORD_COLUMNS,
+        info: ['Dentist', 'Office', 'Phone', 'Address', 'Website', 'Notes'], columns: DENTAL_RECORD_COLUMNS,
         appointments: { path: `${HEALTH_DIR}/dental_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'eye', label: 'Eye', path: `${HEALTH_DIR}/eye.csv`,
         info: ['Eye Doctor', 'Office', 'Phone', 'Address', 'Website', 'Prescription', 'Notes'], columns: RECORD_COLUMNS,
