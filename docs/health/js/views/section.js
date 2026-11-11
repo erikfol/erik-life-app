@@ -119,6 +119,7 @@ export async function renderSection(el, section) {
         save: async rows => { await saveRecords(section, rows); drawOwed(rows); },
         choices: { Location: location, ...PAID_CHOICES },
         filesDir: invoicesDir(section),
+        compact: true, // long notes take many lines: scroll inside a box, with each note cut to a few lines
     });
     checks.push(() => table.hasUnsavedEdits());
     if (notes) { // General Health's Personal Notes: its body Location list is the same as the old Records'

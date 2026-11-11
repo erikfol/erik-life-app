@@ -14,6 +14,19 @@
 .record-table .changed { background: #fffbea !important; border-color: #f5e1a4 !important; }
 .record-table td.remove, .record-table td.move { width: 1%; white-space: nowrap; }
 .record-table td.remove button { padding: 3px 9px; }
+/* A compact record table (recordTable's compact; Health → Records): scrolls inside a box about a screen tall, so its
+   left/right scrollbar is always in view, with the column names on top, the Total row at the bottom and the first
+   column (the date) on the left kept in view. Each text is cut to 3 lines (…) until it's clicked. */
+.scroll-table .table-wrap { max-height: 70vh; overflow: auto; border: 1px solid var(--line-strong); border-radius: 6px; }
+.scroll-table thead th { position: sticky; top: 0; z-index: 2; box-shadow: inset 0 -2px 0 var(--line-strong); }
+.scroll-table tfoot td { position: sticky; bottom: 0; z-index: 1; box-shadow: inset 0 2px 0 var(--line-strong); }
+.scroll-table .filter-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: inset -1px 0 0 var(--line-strong); }
+.scroll-table .filter-table th:first-child { left: 0; z-index: 3; box-shadow: inset -1px 0 0 var(--line-strong), inset 0 -2px 0 var(--line-strong); }
+.scroll-table .filter-table tbody tr:hover td:first-child { background: var(--hover); }
+.scroll-table .filter-table tr.total-row td:first-child { background: #f8faff; z-index: 2; box-shadow: inset -1px 0 0 var(--line-strong), inset 0 2px 0 var(--line-strong); }
+.scroll-table td.wide { min-width: 300px; }
+.scroll-table .clip { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: pointer; }
+.scroll-table .clip.open { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
 /* A standing note at the top of a section (House maintenance: how often it's due and who does it) */
 .section-note { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--blue); background: var(--head); border-radius: 0 6px 6px 0; }
 /* ↑ ↓ buttons in edit lists (shared/js/infobox.js), first in each row of a table being edited */

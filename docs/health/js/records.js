@@ -28,7 +28,7 @@ const RECORD_COLUMNS = [
     { name: 'Out of Pocket', kind: 'money' },
     { name: 'I Owe', kind: 'money' },
     { name: 'Paid?', kind: 'choice', badge: v => (v === 'Paid' ? 'paid' : v === 'Not paid' ? 'not-paid' : '') },
-    { name: 'Additional Notes', kind: 'text' },
+    { name: 'Additional Notes', kind: 'text', wide: true },
     { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
 // Dental's Records split the cost: what was paid at the dentist, and what Cigna still has to pay (this column was

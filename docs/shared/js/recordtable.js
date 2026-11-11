@@ -53,7 +53,8 @@ const numberOf = v => {
  *            one, default 'file');
  *            c.calc(row) → a worked-out value: shown in the read-only view (and in a money Total), never edited or saved;
  *            c.total: false leaves a money column out of the Total line; c.default: what a new entry starts with (a
- *            string, or a function giving one); c.badge(value) → a class: shown as a coloured badge (e.g. a status)
+ *            string, or a function giving one); c.badge(value) → a class: shown as a coloured badge (e.g. a status);
+ *            c.wide: a text column given more room in a compact table (e.g. notes)
  *   rows:    [{ [name]: string }]
  *   save:    async rows => void (rows already trimmed and without blank entries)
  *   choices: { [name]: { list: string[], noun: 'location', add: async name => void } } for 'choice' columns
@@ -61,11 +62,14 @@ const numberOf = v => {
  *   filesDir: the folder for 'files' columns without their own dir
  *   rowActions: [{ label, title, run: async row => void, show?: row => bool }] — a button for each entry in the read-only
  *            view (e.g. move an appointment to the records); run gets the entry as saved; show leaves it off entries it's false for
+ *   compact: for a long table with long texts: it scrolls inside a box about a screen tall (column names on top,
+ *            Total at the bottom and the first column on the left stay in view), and each text is cut to a few lines
+ *            until it's clicked
  * Rows are shown in the order they're saved in. Editing starts in the order the read-only view shows (so a column sort
  * can be kept), ↑ ↓ move a row, and a new entry goes at the top of a table with dates (the bottom of one without).
  * Returns { hasUnsavedEdits() }.
  */
-export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '', rowActions = [] }) {
+export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '', rowActions = [], compact = false }) {
     const tableNo = ++tableCount;
     const editCols = cols.filter(c => !c.calc); // the columns that are typed in and saved
     const valueOf = (c, r) => (c.calc ? c.calc(r) : r[c.name]);
@@ -143,7 +147,12 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             ...base, value: get,
             cell: r => { const v = get(r); return v ? `<span class="cat-badge ${esc(c.badge(v))}">${esc(v)}</span>` : ''; },
         };
-        return { ...base, value: get, tdClass: () => 'text' };
+        const tdClass = () => (c.wide ? 'text wide' : 'text');
+        if (compact) return { // cut to a few lines (…); a click shows it all
+            ...base, value: get, tdClass,
+            cell: r => { const v = get(r); return v ? `<div class="clip" title="Click to show it all">${esc(v)}</div>` : ''; },
+        };
+        return { ...base, value: get, tdClass };
     };
     const firstDate = cols.find(c => c.kind === 'date' && !c.calc); // the first typed-in date (not a worked-out one, like REC payments' Paid By)
 
@@ -156,6 +165,16 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         b.disabled = true;
         try { await rowActions[+b.dataset.rowAction].run(row); } finally { b.disabled = false; }
     });
+
+    // compact: a click on a text that's cut short shows it all, and another click cuts it again (not while selecting it).
+    if (compact) {
+        container.classList.add('scroll-table');
+        readEl.addEventListener('click', e => {
+            const clip = e.target.closest('.clip');
+            if (!clip || String(getSelection()).trim()) return;
+            clip.title = clip.classList.toggle('open') ? 'Click to show less' : 'Click to show it all';
+        });
+    }
 
     // A 'files' cell's files, large (images, and PDFs in a frame).
     readEl.addEventListener('click', async e => {
