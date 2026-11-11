@@ -31,8 +31,10 @@ const RECORD_COLUMNS = [
     { name: 'Additional Notes', kind: 'text' },
     { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
-// Dental's Records also have an estimate of the out-of-pocket cost, next to what was actually paid.
-const DENTAL_RECORD_COLUMNS = RECORD_COLUMNS.flatMap(c => (c.name === 'Total Cost' ? [c, { name: 'Out of Pocket (est)', kind: 'money' }] : [c]));
+// Dental's Records split the cost: what was paid at the dentist, and what Cigna still has to pay (this column was
+// "Out of Pocket"; `was` reads a file saved under the old name, and the next save writes the new one).
+const DENTAL_RECORD_COLUMNS = RECORD_COLUMNS.flatMap(c => (c.name === 'Total Cost' ? [c, { name: 'Paid at Dr', kind: 'money' }]
+    : c.name === 'Out of Pocket' ? [{ ...c, name: 'Due from Cigna', was: 'Out of Pocket' }] : [c]));
 /** The Records' Paid? dropdown (for the record table's choices). */
 export const PAID_CHOICES = { 'Paid?': { list: ['Paid', 'Not paid'], noun: 'status' } };
 
@@ -104,13 +106,14 @@ function accountBalance(rows) {
 }
 
 /**
- * Rows of a section's file ([] when it doesn't exist yet); columns the file lacks read as blank.
+ * Rows of a section's file ([] when it doesn't exist yet); columns the file lacks read as blank (or from the column's
+ * old name, `was`, if it was renamed).
  * track: false for read-only use, so the save guard keeps the version this page is editing.
  */
 export async function loadRecords(section, track = true) {
     const text = track ? await readTracked(section.path) : await fs.readText(section.path);
     if (text === null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(names(section).map(c => [c, r[c] ?? ''])));
+    return parseCSV(text).rows.map(r => Object.fromEntries(section.columns.map(c => [c.name, r[c.name] ?? (c.was && r[c.was]) ?? ''])));
 }
 
 export async function saveRecords(section, rows) {
