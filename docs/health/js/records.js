@@ -14,7 +14,7 @@ const APPOINTMENT_COLUMNS = [
     { name: 'Time', kind: 'suggest' },
     { name: 'Location', kind: 'suggest' }, // where it is (offers the ones used before), not General Health's body locations
     { name: 'Description', kind: 'text' },
-    { name: 'Additional Notes', kind: 'text' },
+    { name: 'Additional Notes', kind: 'text', wide: true },
 ];
 
 // The Records of General Health, Dental and Eye: each visit, where (the office: offers the ones used before, not
@@ -58,7 +58,7 @@ export const SECTIONS = [
             { name: 'Date', kind: 'date' },
             { name: 'Location', kind: 'choice' },
             { name: 'Description', kind: 'text' },
-            { name: 'Additional Notes', kind: 'text' },
+            { name: 'Additional Notes', kind: 'text', wide: true },
         ] },
         appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,

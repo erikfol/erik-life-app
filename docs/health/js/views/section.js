@@ -106,6 +106,7 @@ export async function renderSection(el, section) {
             rows: apptRows,
             save: async r => { await saveRecords(appts, r); drawBanner(r); },
             rowActions: [{ label: '→ Records', title: 'Move this appointment down to Records: the columns Records has are filled in from it, the rest is left blank to fill in', run: moveToRecords }],
+            compact: true,
         });
         checks.push(() => apptTable.hasUnsavedEdits());
     }
@@ -128,6 +129,7 @@ export async function renderSection(el, section) {
             rows: noteRows,
             save: rows => saveRecords(notes, rows),
             choices: { Location: location },
+            compact: true,
         });
         checks.push(() => notesTable.hasUnsavedEdits());
     }
