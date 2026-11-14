@@ -66,6 +66,7 @@ function renderSchedule(el, v, rows, get) {
                 { name: 'Last done', kind: 'text', calc: r => lastText(v, status(r), r) || 'Not logged' },
                 cols.at(-1), ...cols.slice(2, -1)], // Notes next, so it's in view; then how often
             rows: saved,
+            compact: true, // long notes: scroll inside a box, with each note cut to a few lines
             save: async next => { await saveSchedule(v, next); saved = next; schedule = null; draw(); },
         });
     };

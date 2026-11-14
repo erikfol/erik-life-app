@@ -209,7 +209,7 @@ export const scheduleColumns = (v, actions = []) => [
     { name: 'First (months)', kind: 'number' },
     { name: 'Due by (month)', kind: 'suggest', suggestions: MONTHS },
     { name: 'Also counts', kind: 'suggest', suggestions: actions },
-    { name: 'Notes', kind: 'text' },
+    { name: 'Notes', kind: 'text', wide: true }, // more room in the compact table
 ];
 export const loadSchedule = (v, track = true) => loadRows(schedulePath(v), scheduleColumns(v), track);
 export const saveSchedule = (v, rows) => saveRows(schedulePath(v), scheduleColumns(v), rows);
