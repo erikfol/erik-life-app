@@ -86,7 +86,7 @@ export const maintenanceColumns = (v, actions = []) => [
     { name: 'Location', kind: 'suggest', suggestions: (v.places || []).map(p => p.name) }, // where it was done
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
-    { name: 'Additional Notes', kind: 'text' },
+    { name: 'Additional Notes', kind: 'text', wide: true }, // more room in the compact table
     { name: 'Invoices', kind: 'files', noun: 'invoice' }, // images / PDFs in invoicesDir(v)
 ];
 /** Where a vehicle's maintenance invoices are kept. */

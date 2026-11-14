@@ -195,6 +195,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
         columns: maintenanceColumns(v, (plan || []).map(r => r.Item)), // the schedule's items are offered first as Actions
         rows,
         filesDir: invoicesDir(v),
+        compact: true, // long notes take many lines: scroll inside a box, with each note cut to a few lines
         save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redrawSchedule(); },
     });
 }
