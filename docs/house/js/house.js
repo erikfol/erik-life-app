@@ -119,6 +119,10 @@ export const FUTURE_UPDATES = AREAS.find(t => t.id === 'updates').parts.find(p =
 //    specs: [{ label, value }] }];
 // each project's photos and sketches in its own folder.
 export const houseProjects = h => h.areas?.projects?.items ?? [];
+// The Projects tab's General information (things that go with every project, e.g. what fits in the car): areas.projects.info
+// [{ label, value }], these starting fields until it's first saved.
+export const PROJECT_INFO = ['Notes'];
+export const projectsInfo = h => h.areas?.projects?.info ?? PROJECT_INFO.map(label => ({ label, value: '' }));
 export const projectDir = (h, p) => `${HOUSE_DIR}/projects/${h.id}-${p.id}`;
 export const PROJECT_SPECS = ['Dimensions', 'Notes']; // a new project's starting Measurements & specs fields
 export const MATERIAL_COLUMNS = [

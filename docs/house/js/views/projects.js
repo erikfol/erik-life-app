@@ -1,4 +1,5 @@
-// The Projects tab: the list of house projects (#<house>/projects) and one page per project (#<house>/projects/<id>) to
+// The Projects tab: General information for every project (e.g. what fits in the car) and the list of house projects
+// (#<house>/projects), and one page per project (#<house>/projects/<id>) to
 // plan it — status, plan & notes (headings, bullets, a [ ]/[x] step checklist), materials (with prices), measurements &
 // specs, photos & sketches, and the Future updates linked to it (their Project column). Its estimated total is what the
 // materials cost (each one's price times its quantity).
@@ -8,17 +9,18 @@ import { infoBox } from '../../../shared/js/infobox.js';
 import { renderGallery } from '../../../vehicles/js/views/gallery.js';
 import { textHtml } from '../../../vehicles/js/views/guides.js';
 import {
-    HOUSE_DIR, HOUSE_PATH, IMPROVEMENT_STATUSES, FUTURE_UPDATES, MATERIAL_COLUMNS, PROJECT_SPECS, houseProjects, projectDir,
+    HOUSE_DIR, HOUSE_PATH, IMPROVEMENT_STATUSES, FUTURE_UPDATES, MATERIAL_COLUMNS, PROJECT_SPECS, houseProjects, projectsInfo, projectDir,
     materialCost, saveHouses, loadTable, saveTable,
 } from '../house.js';
 
 let draft = null; // { start, read } while the project's heading or its plan is being edited
 let materials = null; // the Materials table
 let specs = null; // the Measurements & specs box
+let general = null; // the list's General information box
 
 export const projectUnsaved = () => (!!draft && draft.read() !== draft.start) || !!materials?.hasUnsavedEdits()
-    || !!specs?.hasUnsavedEdits();
-export const forgetProject = () => { draft = null; materials = null; specs = null; };
+    || !!specs?.hasUnsavedEdits() || !!general?.hasUnsavedEdits();
+export const forgetProject = () => { draft = null; materials = null; specs = null; general = null; };
 
 const isDone = p => /^done$/i.test((p.status || '').trim());
 const total = p => (p.materials || []).reduce((t, r) => t + (Number(materialCost(r)) || 0), 0); // price × quantity
@@ -31,12 +33,13 @@ const steps = p => {
     return all ? `${done} of ${all} step${all === 1 ? '' : 's'} done` : '';
 };
 
-/** Save the house with these projects. */
-async function saveProjects(list, h, items) {
-    const updated = { ...h, areas: { ...h.areas, projects: { ...h.areas?.projects, items } } };
+/** Save the house with these changes to its Projects tab ({ items } the projects, { info } its General information). */
+async function saveTab(list, h, fields) {
+    const updated = { ...h, areas: { ...h.areas, projects: { ...h.areas?.projects, ...fields } } };
     await saveHouses(list.map(x => (x.id === h.id ? updated : x)));
     Object.assign(h, updated);
 }
+const saveProjects = (list, h, items) => saveTab(list, h, { items });
 
 /** Rows for a table, every column filled in (rows saved before a column was added just lack it). */
 const filled = (rows, cols) => (rows || []).map(r => Object.fromEntries(cols.map(c => [c.name, r[c.name] ?? ''])));
@@ -57,6 +60,10 @@ export function renderProjectList(el, list, h, top) {
         <p class="lead">Kept in <code>${esc(HOUSE_PATH)}</code>; each project's photos and sketches in its own folder in
             <code>${esc(HOUSE_DIR)}/projects/</code>.</p>
         <section>
+            <h2>General information</h2>
+            <div id="p-info"></div>
+        </section>
+        <section>
             <h2>Projects</h2>
             <div class="row table-tools">
                 <button type="button" class="small" id="p-add">＋ Add project</button>
@@ -72,6 +79,11 @@ export function renderProjectList(el, list, h, top) {
                     ${steps(p) ? `<p class="muted">${esc(steps(p))}</p>` : ''}
                 </a>`).join('')}</div>
         </section>`;
+    general = infoBox(el.querySelector('#p-info'), {
+        info: projectsInfo(h),
+        noun: 'field',
+        save: async info => saveTab(list, h, { info }),
+    });
     el.querySelector('#p-add').onclick = () => {
         const form = el.querySelector('#p-new');
         form.innerHTML = `
