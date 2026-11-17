@@ -70,6 +70,7 @@ export default async function renderTaxes(el) {
     years.forEach((Y, k) => {
         const P = years[k - 1];
         Y.change = P?.complete && Y.complete ? Y.total - P.total : NaN;
+        Y.changePct = Number.isFinite(Y.change) && P.total ? (Y.change / P.total) * 100 : NaN;
     });
 
     el.innerHTML = `
@@ -257,6 +258,8 @@ export default async function renderTaxes(el) {
             { ...moneyCol('total', 'Year total', r => r.total), cell: r => `<strong>${esc(money(r.total))}</strong>${r.complete ? '' : ' <span class="muted">(so far)</span>'}` },
             { id: 'change', label: 'Change', num: true, value: r => r.change, text: v => (v > 0 ? '+' : '') + money(v),
                 tdClass: r => `nowrap${r.change > 0 ? ' negative' : r.change < 0 ? ' positive' : ''}` },
+            { id: 'changePct', label: '% change', num: true, value: r => r.changePct, text: v => (v > 0 ? '+' : '') + v.toFixed(1) + '%',
+                tdClass: r => `nowrap${r.changePct > 0 ? ' negative' : r.changePct < 0 ? ' positive' : ''}` },
             numCol('rate', 'Tax rate', r => r.rate, money),
             numCol('assessed', 'Assessed value', r => r.assessed, wholeDollars),
             moneyCol('monthly', 'Mortgage payment', r => r.monthly),
@@ -267,7 +270,7 @@ export default async function renderTaxes(el) {
         footer: (list, filtered) => `<tr class="total-row"><td><strong>Total${filtered ? ' (filtered)' : ''}</strong></td>
             <td class="amt"><strong>${esc(money(totalOf(list, r => r.h1)))}</strong></td>
             <td class="amt"><strong>${esc(money(totalOf(list, r => r.h2)))}</strong></td>
-            <td class="amt"><strong>${esc(money(totalOf(list, r => r.total)))}</strong></td><td colspan="5"></td></tr>`,
+            <td class="amt"><strong>${esc(money(totalOf(list, r => r.total)))}</strong></td><td colspan="6"></td></tr>`,
     });
 
     // ── All bills ──
