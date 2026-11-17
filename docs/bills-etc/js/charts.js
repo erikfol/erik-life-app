@@ -131,8 +131,10 @@ export function drawMonthBars(canvas, { labels, income, spending, selected }) {
  * Hover tooltip: when series have a `name`, pointing at a period lists each named series' value there,
  * formatted by the series' tipFmt, else the chart's tipFmt, else valueFmt, else fmt. A series with tipOnly: true
  * isn't drawn, it only shows in the tooltip. tipHead(i) → tooltip title (default: the period's label).
+ * slant: value labels are never sideways: level when they fit in the space a bar has (wider than the bar itself for
+ * stacked or one-series charts), else tilted 45° (steeper, up to 65°, when the bars are very close together).
  */
-export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, valueFmt = null, stacked = false, tipFmt = null, tipHead = null }) {
+export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, valueFmt = null, stacked = false, tipFmt = null, tipHead = null, slant = false }) {
     const tipSeries = series;
     series = series.filter(x => !x.tipOnly);
     const s = setup(canvas);
@@ -141,16 +143,18 @@ export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, va
     if (!s || !n) return;
     const { ctx, W, H } = s;
     const pad = { top: 16, right: 12, bottom: 30, left: 64 };
-    const chartW = W - pad.left - pad.right;
     const totals = labels.map((_, i) => series.reduce((a, x) => a + (Number.isFinite(x.values[i]) ? x.values[i] : 0), 0));
     const all = stacked ? totals : series.flatMap(x => x.values.filter(Number.isFinite));
 
-    const groupW = chartW / labels.length;
-    const labelEvery = Math.ceil(52 / groupW);
     const cols = stacked ? 1 : series.length;
     const gap = cols > 1 ? 2 : 0;
-    const barW = Math.min((groupW * 0.7 - gap * (cols - 1)) / cols, 26);
-    const gOff = (groupW - cols * barW - gap * (cols - 1)) / 2;
+    let groupW, barW, gOff;
+    const layout = () => {
+        groupW = (W - pad.left - pad.right) / labels.length;
+        barW = Math.min((groupW * 0.7 - gap * (cols - 1)) / cols, 26);
+        gOff = (groupW - cols * barW - gap * (cols - 1)) / 2;
+    };
+    layout();
 
     // Room for value labels above the tallest bar and below the deepest one.
     const VFONT = `10px ${FONT}`;
@@ -158,8 +162,17 @@ export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, va
         : series.filter(x => x.valueLabels).flatMap(x => x.values.filter(v => Number.isFinite(v) && v));
     ctx.font = VFONT;
     const textW = Math.max(0, ...labelled.map(v => ctx.measureText(valueFmt(v)).width));
-    const sideways = textW > barW + 4;
-    const room = labelled.length ? (sideways ? textW : 10) + 6 : 0;
+    const fitW = slant && cols === 1 ? groupW - 10 : barW + 4; // (a clear gap between neighbouring labels)
+    const turn = textW <= fitW ? 'level' : slant ? 'tilted' : 'sideways';
+    // Tilted 45°, or steeper (up to 65°) when the bars are so close that a label would run into the next one.
+    const tilt = Math.min(Math.max(Math.acos(Math.min(1, Math.max(0, (groupW - 8) / (textW || 1)))), Math.PI / 4), Math.PI * 65 / 180);
+    if (turn === 'tilted') { // the last bar's label runs off to the right: make room for it
+        pad.right = Math.max(pad.right, Math.ceil(textW * Math.cos(tilt) + 4 - groupW / 2));
+        layout();
+    }
+    const chartW = W - pad.left - pad.right;
+    const labelEvery = Math.ceil(52 / groupW);
+    const room = !labelled.length ? 0 : (turn === 'sideways' ? textW : turn === 'tilted' ? textW * Math.sin(tilt) + 8 : 10) + 6;
     if (labelled.some(v => v > 0)) pad.top += room;
     const below = labelled.some(v => v < 0) ? room : 0;
     const chartH = H - pad.top - pad.bottom - below;
@@ -180,13 +193,15 @@ export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, va
         ctx.fillText(fmt(Math.abs(v) < step / 2 ? 0 : v), pad.left - 6, y + 4);
     }
 
+    const valueLabels = []; // drawn after all the bars, so a taller bar next door never covers one
     for (let i = 0; i < n; i++) {
         const gx = pad.left + i * groupW;
         if (i === selected) {
             ctx.fillStyle = '#eef3ff';
             ctx.fillRect(gx + 1, pad.top, groupW - 2, chartH + below);
         }
-        ctx.globalAlpha = selected < 0 || i === selected ? 1 : 0.55;
+        const alpha = selected < 0 || i === selected ? 1 : 0.55;
+        ctx.globalAlpha = alpha;
         let base = 0;
         series.forEach((ser, k) => {
             const v = ser.values[i];
@@ -195,27 +210,9 @@ export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, va
             const y0 = yOf(base), y1 = yOf(base + v), x = gx + gOff + (stacked ? 0 : k * (barW + gap));
             ctx.fillRect(x, Math.min(y0, y1), barW, Math.abs(y1 - y0));
             if (stacked) base += v;
-            else if (valueFmt && ser.valueLabels) label(x, v);
+            else if (valueFmt && ser.valueLabels && v) valueLabels.push({ x, v, alpha });
         });
-        if (stacked && labelled.length) label(gx + gOff, base);
-        function label(x, v) {
-            if (!v) return;
-            const y1 = yOf(v);
-            ctx.save();
-            ctx.font = VFONT;
-            ctx.fillStyle = '#555';
-            const up = v > 0;
-            if (sideways) {
-                ctx.translate(x + barW / 2 + 3.5, y1 + (up ? -4 : 4));
-                ctx.rotate(-Math.PI / 2);
-                ctx.textAlign = up ? 'left' : 'right';
-                ctx.fillText(valueFmt(v), 0, 0);
-            } else {
-                ctx.textAlign = 'center';
-                ctx.fillText(valueFmt(v), x + barW / 2, up ? y1 - 4 : y1 + 12);
-            }
-            ctx.restore();
-        }
+        if (stacked && labelled.length && base) valueLabels.push({ x: gx + gOff, v: base, alpha });
         ctx.globalAlpha = 1;
         if (i === selected || (i % labelEvery === 0 && !(selected >= 0 && Math.abs(i - selected) < labelEvery))) {
             ctx.fillStyle = i === selected ? '#1a1a2e' : '#888';
@@ -223,6 +220,32 @@ export function drawBars(canvas, { labels, series, selected = -1, fmt = kFmt, va
             ctx.textAlign = 'center';
             ctx.fillText(labels[i], gx + groupW / 2, pad.top + chartH + below + 18);
         }
+    }
+    for (const { x, v, alpha } of valueLabels) {
+        const cx = x + barW / 2, y1 = yOf(v), up = v > 0, text = valueFmt(v);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = VFONT;
+        ctx.fillStyle = '#555';
+        if (turn === 'sideways') {
+            ctx.translate(cx + 3.5, y1 + (up ? -4 : 4));
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = up ? 'left' : 'right';
+            ctx.fillText(text, 0, 0);
+        } else if (turn === 'tilted') { // reads up and to the right from the top of the bar (down and to the right below it)
+            ctx.translate(cx - 2, y1 + (up ? -4 : 10));
+            ctx.rotate(up ? -tilt : tilt);
+            ctx.textAlign = 'left';
+            ctx.strokeStyle = '#fff'; // a white edge keeps it readable where it crosses the next bar
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(text, 0, 0);
+            ctx.fillText(text, 0, 0);
+        } else {
+            ctx.textAlign = 'center';
+            ctx.fillText(text, cx, up ? y1 - 4 : y1 + 12);
+        }
+        ctx.restore();
     }
     canvas._hit = x => {
         const i = Math.floor((x - pad.left) / groupW);

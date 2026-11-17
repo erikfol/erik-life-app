@@ -177,7 +177,7 @@ export default async function renderTaxes(el) {
                 { name: '2nd half', values: list.map(b => (b.half === 2 ? b.amount : NaN)), color: COLORS.h2 },
                 { name: 'Rate', values: list.map(b => b.rate), tipOnly: true, tipFmt: rateText },
             ],
-            stacked: true, selected: list.indexOf(bills[i]), fmt: axisK, valueFmt: wholeDollars, tipFmt: money,
+            stacked: true, slant: true, selected: list.indexOf(bills[i]), fmt: axisK, valueFmt: wholeDollars, tipFmt: money,
             tipHead: k => `${billLabel(list[k])}${list[k].due ? ` · due ${dLong(list[k].due)}` : ''}`,
         });
         drawBars($('#c-years'), {
@@ -187,7 +187,7 @@ export default async function renderTaxes(el) {
                 { name: '2nd half', values: ys.map(Y => Y.h2), color: COLORS.h2, valueLabels: true },
                 { name: 'Year total', values: ys.map(Y => Y.total), tipOnly: true },
             ],
-            stacked: true, fmt: axisK, valueFmt: wholeDollars, tipFmt: money,
+            stacked: true, slant: true, fmt: axisK, valueFmt: wholeDollars, tipFmt: money,
             tipHead: k => `${ys[k].year}${ys[k].complete ? '' : ' (2nd half not added yet)'}`,
         });
         const rated = ys.filter(Y => Y.rates);
@@ -197,7 +197,7 @@ export default async function renderTaxes(el) {
                 ...RATE_PARTS.map((p, k) => ({ name: p.label, values: rated.map(Y => Y.rates[p.id]), color: p.color, valueLabels: k === RATE_PARTS.length - 1 })),
                 { name: 'Total rate', values: rated.map(Y => Y.rate), tipOnly: true },
             ],
-            stacked: true, fmt: v => '$' + v.toFixed(0), valueFmt: v => money(v), tipFmt: money,
+            stacked: true, slant: true, fmt: v => '$' + v.toFixed(0), valueFmt: v => money(v), tipFmt: money,
         });
         drawBars($('#c-value'), {
             labels: ys.map(Y => String(Y.year)),
@@ -206,7 +206,7 @@ export default async function renderTaxes(el) {
                 { name: 'Buildings', values: ys.map(Y => Y.buildings), color: COLORS.buildings, valueLabels: true },
                 { name: 'Total', values: ys.map(Y => Y.assessed), tipOnly: true },
             ],
-            stacked: true, fmt: axisK, valueFmt: wholeDollars, tipFmt: wholeDollars,
+            stacked: true, slant: true, fmt: axisK, valueFmt: wholeDollars, tipFmt: wholeDollars,
         });
     };
     $('#c-bills').onclick = e => { const k = $('#c-bills')._hit?.(e.offsetX) ?? -1; if (k >= 0) show(bills.indexOf(shownBills()[k])); };
