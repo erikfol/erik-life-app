@@ -301,3 +301,36 @@ export function lastText(v, s, item) {
     return [showDay(dayOf(s.last.Date)), Number.isFinite(miles) ? amount(miles, s.unit) : ''].filter(Boolean).join(' · ')
         + (action.toLowerCase() !== String(item.Item || '').trim().toLowerCase() ? ` (${action})` : '');
 }
+
+// ── Current tires (cars) ────────────────────────────────────────────────────────────────────────────────────────────
+// Worked out from the newest Maintenance entry whose Action is "New tires" (so logging the next set starts it over) and
+// the latest reading (currentReading). Nothing extra is saved.
+export const hasTires = v => v.type === 'car';
+const isNewTires = r => /^new tires?$/i.test(String(r.Action || '').trim());
+
+/** '2 years, 2 months' (or '12 days' under a month) from Date `from` to Date `to`. */
+function ageText(from, to) {
+    const months = (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth() - (to.getDate() < from.getDate() ? 1 : 0);
+    const part = (n, word) => (n ? `${n} ${word}${n === 1 ? '' : 's'}` : '');
+    if (months < 1) return part(Math.max(0, Math.round((to - from) / 864e5)), 'day') || 'Put on today';
+    return [part(Math.floor(months / 12), 'year'), part(months % 12, 'month')].filter(Boolean).join(', ');
+}
+
+/**
+ * The tires on the car now, from the newest New tires entry in the Maintenance `log` and `now` (currentReading):
+ * { entry (that log row), at (the reading they went on at; NaN if it wasn't logged), on (miles put on them since; NaN
+ * without both readings), age ('2 years, 2 months', to today), perYear (miles a year on them, or null until they've
+ * been on a month), tire (the Description's first line without its price: 'Michelin …') }, or null if none is logged.
+ */
+export function currentTires(v, log, now, today = new Date()) {
+    const meter = v.meter || 'Mileage';
+    const entry = log.filter(r => ISO_DAY.test(r.Date || '') && isNewTires(r))
+        .sort((a, b) => b.Date.localeCompare(a.Date) || (milesOf(b[meter]) || 0) - (milesOf(a[meter]) || 0))[0];
+    if (!entry) return null;
+    const date = dayOf(entry.Date), at = milesOf(entry[meter]);
+    const on = Number.isFinite(at) && Number.isFinite(now?.miles) && now.miles >= at ? now.miles - at : NaN;
+    const days = now ? Math.round((now.date - date) / 864e5) : NaN;
+    const tire = String(entry.Description || '').split('\n')[0].replace(/\s*=\s*\$.*$/, '').trim();
+    return { entry, at, on, age: ageText(date, new Date(today.getFullYear(), today.getMonth(), today.getDate())),
+        perYear: Number.isFinite(on) && days >= 28 ? Math.round(on / days * 365.25) : null, tire };
+}

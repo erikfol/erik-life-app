@@ -1,4 +1,4 @@
-// One vehicle's page, in three tabs: Overview (information, current mileage and the maintenance schedule for cars,
+// One vehicle's page, in three tabs: Overview (information, current mileage, the maintenance schedule and current tires for cars,
 // service places, photos, maintenance table), Guides (long how-to notes with reference images) and Notes (a dated log).
 // Also the "Add vehicle" page.
 import { esc, toast } from '../../../bills-etc/js/util.js';
@@ -12,7 +12,7 @@ import {
     TYPES, VEHICLES_PATH, saveVehicles, photosDir, newVehicle, maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance,
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
-    lastText, soonOf, SOON_DAYS, invoicesDir,
+    lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires,
 } from '../vehicles.js';
 
 let table = null;
@@ -74,14 +74,50 @@ function renderSchedule(el, v, rows, get) {
     return draw;
 }
 
+/** A Date as '2026-11-18' (its own day, not UTC's). */
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** One figure in a row of them (Current mileage, Current tires): a label, the value big, and an optional line under it. */
+const stat = (label, value, sub) => `<div class="info-item"><dt>${label}</dt><dd class="mileage-stat">${esc(value)}</dd>${
+    sub ? `<dd class="muted mileage-sub">${esc(sub)}</dd>` : ''}</div>`;
+
+/**
+ * Current tires: the miles on them since the newest New tires entry in the Maintenance log, when they went on, how old
+ * they are and the miles a year on them, from get() = { log, readings } (both logs as last saved). Returns redraw().
+ */
+function renderTires(el, v, get) {
+    const draw = () => {
+        const { log, readings } = get();
+        const now = currentReading(v, log, readings);
+        const t = currentTires(v, log, now);
+        if (!t) {
+            el.innerHTML = `<p class="muted">No tires logged yet. When tires go on, add a Maintenance entry with the Action
+                <strong>New tires</strong> and the mileage, and the miles on them show here.</p>`;
+            return;
+        }
+        const n = x => Math.round(x).toLocaleString('en-US'), meter = (v.meter || 'Mileage').toLowerCase();
+        const where = String(t.entry.Location || '').trim();
+        el.innerHTML = `<dl class="info-grid mileage-stats">${
+            Number.isFinite(t.on)
+                ? stat('Miles on these tires', `${n(t.on)} miles`, `as of ${showDate(isoDay(now.date))} (${n(now.miles)} miles)`)
+                : stat('Miles on these tires', '—', Number.isFinite(t.at) ? 'No newer reading yet' : `The New tires entry has no ${meter}`)}${
+            stat('Put on', showDate(t.entry.Date), [Number.isFinite(t.at) ? `at ${n(t.at)} miles` : '', where].filter(Boolean).join(' · '))}${
+            stat('Age', t.age)}${
+            t.perYear !== null ? stat('Miles per year', `≈ ${n(t.perYear)}`, 'on these tires') : ''}</dl>
+            <p class="muted mileage-sub">${t.tire ? `<strong>${esc(t.tire)}</strong>. ` : ''}From the newest Maintenance entry with
+                the Action New tires, and the latest ${esc(meter)} (from the mileage log or the Maintenance log). Log the next
+                set the same way and this starts over.</p>`;
+    };
+    draw();
+    return draw;
+}
+
 /** The newest reading in the log (64,870 miles, Oct 23, 2026) and the miles a month and a year it works out to. */
 const currentMileage = (v, rows) => {
     const r = latestMileage(rows);
     if (!r) return '<p class="muted">Nothing logged yet. Press Edit to add a reading.</p>';
     const rate = mileageRate(v, rows);
     const n = x => (Number.isNaN(Number(x)) ? String(x) : Number(x).toLocaleString('en-US'));
-    const stat = (label, value, sub) => `<div class="info-item"><dt>${label}</dt><dd class="mileage-stat">${esc(value)}</dd>${
-        sub ? `<dd class="muted mileage-sub">${esc(sub)}</dd>` : ''}</div>`;
     return `<dl class="info-grid mileage-stats">${stat('Latest reading', `${n(r.Mileage)} miles`, showDate(r.Date))}${rate.why
         ? stat('Miles per month / year', '—', rate.why)
         : stat('Miles per month', `≈ ${n(rate.perMonth)}`) + stat('Miles per year', `≈ ${n(rate.perYear)}`)}</dl>
@@ -142,6 +178,10 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             <div class="sched"></div>
             <p class="muted mileage-sub sched-note"></p>
         </section>` : ''}
+        ${hasTires(v) ? `<section>
+            <h2>Current tires</h2>
+            <div id="tires"></div>
+        </section>` : ''}
         <section>
             <h2>Service places</h2>
             <div id="places"></div>
@@ -179,13 +219,15 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     // The logs as last saved: the mileage table's worked-out columns and the schedule are worked out from them.
     const saved = { log: rows, readings: miles || [] };
     const redrawSchedule = plan ? renderSchedule(el.querySelector('#schedule'), v, plan, () => saved) : () => {};
+    const redrawTires = hasTires(v) ? renderTires(el.querySelector('#tires'), v, () => saved) : () => {};
+    const redraw = () => { redrawSchedule(); redrawTires(); }; // after either log is saved
     if (miles) {
         const now = el.querySelector('#miles-now');
         now.innerHTML = currentMileage(v, miles);
         mileage = recordTable(el.querySelector('#miles'), {
             columns: [...MILEAGE_COLUMNS, ...mileageRateColumns(v, () => saved.readings)],
             rows: miles,
-            save: async rows => { await saveMileage(v, rows); saved.readings = rows; now.innerHTML = currentMileage(v, rows); redrawSchedule(); },
+            save: async rows => { await saveMileage(v, rows); saved.readings = rows; now.innerHTML = currentMileage(v, rows); redraw(); },
         });
     }
     renderPlaces(el.querySelector('#places'), list, v);
@@ -197,7 +239,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
         rows,
         filesDir: invoicesDir(v),
         compact: true, // long notes take many lines: scroll inside a box, with each note cut to a few lines
-        save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redrawSchedule(); },
+        save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redraw(); },
     });
 }
 
