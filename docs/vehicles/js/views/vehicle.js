@@ -12,18 +12,20 @@ import {
     TYPES, VEHICLES_PATH, saveVehicles, photosDir, newVehicle, maintenancePath, maintenanceColumns, loadMaintenance, saveMaintenance,
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
-    lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires,
+    lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires, treadPath, TREAD_COLUMNS, loadTread, saveTread,
+    lowestTread, treadLevel, treadMiles, latestTread, TREAD_LOW, TREAD_WORN,
 } from '../vehicles.js';
 
 let table = null;
 let mileage = null; // the mileage log (cars)
 let schedule = null; // the maintenance schedule (cars)
+let tread = null; // the tread depth log (cars)
 let info = null; // the information box
 
 export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!mileage?.hasUnsavedEdits() || !!schedule?.hasUnsavedEdits()
-    || !!info?.hasUnsavedEdits() || placesUnsaved() || guidesUnsaved() || notesUnsaved();
+    || !!tread?.hasUnsavedEdits() || !!info?.hasUnsavedEdits() || placesUnsaved() || guidesUnsaved() || notesUnsaved();
 export const forget = () => {
-    table = null; mileage = null; schedule = null; info = null;
+    table = null; mileage = null; schedule = null; tread = null; info = null;
     closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetGuides(); forgetNotes();
 };
 
@@ -81,33 +83,58 @@ const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
 const stat = (label, value, sub) => `<div class="info-item"><dt>${label}</dt><dd class="mileage-stat">${esc(value)}</dd>${
     sub ? `<dd class="muted mileage-sub">${esc(sub)}</dd>` : ''}</div>`;
 
+const TREAD_STATUS = { red: 'Worn out', yellow: 'Replace soon', ok: 'OK' };
+const TREAD_CLASS = { 'Worn out': 'due-red', 'Replace soon': 'due-yellow', OK: 'due-ok' };
+/** A depth in 32nds of an inch: '6/32', '5.5/32'. */
+const depth = n => `${n}/32`;
+
 /**
  * Current tires: the miles on them since the newest New tires entry in the Maintenance log, when they went on, how old
- * they are and the miles a year on them, from get() = { log, readings } (both logs as last saved). Returns redraw().
+ * they are, the miles a year on them and their latest tread depth, above the tread depth log (editable; its Miles on
+ * tires, Lowest and Status are worked out). get() = { log, readings, tread }: the three logs as last saved; tread
+ * saves are written back into it. Returns redraw(), for after the maintenance or mileage log is saved.
  */
 function renderTires(el, v, get) {
-    const draw = () => {
-        const { log, readings } = get();
+    const drawNow = () => {
+        const { log, readings, tread: treadRows } = get();
         const now = currentReading(v, log, readings);
         const t = currentTires(v, log, now);
+        const box = el.querySelector('.tires-now');
         if (!t) {
-            el.innerHTML = `<p class="muted">No tires logged yet. When tires go on, add a Maintenance entry with the Action
+            box.innerHTML = `<p class="muted">No tires logged yet. When tires go on, add a Maintenance entry with the Action
                 <strong>New tires</strong> and the mileage, and the miles on them show here.</p>`;
             return;
         }
         const n = x => Math.round(x).toLocaleString('en-US'), meter = (v.meter || 'Mileage').toLowerCase();
         const where = String(t.entry.Location || '').trim();
-        el.innerHTML = `<dl class="info-grid mileage-stats">${
+        const last = latestTread(treadRows, t.entry.Date); // measured since these tires went on
+        box.innerHTML = `<dl class="info-grid mileage-stats">${
             Number.isFinite(t.on)
                 ? stat('Miles on these tires', `${n(t.on)} miles`, `as of ${showDate(isoDay(now.date))} (${n(now.miles)} miles)`)
                 : stat('Miles on these tires', '—', Number.isFinite(t.at) ? 'No newer reading yet' : `The New tires entry has no ${meter}`)}${
             stat('Put on', showDate(t.entry.Date), [Number.isFinite(t.at) ? `at ${n(t.at)} miles` : '', where].filter(Boolean).join(' · '))}${
             stat('Age', t.age)}${
-            t.perYear !== null ? stat('Miles per year', `≈ ${n(t.perYear)}`, 'on these tires') : ''}</dl>
+            t.perYear !== null ? stat('Miles per year', `≈ ${n(t.perYear)}`, 'on these tires') : ''}${
+            last ? stat('Tread', depth(lowestTread(last)), `lowest tire, ${showDate(last.Date)} · ${TREAD_STATUS[treadLevel(lowestTread(last))]}`) : ''}</dl>
             <p class="muted mileage-sub">${t.tire ? `<strong>${esc(t.tire)}</strong>. ` : ''}From the newest Maintenance entry with
                 the Action New tires, and the latest ${esc(meter)} (from the mileage log or the Maintenance log). Log the next
                 set the same way and this starts over.</p>`;
     };
+    const drawLog = () => {
+        if (tread?.hasUnsavedEdits()) return; // don't throw away edits in progress
+        const saved = get();
+        tread = recordTable(el.querySelector('.tread'), {
+            columns: [TREAD_COLUMNS[0], TREAD_COLUMNS[1],
+                { name: 'Miles on tires', kind: 'number', calc: r => { const m = treadMiles(v, get().log, r); return Number.isFinite(m) ? m : ''; } },
+                ...TREAD_COLUMNS.slice(2, -1),
+                { name: 'Lowest', kind: 'number', calc: r => { const m = lowestTread(r); return Number.isFinite(m) ? m : ''; } },
+                { name: 'Status', kind: 'text', calc: r => TREAD_STATUS[treadLevel(lowestTread(r))] || '', badge: x => TREAD_CLASS[x] || '' },
+                TREAD_COLUMNS.at(-1)],
+            rows: saved.tread,
+            save: async rows => { await saveTread(v, rows); saved.tread = rows; drawNow(); },
+        });
+    };
+    const draw = () => { drawNow(); drawLog(); };
     draw();
     return draw;
 }
@@ -157,10 +184,12 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     const rows = await loadMaintenance(v);
     const miles = hasMileageLog(v) ? await loadMileage(v) : null;
     const plan = hasSchedule(v) ? await loadSchedule(v) : null;
+    const treadRows = hasTires(v) ? await loadTread(v) : null;
     el.innerHTML = `
         <h1 class="page" id="v-name"></h1>
         <p class="lead">${esc(TYPES[v.type]?.label || 'Vehicle')} · information in <code>${esc(VEHICLES_PATH)}</code>,
-            ${miles ? `mileage in <code>${esc(mileagePath(v))}</code>, ` : ''}${plan ? `schedule in <code>${esc(schedulePath(v))}</code>, ` : ''}maintenance in
+            ${miles ? `mileage in <code>${esc(mileagePath(v))}</code>, ` : ''}${plan ? `schedule in <code>${esc(schedulePath(v))}</code>, ` : ''}${
+                treadRows ? `tread depths in <code>${esc(treadPath(v))}</code>, ` : ''}maintenance in
             <code>${esc(maintenancePath(v))}</code>.</p>
         ${tabs(v, part)}
         <section>
@@ -178,9 +207,14 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             <div class="sched"></div>
             <p class="muted mileage-sub sched-note"></p>
         </section>` : ''}
-        ${hasTires(v) ? `<section>
+        ${treadRows ? `<section id="tires">
             <h2>Current tires</h2>
-            <div id="tires"></div>
+            <div class="tires-now"></div>
+            <h3 class="tread-h">Tread depth</h3>
+            <p class="muted mileage-sub">Each tire's depth in 32nds of an inch (a gauge reading of 6 is 6/32): LF left front,
+                RF right front, LR left rear, RR right rear. Replace soon at ${TREAD_LOW}/32 or less; worn out at ${TREAD_WORN}/32,
+                the legal minimum. Miles on tires counts from the New tires entry before each reading.</p>
+            <div class="tread"></div>
         </section>` : ''}
         <section>
             <h2>Service places</h2>
@@ -216,10 +250,10 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             onListChanged(list.find(x => x.id !== v.id)?.id || 'new');
         },
     });
-    // The logs as last saved: the mileage table's worked-out columns and the schedule are worked out from them.
-    const saved = { log: rows, readings: miles || [] };
+    // The logs as last saved: the mileage table's worked-out columns, the schedule and the tires are worked out from them.
+    const saved = { log: rows, readings: miles || [], tread: treadRows || [] };
     const redrawSchedule = plan ? renderSchedule(el.querySelector('#schedule'), v, plan, () => saved) : () => {};
-    const redrawTires = hasTires(v) ? renderTires(el.querySelector('#tires'), v, () => saved) : () => {};
+    const redrawTires = treadRows ? renderTires(el.querySelector('#tires'), v, () => saved) : () => {};
     const redraw = () => { redrawSchedule(); redrawTires(); }; // after either log is saved
     if (miles) {
         const now = el.querySelector('#miles-now');

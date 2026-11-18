@@ -308,6 +308,13 @@ export function lastText(v, s, item) {
 export const hasTires = v => v.type === 'car';
 const isNewTires = r => /^new tires?$/i.test(String(r.Action || '').trim());
 
+/** The newest New tires entry in the Maintenance `log` on or before day `upTo` ('2026-11-18'), or undefined. */
+function tiresBy(v, log, upTo) {
+    const meter = v.meter || 'Mileage';
+    return log.filter(r => ISO_DAY.test(r.Date || '') && r.Date <= upTo && isNewTires(r))
+        .sort((a, b) => b.Date.localeCompare(a.Date) || (milesOf(b[meter]) || 0) - (milesOf(a[meter]) || 0))[0];
+}
+
 /** '2 years, 2 months' (or '12 days' under a month) from Date `from` to Date `to`. */
 function ageText(from, to) {
     const months = (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth() - (to.getDate() < from.getDate() ? 1 : 0);
@@ -324,8 +331,7 @@ function ageText(from, to) {
  */
 export function currentTires(v, log, now, today = new Date()) {
     const meter = v.meter || 'Mileage';
-    const entry = log.filter(r => ISO_DAY.test(r.Date || '') && isNewTires(r))
-        .sort((a, b) => b.Date.localeCompare(a.Date) || (milesOf(b[meter]) || 0) - (milesOf(a[meter]) || 0))[0];
+    const entry = tiresBy(v, log, '9999-12-31');
     if (!entry) return null;
     const date = dayOf(entry.Date), at = milesOf(entry[meter]);
     const on = Number.isFinite(at) && Number.isFinite(now?.miles) && now.miles >= at ? now.miles - at : NaN;
@@ -334,3 +340,37 @@ export function currentTires(v, log, now, today = new Date()) {
     return { entry, at, on, age: ageText(date, new Date(today.getFullYear(), today.getMonth(), today.getDate())),
         perYear: Number.isFinite(on) && days >= 28 ? Math.round(on / days * 365.25) : null, tire };
 }
+
+// A tread depth log whenever the tires are measured: Date, Mileage, each tire's depth in 32nds of an inch, Notes.
+export const treadPath = v => `${VEHICLES_DIR}/${v.id}-tread.csv`;
+export const TREAD_TIRES = ['LF', 'RF', 'LR', 'RR']; // left front, right front, left rear, right rear
+export const TREAD_COLUMNS = [
+    { name: 'Date', kind: 'date', default: () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } },
+    { name: 'Mileage', kind: 'number' },
+    ...TREAD_TIRES.map(name => ({ name, kind: 'number' })),
+    { name: 'Notes', kind: 'text' },
+];
+export const loadTread = (v, track = true) => loadRows(treadPath(v), TREAD_COLUMNS, track);
+export const saveTread = (v, rows) => saveRows(treadPath(v), TREAD_COLUMNS, rows);
+
+/** Tread at or below TREAD_LOW 32nds is getting low (replace soon); at or below TREAD_WORN it's worn to the legal minimum. */
+export const TREAD_LOW = 4, TREAD_WORN = 2;
+/** The lowest of a reading's measured depths, or NaN if none is filled in. */
+export const lowestTread = r => {
+    const depths = TREAD_TIRES.map(t => milesOf(r[t])).filter(Number.isFinite);
+    return depths.length ? Math.min(...depths) : NaN;
+};
+/** 'red' (worn out), 'yellow' (replace soon) or 'ok' for a depth in 32nds; null for NaN. */
+export const treadLevel = n => (!Number.isFinite(n) ? null : n <= TREAD_WORN ? 'red' : n <= TREAD_LOW ? 'yellow' : 'ok');
+
+/** Miles on the tires at a tread reading: its Mileage less that of the newest New tires entry on or before its date (NaN if either is missing). */
+export function treadMiles(v, log, r) {
+    if (!ISO_DAY.test(r.Date || '')) return NaN;
+    const entry = tiresBy(v, log, r.Date), at = entry ? milesOf(entry[v.meter || 'Mileage']) : NaN, miles = milesOf(r.Mileage);
+    return Number.isFinite(at) && Number.isFinite(miles) && miles >= at ? miles - at : NaN;
+}
+
+/** The newest dated reading with a depth in it on or after day `since` ('2024-09-05', when the tires went on), or null. */
+export const latestTread = (rows, since = '') => rows
+    .filter(r => ISO_DAY.test(r.Date || '') && r.Date >= since && Number.isFinite(lowestTread(r)))
+    .sort((a, b) => b.Date.localeCompare(a.Date))[0] || null;
