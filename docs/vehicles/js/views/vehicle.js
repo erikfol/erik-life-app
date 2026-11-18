@@ -14,6 +14,7 @@ import {
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
     lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires, treadPath, TREAD_COLUMNS, loadTread, saveTread,
     lowestTread, treadLevel, treadMiles, latestTread, TREAD_LOW, TREAD_WORN, tireInfoOf, newTread, tireWarranty,
+    treadForecast,
 } from '../vehicles.js';
 
 let table = null;
@@ -113,6 +114,12 @@ function renderTires(el, list, v, get) {
         const w = tireWarranty(v, t), fresh = newTread(v);
         const ended = w && ((w.until && new Date() >= w.until) || w.left <= 0);
         const day = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        // About when they get to Replace soon and Worn out, in a straight line from new (or the first reading) to the latest.
+        const forecast = treadForecast(v, t, treadRows, now);
+        const hundred = x => n(Math.round(x / 100) * 100), month = d => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        const ahead = (label, a) => (a.now ? stat(label, 'Now', `the lowest tire is at ${depth(a.depth)} or less`)
+            : stat(label, a.date ? `≈ ${month(a.date)}` : `≈ ${hundred(a.miles)} miles`,
+                [a.date ? `at ≈ ${hundred(a.miles)} miles` : '', Number.isFinite(a.on) ? `≈ ${hundred(a.on)} on the tires` : ''].filter(Boolean).join(' · ')));
         box.innerHTML = `<dl class="info-grid mileage-stats">${
             Number.isFinite(t.on)
                 ? stat('Miles on these tires', `${n(t.on)} miles`, `as of ${showDate(isoDay(now.date))} (${n(now.miles)} miles)`)
@@ -124,10 +131,14 @@ function renderTires(el, list, v, get) {
                 : stat('Treadwear warranty', Number.isFinite(w.left) ? `${n(w.left)} miles left` : `${n(w.miles)} miles`,
                     [Number.isFinite(w.left) ? `of ${n(w.miles)}` : '', w.until ? `until ${day(w.until)}` : ''].filter(Boolean).join(' · '))}${
             last ? stat('Tread', depth(lowestTread(last)), `lowest tire${Number.isFinite(fresh) ? ` (${depth(fresh)} new)` : ''}, ${
-                showDate(last.Date)} · ${TREAD_STATUS[treadLevel(lowestTread(last))]}`) : ''}</dl>
+                showDate(last.Date)} · ${TREAD_STATUS[treadLevel(lowestTread(last))]}`) : ''}${
+            !forecast ? '' : forecast.why ? stat('Tread estimate', '—', forecast.why)
+                : ahead(`Replace soon (${depth(TREAD_LOW)})`, forecast.at[0]) + ahead(`Worn out (${depth(TREAD_WORN)})`, forecast.at[1])}</dl>
             <p class="muted mileage-sub">${t.tire ? `<strong>${esc(t.tire)}</strong>. ` : ''}From the newest Maintenance entry with
                 the Action New tires, and the latest ${esc(meter)} (from the mileage log or the Maintenance log). Log the next
-                set the same way and this starts over.</p>`;
+                set the same way and this starts over.${forecast?.at ? ` Replace soon and Worn out are estimates: the wear so far
+                (${forecast.from === 'new' ? `from ${depth(newTread(v))} new` : 'since the first reading'} to the latest tread reading, about
+                ${n(1 / forecast.perMile)} miles per 32nd), kept up at the miles per year on these tires.` : ''}</p>`;
     };
     const drawLog = () => {
         if (tread?.hasUnsavedEdits()) return; // don't throw away edits in progress

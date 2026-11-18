@@ -397,3 +397,32 @@ export function tireWarranty(v, t) {
     const months = n > 0 ? (/month/i.test(length) ? n : n * 12) : 0;
     return { miles, left: Number.isFinite(t.on) ? miles - t.on : NaN, until: months ? plusMonths(dayOf(t.entry.Date), Math.round(months)) : null };
 }
+
+/**
+ * About when tires `t` (currentTires) wear down to each depth in `targets` (32nds), in a straight line: from the New
+ * tread depth at the mileage they went on at (or, without it, the oldest tread reading since then) to the newest
+ * reading since then with a mileage, then on at their miles a year (t.perYear) from `now` (currentReading).
+ * → { perMile (32nds worn a mile), from: 'new' | 'reading', at: [{ depth, now (already there), miles (odometer),
+ * on (miles on the tires, or NaN), date (a Date, or null without a rate) }] }; { why } when it can't be worked out;
+ * null without a reading.
+ */
+export function treadForecast(v, t, rows, now, targets = [TREAD_LOW, TREAD_WORN]) {
+    if (!t) return null;
+    const readings = rows.filter(r => ISO_DAY.test(r.Date || '') && r.Date >= t.entry.Date && Number.isFinite(lowestTread(r))
+        && Number.isFinite(milesOf(r.Mileage))).sort((a, b) => a.Date.localeCompare(b.Date) || milesOf(a.Mileage) - milesOf(b.Mileage));
+    const last = readings.at(-1);
+    if (!last) return null;
+    const fresh = newTread(v), lastMiles = milesOf(last.Mileage), lowest = lowestTread(last);
+    const start = Number.isFinite(fresh) && Number.isFinite(t.at) ? { miles: t.at, depth: fresh, from: 'new' }
+        : readings.length > 1 ? { miles: milesOf(readings[0].Mileage), depth: lowestTread(readings[0]), from: 'reading' } : null;
+    if (!start) return { why: 'Needs the New tread depth in Tire information, or a second reading' };
+    const worn = start.depth - lowest, miles = lastMiles - start.miles;
+    if (!(worn > 0) || !(miles > 0)) return { why: 'Needs a reading that shows some wear' };
+    const perMile = worn / miles;
+    return { perMile, from: start.from, at: targets.map(depth => {
+        if (lowest <= depth) return { depth, now: true };
+        const odo = lastMiles + (lowest - depth) / perMile;
+        const date = t.perYear && now ? new Date(now.date.getTime() + Math.max(0, odo - now.miles) / t.perYear * 365.25 * 864e5) : null;
+        return { depth, now: false, miles: odo, on: Number.isFinite(t.at) ? odo - t.at : NaN, date };
+    }) };
+}
