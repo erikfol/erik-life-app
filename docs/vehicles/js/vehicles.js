@@ -374,3 +374,26 @@ export function treadMiles(v, log, r) {
 export const latestTread = (rows, since = '') => rows
     .filter(r => ISO_DAY.test(r.Date || '') && r.Date >= since && Number.isFinite(lowestTread(r)))
     .sort((a, b) => b.Date.localeCompare(a.Date))[0] || null;
+
+// A car's Tire information box (vehicle.tires, [{ label, value }] like its information): facts about the set on it now,
+// such as the treadwear warranty and the tread depth when new. Some of it is worked out with, by its label.
+export const TIRE_FIELDS = ['Treadwear warranty', 'Warranty length', 'New tread depth'];
+export const tireInfoOf = v => (Array.isArray(v.tires) ? v.tires : TIRE_FIELDS.map(label => ({ label, value: '' })));
+const tireValue = (v, label) => tireInfoOf(v).find(f => f.label.trim().toLowerCase() === label.toLowerCase())?.value.trim() || '';
+const firstNumber = text => { const m = /\d[\d,]*(\.\d+)?/.exec(text); return m ? Number(m[0].replace(/,/g, '')) : NaN; };
+
+/** The tread depth when new, in 32nds, from the Tire information's New tread depth ('10/32', '10/32"', '10'), or NaN. */
+export const newTread = v => firstNumber(tireValue(v, 'New tread depth'));
+
+/**
+ * The treadwear warranty of tires `t` (currentTires), from the Tire information's Treadwear warranty ('60,000 miles')
+ * and Warranty length ('6 years', '72 months'; from the day they went on): { miles, left (miles left; ≤ 0 once used
+ * up, NaN without the miles on them), until (a Date, or null) }, or null without a warranty mileage.
+ */
+export function tireWarranty(v, t) {
+    const miles = firstNumber(tireValue(v, 'Treadwear warranty'));
+    if (!t || !(miles > 0)) return null;
+    const length = tireValue(v, 'Warranty length'), n = firstNumber(length);
+    const months = n > 0 ? (/month/i.test(length) ? n : n * 12) : 0;
+    return { miles, left: Number.isFinite(t.on) ? miles - t.on : NaN, until: months ? plusMonths(dayOf(t.entry.Date), Math.round(months)) : null };
+}

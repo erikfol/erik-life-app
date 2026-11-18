@@ -13,19 +13,20 @@ import {
     hasMileageLog, mileagePath, MILEAGE_COLUMNS, loadMileage, saveMileage, latestMileage, mileageRate, mileageRateColumns,
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
     lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires, treadPath, TREAD_COLUMNS, loadTread, saveTread,
-    lowestTread, treadLevel, treadMiles, latestTread, TREAD_LOW, TREAD_WORN,
+    lowestTread, treadLevel, treadMiles, latestTread, TREAD_LOW, TREAD_WORN, tireInfoOf, newTread, tireWarranty,
 } from '../vehicles.js';
 
 let table = null;
 let mileage = null; // the mileage log (cars)
 let schedule = null; // the maintenance schedule (cars)
 let tread = null; // the tread depth log (cars)
+let tireInfo = null; // the Tire information box (cars)
 let info = null; // the information box
 
 export const hasUnsavedEdits = () => !!table?.hasUnsavedEdits() || !!mileage?.hasUnsavedEdits() || !!schedule?.hasUnsavedEdits()
-    || !!tread?.hasUnsavedEdits() || !!info?.hasUnsavedEdits() || placesUnsaved() || guidesUnsaved() || notesUnsaved();
+    || !!tread?.hasUnsavedEdits() || !!tireInfo?.hasUnsavedEdits() || !!info?.hasUnsavedEdits() || placesUnsaved() || guidesUnsaved() || notesUnsaved();
 export const forget = () => {
-    table = null; mileage = null; schedule = null; tread = null; info = null;
+    table = null; mileage = null; schedule = null; tread = null; tireInfo = null; info = null;
     closeFilterMenu(); releaseGalleries(); forgetPlaces(); forgetGuides(); forgetNotes();
 };
 
@@ -90,11 +91,12 @@ const depth = n => `${n}/32`;
 
 /**
  * Current tires: the miles on them since the newest New tires entry in the Maintenance log, when they went on, how old
- * they are, the miles a year on them and their latest tread depth, above the tread depth log (editable; its Miles on
- * tires, Lowest and Status are worked out). get() = { log, readings, tread }: the three logs as last saved; tread
- * saves are written back into it. Returns redraw(), for after the maintenance or mileage log is saved.
+ * they are, the miles a year on them, the treadwear warranty left and their latest tread depth; the Tire information
+ * box (saved with the vehicle in `list`); and the tread depth log (editable; its Miles on tires, Lowest and Status are
+ * worked out). get() = { log, readings, tread }: the three logs as last saved; tread saves are written back into it.
+ * Returns redraw(), for after the maintenance or mileage log is saved.
  */
-function renderTires(el, v, get) {
+function renderTires(el, list, v, get) {
     const drawNow = () => {
         const { log, readings, tread: treadRows } = get();
         const now = currentReading(v, log, readings);
@@ -108,6 +110,9 @@ function renderTires(el, v, get) {
         const n = x => Math.round(x).toLocaleString('en-US'), meter = (v.meter || 'Mileage').toLowerCase();
         const where = String(t.entry.Location || '').trim();
         const last = latestTread(treadRows, t.entry.Date); // measured since these tires went on
+        const w = tireWarranty(v, t), fresh = newTread(v);
+        const ended = w && ((w.until && new Date() >= w.until) || w.left <= 0);
+        const day = d => d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         box.innerHTML = `<dl class="info-grid mileage-stats">${
             Number.isFinite(t.on)
                 ? stat('Miles on these tires', `${n(t.on)} miles`, `as of ${showDate(isoDay(now.date))} (${n(now.miles)} miles)`)
@@ -115,7 +120,11 @@ function renderTires(el, v, get) {
             stat('Put on', showDate(t.entry.Date), [Number.isFinite(t.at) ? `at ${n(t.at)} miles` : '', where].filter(Boolean).join(' · '))}${
             stat('Age', t.age)}${
             t.perYear !== null ? stat('Miles per year', `≈ ${n(t.perYear)}`, 'on these tires') : ''}${
-            last ? stat('Tread', depth(lowestTread(last)), `lowest tire, ${showDate(last.Date)} · ${TREAD_STATUS[treadLevel(lowestTread(last))]}`) : ''}</dl>
+            !w ? '' : ended ? stat('Treadwear warranty', 'Ended', w.left <= 0 ? `used up its ${n(w.miles)} miles` : `on ${day(w.until)}`)
+                : stat('Treadwear warranty', Number.isFinite(w.left) ? `${n(w.left)} miles left` : `${n(w.miles)} miles`,
+                    [Number.isFinite(w.left) ? `of ${n(w.miles)}` : '', w.until ? `until ${day(w.until)}` : ''].filter(Boolean).join(' · '))}${
+            last ? stat('Tread', depth(lowestTread(last)), `lowest tire${Number.isFinite(fresh) ? ` (${depth(fresh)} new)` : ''}, ${
+                showDate(last.Date)} · ${TREAD_STATUS[treadLevel(lowestTread(last))]}`) : ''}</dl>
             <p class="muted mileage-sub">${t.tire ? `<strong>${esc(t.tire)}</strong>. ` : ''}From the newest Maintenance entry with
                 the Action New tires, and the latest ${esc(meter)} (from the mileage log or the Maintenance log). Log the next
                 set the same way and this starts over.</p>`;
@@ -136,6 +145,16 @@ function renderTires(el, v, get) {
     };
     const draw = () => { drawNow(); drawLog(); };
     draw();
+    tireInfo = infoBox(el.querySelector('.tires-info'), {
+        info: tireInfoOf(v),
+        noun: 'tires',
+        save: async newInfo => {
+            const updated = { ...v, tires: newInfo };
+            await saveVehicles(list.map(x => (x.id === v.id ? updated : x)));
+            Object.assign(v, updated);
+            drawNow();
+        },
+    });
     return draw;
 }
 
@@ -210,6 +229,10 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
         ${treadRows ? `<section id="tires">
             <h2>Current tires</h2>
             <div class="tires-now"></div>
+            <h3 class="tread-h">Tire information</h3>
+            <div class="tires-info"></div>
+            <p class="muted mileage-sub">For the set on now. Treadwear warranty (miles) and Warranty length (years, from
+                the day they went on) give the warranty figure above; New tread depth goes next to the tread.</p>
             <h3 class="tread-h">Tread depth</h3>
             <p class="muted mileage-sub">Each tire's depth in 32nds of an inch (a gauge reading of 6 is 6/32): LF left front,
                 RF right front, LR left rear, RR right rear. Replace soon at ${TREAD_LOW}/32 or less; worn out at ${TREAD_WORN}/32,
@@ -253,7 +276,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     // The logs as last saved: the mileage table's worked-out columns, the schedule and the tires are worked out from them.
     const saved = { log: rows, readings: miles || [], tread: treadRows || [] };
     const redrawSchedule = plan ? renderSchedule(el.querySelector('#schedule'), v, plan, () => saved) : () => {};
-    const redrawTires = treadRows ? renderTires(el.querySelector('#tires'), v, () => saved) : () => {};
+    const redrawTires = treadRows ? renderTires(el.querySelector('#tires'), list, v, () => saved) : () => {};
     const redraw = () => { redrawSchedule(); redrawTires(); }; // after either log is saved
     if (miles) {
         const now = el.querySelector('#miles-now');

@@ -120,3 +120,4 @@ h3.g-images { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.4p
 /* Current tires: the tread depth log under the figures */
 h3.tread-h { font-size: 0.95em; margin: 18px 0 4px; }
 .tread .record-table, .tread .table-wrap { max-width: 980px; }
+.tires-info + p.mileage-sub { margin-top: 8px; }
