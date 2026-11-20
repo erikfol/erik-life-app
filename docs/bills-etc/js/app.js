@@ -14,8 +14,9 @@ import utilities from './views/utilities.js';
 import loans from './views/loans.js';
 import savings from './views/savings.js';
 import bills from './views/bills.js';
+import income from './views/income.js';
 
-const VIEWS = { home, month, bills, dashboard, utilities, loans, savings, edit, subs, config };
+const VIEWS = { home, month, income, bills, dashboard, utilities, loans, savings, edit, subs, config };
 const viewEl = document.getElementById('view');
 let current = null;
 let currentName = null;

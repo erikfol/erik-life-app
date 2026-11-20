@@ -304,8 +304,11 @@ function bindTip(canvas) {
  * instead of starting at 0, labelled with fmt. hlines: [{ value, label, color }] dashed lines across the chart (e.g. a
  * level to stay above), each labelled at its right end; the axis makes room for them. xs: each label's place across the
  * chart (0 to 1, e.g. by date, for points unevenly apart) instead of evenly spaced; labels that would overlap are left out.
+ * ceil: values above it don't stretch the axis; they're drawn as ▲ at the top, labelled with their value (e.g. a one-off
+ * bonus). marks: [{ index, text }] a dashed line at that label with `text` in a small badge on top (e.g. numbered notes).
+ * tipExtra(i) → more HTML for the hover tip.
  */
-export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false, hlines = [], xs = null }) {
+export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, tipHead = null, markIndex = -1, markText = 'Today', fit = false, hlines = [], xs = null, ceil = Infinity, marks = [], tipExtra = null }) {
     const s = setup(canvas);
     const n = labels.length;
     canvas._tip = null;
@@ -314,7 +317,9 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     const pad = { top: 18, right: 16, bottom: 30, left: 64 };
     const chartW = W - pad.left - pad.right, chartH = H - pad.top - pad.bottom;
     const lines = hlines.filter(h => Number.isFinite(h.value));
-    const all = [...series.flatMap(x => x.values.filter(Number.isFinite)), ...lines.map(h => h.value)];
+    const values = series.flatMap(x => x.values.filter(Number.isFinite));
+    const inRange = values.filter(v => v <= ceil);
+    const all = [...(inRange.length ? inRange : values), ...lines.map(h => h.value)];
     let minVal = 0, maxVal = niceMax(Math.max(1, ...all) * 1.05), ticks = 4;
     if (fit && all.length) {
         // The values, widened to at least 10% of the largest, with a little room above and below; then the tidiest axis
@@ -334,7 +339,7 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     }
     yGrid(ctx, pad, chartW, chartH, maxVal, minVal, fit ? fmt : kFmt, ticks);
     const xOf = i => pad.left + (n === 1 ? chartW / 2 : (xs ? xs[i] : i / (n - 1)) * chartW);
-    const yOf = v => pad.top + chartH - ((Math.max(minVal, v) - minVal) / (maxVal - minVal)) * chartH;
+    const yOf = v => pad.top + chartH - ((Math.min(maxVal, Math.max(minVal, v)) - minVal) / (maxVal - minVal)) * chartH;
 
     ctx.font = `11px ${FONT}`;
     ctx.fillStyle = '#888';
@@ -345,6 +350,7 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
     if (xs) { // the last label, then each one from the left that has room
         const taken = [];
         [n - 1, ...labels.keys()].forEach(i => {
+            if (!labels[i]) return; // a point without a label of its own
             const x = labelX(labels[i], i), half = ctx.measureText(labels[i]).width / 2 + 4;
             if (taken.some(([a, b]) => x + half > a && x - half < b)) return;
             taken.push([x - half, x + half]);
@@ -361,6 +367,23 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
         ctx.restore();
         ctx.fillStyle = '#555';
         ctx.fillText(markText, xOf(markIndex), pad.top - 6);
+    }
+
+    for (const m of marks.filter(m => m.index >= 0 && m.index < n)) { // e.g. numbered notes: a dashed line and a badge on top
+        const x = xOf(m.index), color = m.color || '#b9770e';
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + chartH); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(x, pad.top - 9, 8, 0, 2 * Math.PI); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `700 10px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(m.text, x, pad.top - 5.5);
+        ctx.restore();
     }
 
     for (const h of lines) { // e.g. Oh sh!t money: a dashed level line, labelled at its right end
@@ -395,8 +418,21 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
         if (ser.dots) { // a dot on each value (e.g. readings taken now and then)
             ctx.setLineDash([]);
             ctx.fillStyle = ser.color;
-            ser.values.forEach((v, i) => { if (Number.isFinite(v)) { ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3.5, 0, 2 * Math.PI); ctx.fill(); } });
+            ser.values.forEach((v, i) => { if (Number.isFinite(v) && v <= maxVal) { ctx.beginPath(); ctx.arc(xOf(i), yOf(v), 3.5, 0, 2 * Math.PI); ctx.fill(); } });
         }
+        // Off the top (only with `ceil`): ▲ at the edge with the value beside it.
+        ser.values.forEach((v, i) => {
+            if (!(Number.isFinite(v) && v > maxVal)) return;
+            const x = xOf(i), y = pad.top;
+            ctx.setLineDash([]);
+            ctx.fillStyle = ser.color;
+            ctx.beginPath(); ctx.moveTo(x, y - 1); ctx.lineTo(x - 6, y + 9); ctx.lineTo(x + 6, y + 9); ctx.closePath(); ctx.fill();
+            ctx.font = `600 11px ${FONT}`;
+            const t = (tipFmt || fmt)(v), w = ctx.measureText(t).width;
+            const right = x + 9 + w <= W - 2;
+            ctx.textAlign = right ? 'left' : 'right';
+            ctx.fillText(t, right ? x + 9 : x - 9, y + 9);
+        });
         ctx.restore();
     }
 
@@ -406,7 +442,7 @@ export function drawLines(canvas, { labels, series, fmt = kFmt, tipFmt = null, t
         html: i => {
             const lines = series.filter(x => x.name && Number.isFinite(x.values[i]))
                 .map(x => `<div><span class="tip-dot" style="background:${x.color}"></span>${esc(x.name)}: <strong>${esc((tipFmt || fmt)(x.values[i]))}</strong></div>`);
-            return lines.length ? `<div class="tip-head">${esc(tipHead ? tipHead(i) : labels[i])}</div>${lines.join('')}` : '';
+            return lines.length ? `<div class="tip-head">${esc(tipHead ? tipHead(i) : labels[i])}</div>${lines.join('')}${tipExtra ? tipExtra(i) || '' : ''}` : '';
         },
     };
     bindTip(canvas);

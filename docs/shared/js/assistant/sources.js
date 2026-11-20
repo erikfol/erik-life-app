@@ -19,7 +19,7 @@ import { scrubRow, scrubTree, scrubText } from './scrub.js';
 const FOLDERS = [
     ['401k', '401(k)'], ['taxes', 'Taxes'], ['health', 'Health'], ['vehicles', 'Vehicles'], ['house', 'House'], ['pets', 'Pets'],
     ['insurance', 'Insurance'], ['dinner-planner', 'Dinner Planner'], ['kid-lunches', 'Kid Lunches'], ['gifts', 'Gifts, birthdays and anniversaries'],
-    ['career', 'Working career'], ['electric', 'Electric'], ['heat_home', 'Home heating'], ['forgettable_subs', 'Forgettable subscriptions'],
+    ['career', 'Working career'], ['electric', 'Electric'], ['heat_home', 'Home heating'], ['forgettable_subs', 'Forgettable subscriptions'], ['income', 'Notes on why take-home pay changed (by paycheck date)'],
 ];
 // Read through the app's own code below instead, or an internal copy of what's in another source.
 const SKIP = /^inputs\/(electric\/master_electric\.csv|heat_home\/master_heat_home\.csv|dinner-planner\/db\.json)$/;

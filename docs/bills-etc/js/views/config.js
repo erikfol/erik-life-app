@@ -56,7 +56,7 @@ export default {
 
         el.innerHTML = `<div id="cfg">
             <div class="row" style="margin-bottom:6px">
-                <p class="lead" style="margin:0">How This Month projects the month. Saved to <code>config.json</code>; notes (keys starting with <code>_</code>) are kept. Your monthly income is on the <a href="#bills">Bills</a> page.</p>
+                <p class="lead" style="margin:0">How This Month projects the month. Saved to <code>config.json</code>; notes (keys starting with <code>_</code>) are kept. Your monthly income is on the <a href="#income">Income</a> page.</p>
                 <span class="spacer"></span>
                 <span id="total" class="muted" style="font-size:0.9em"></span>
                 <button class="primary" id="save">${isNew ? 'Create config.json' : 'Save'}</button>

@@ -18,6 +18,7 @@ export const PAGES = {
     'bills-etc': ['bills-etc/', 'Bills Etc'],
     'bills-etc/this-month': ['bills-etc/#month', 'This Month'],
     'bills-etc/savings': ['bills-etc/#savings', 'Savings'],
+    'bills-etc/income': ['bills-etc/#income', 'Income'],
     'bills-etc/bills': ['bills-etc/#bills', 'Bills'],
     'bills-etc/utilities': ['bills-etc/#utilities', 'Utilities'],
     'bills-etc/loans': ['bills-etc/#loans', 'Loan/CC'],

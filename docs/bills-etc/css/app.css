@@ -300,6 +300,7 @@ th.filtered .fbtn::before { content: '⧩ '; font-size: 0.9em; }
 .kpis .cmp { font-size: 0.82em; margin-top: 6px; line-height: 1.4; color: var(--muted); }
 .delta-good { color: var(--green); font-weight: 600; }
 .delta-bad { color: var(--red); font-weight: 600; }
+.note-num { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; border-radius: 9px; background: #b9770e; color: #fff; font-size: 0.75em; font-weight: 700; text-align: center; padding: 0 4px; }
 .where-row {
     display: grid; grid-template-columns: minmax(120px, 190px) 1fr 100px minmax(120px, 170px);
     align-items: center; gap: 12px; width: 100%; text-align: left;
