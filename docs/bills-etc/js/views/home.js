@@ -9,6 +9,7 @@ import { esc, money, toast } from '../util.js';
 import { refreshStatus } from '../app.js';
 import { dataTable, closeFilterMenu } from '../datatable.js';
 import renderUpdates from './updates.js';
+import renderCalendar from './billcal.js';
 
 let busy = false;
 let running = null; // AbortController of the active load
@@ -132,6 +133,11 @@ const home = {
             <p class="lead">Bills Etc runs entirely in your browser. Your bank files stay in your own folder (on your computer, kept in your Dropbox).</p>
             ${supported || cloud ? '' : `<div class="banner">This device can't open a folder. Sign in with Dropbox below to use your files from your Dropbox.</div>`}
 
+            <section id="cal-wrap" hidden>
+                <h2>Bills &amp; paydays <span class="sub">when each bill comes out, how much, and when you get paid</span></h2>
+                <div id="calendar"></div>
+            </section>
+
             <section>
                 <h2>Your data folder</h2>
                 ${cloud ? `<p>On this device your files are read from and saved to your Dropbox (<code>${esc(FOLDER_LABEL)}</code>):
@@ -205,7 +211,9 @@ const home = {
             el.querySelector('#pick').textContent = root ? 'Change folder…' : 'Choose folder…';
             el.querySelector('#pick').classList.toggle('primary', !root);
             el.querySelector('#updates-wrap').hidden = !root;
+            el.querySelector('#cal-wrap').hidden = !root;
             if (!root) return;
+            renderCalendar(el.querySelector('#calendar'));
             renderUpdates(el.querySelector('#updates'));
             try {
                 const st = await folderStatus();

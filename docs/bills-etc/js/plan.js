@@ -77,28 +77,25 @@ function savedAfter(rows, p, next, cap = Infinity) {
 }
 
 /**
- * Everything the Left to spend section shows for month `ym`.
- * `rows`: master + current month, parsed (allTransactions). `bills`: billMonth results for `ym` with `counted`.
- * `match`: row → bill. `dataThrough`: newest transaction loaded. `ended`: the month is over (no predictions).
+ * How you're paid: the paycheck merchant (your setting, else the most frequent Income depositor), every paycheck so far
+ * (`all`, oldest first), the days between paychecks (`every`, the median of the last few gaps: 14 for every other week)
+ * and the amount to expect (`paycheck`: your setting, else the latest one). Shared by This Month and Setup's calendar.
  */
-export function leftToSpend({ cfg, rows, ym, bills, match, dataThrough, today = new Date(), ended = false }) {
+export function payRhythm(cfg, rows) {
     const plan = parsePlan(cfg);
     const merchants = incomeMerchants(rows);
     const merchant = plan.merchant || merchants[0] || null;
     const all = merchant ? paydays(rows, merchant) : [];
     const latest = all[all.length - 1] || null;
-
-    // Pay rhythm: median gap of the last few paychecks (14 for every other week).
     const gaps = all.slice(-7).map((p, i, a) => (i ? Math.round((p.date - a[i - 1].date) / DAY) : null)).filter(Boolean).sort((a, b) => a - b);
     const every = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 14;
     const paycheck = plan.paycheck ?? latest?.amount ?? 0;
+    return { plan, merchants, merchant, all, latest, every, paycheck };
+}
 
-    // Savings per paycheck: what moved after the latest paycheck whose window has fully loaded.
-    const savingsFrom = [...all].reverse().find(p => dataThrough && addDays(p.date, SAVE_WINDOW) <= dataThrough) || null;
-    const detectedSavings = savingsFrom ? -sumAmt(savedAfter(rows, savingsFrom, all[all.indexOf(savingsFrom) + 1])) : 0;
-    const perCheck = plan.savings ?? detectedSavings;
-
-    // This month's paychecks: the real ones, then expected ones every `every` days after the latest.
+/** Month `ym`'s paychecks, oldest first: the real ones (`received`), then, unless `ended`, expected ones every `every`
+ * days after the latest real one. Each is { date, amount, rows, received }. */
+export function monthChecks({ all, latest, every, paycheck }, ym, ended = false) {
     const first = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1);
     const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
     const checks = all.filter(p => yearMonth(p.date) === ym).map(p => ({ ...p, received: true }));
@@ -109,7 +106,27 @@ export function leftToSpend({ cfg, rows, ym, bills, match, dataThrough, today = 
             }
         }
     }
-    checks.sort((a, b) => a.date - b.date);
+    return checks.sort((a, b) => a.date - b.date);
+}
+
+/**
+ * Everything the Left to spend section shows for month `ym`.
+ * `rows`: master + current month, parsed (allTransactions). `bills`: billMonth results for `ym` with `counted`.
+ * `match`: row → bill. `dataThrough`: newest transaction loaded. `ended`: the month is over (no predictions).
+ */
+export function leftToSpend({ cfg, rows, ym, bills, match, dataThrough, today = new Date(), ended = false }) {
+    const pay = payRhythm(cfg, rows);
+    const { plan, merchants, merchant, all, latest, every, paycheck } = pay;
+
+    // Savings per paycheck: what moved after the latest paycheck whose window has fully loaded.
+    const savingsFrom = [...all].reverse().find(p => dataThrough && addDays(p.date, SAVE_WINDOW) <= dataThrough) || null;
+    const detectedSavings = savingsFrom ? -sumAmt(savedAfter(rows, savingsFrom, all[all.indexOf(savingsFrom) + 1])) : 0;
+    const perCheck = plan.savings ?? detectedSavings;
+
+    // This month's paychecks: the real ones, then expected ones every `every` days after the latest.
+    const first = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1);
+    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+    const checks = monthChecks(pay, ym, ended);
 
     // Savings: each of this month's paychecks owes its transfer (even if it lands early next month);
     // a transfer for last month's last paycheck isn't counted again here.
