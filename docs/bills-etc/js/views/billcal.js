@@ -30,7 +30,7 @@ function itemHtml(it) {
     }
     const approx = it.state !== 'paid' && it.bill.varies ? '≈ ' : '';
     const tip = `${it.bill.name}: ${approx}${money(it.amount)}, ${BILL_TIP[it.state]}`;
-    return `<span class="cal-item bill ${it.state}" title="${esc(tip)}"><span class="n">${BILL_ICON[it.state] || ''}${esc(it.bill.name)}</span><span class="a">${approx}−${esc(money(it.amount))}</span></span>`;
+    return `<span class="cal-item bill ${it.state}" title="${esc(tip)}"><span class="n">${esc(it.bill.name)}</span><span class="a">${BILL_ICON[it.state] || ''}${approx}−${esc(money(it.amount))}</span></span>`;
 }
 
 /** "to Rocket Mortgage": the merchant a payment went to, when it isn't just the bill's name. */
