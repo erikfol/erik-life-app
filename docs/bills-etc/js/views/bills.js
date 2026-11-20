@@ -56,7 +56,7 @@ export default {
             <p class="lead">Scheduled bills leave on about the same day every month (or every few months). Everything else is unscheduled. This month's bills (paid, still due, late) are on <a href="#month">This Month</a>.
                 ${dataThrough ? `Bank data is loaded through <strong>${esc(dataThrough.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</strong>.` : ''}</p>
             ${bills.length ? '' : `<div class="banner"><strong>No scheduled bills yet.</strong> Add them from <strong>Suggested from your history</strong> below, or with <strong>+ Add a bill</strong>.
-                ${!hasBills(cfg) && legacy.length ? `Until you add one, This Month keeps using the ${legacy.length} fixed expenses from Config:
+                ${!hasBills(cfg) && legacy.length ? `Until you add one, This Month keeps using the ${legacy.length} fixed expenses in config.json:
                 ${legacy.map(([k, v]) => `${esc(k.replace(/_/g, ' '))} ${esc(money(v))}`).join(' · ')}. Once you add a bill, your bills replace that list (a copy is kept in config.json).` : ''}</div>`}
 
             <section>

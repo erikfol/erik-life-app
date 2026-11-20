@@ -2,134 +2,62 @@ import * as fs from '../fs.js';
 import { PATHS, loadConfig, DEFAULT_CONFIG } from '../data.js';
 import { getCategories } from '../rules.js';
 import { categoryUsage, addCategory, renameCategory, removeCategory, validateName, LOCKED } from '../categories.js';
-import { esc, money, toast } from '../util.js';
+import { esc, toast } from '../util.js';
 import { requireFolder } from '../app.js';
 import { closeFilterMenu } from '../datatable.js';
 import { hasBills } from '../bills.js';
 import { renderMerchants, merchantsCanLeave } from './merchantrules.js';
 
-let dirty = false;
-
 const TABS = [
-    { id: 'projection', label: 'Projection' },
     { id: 'categories', label: 'Categories' },
     { id: 'merchants', label: 'Merchants' },
 ];
-
-const kvRow = (name, value, placeholder) => `
-    <div class="kv-row">
-        <input type="text" class="k" value="${esc(name)}" placeholder="${placeholder}">
-        <input type="number" class="v" step="0.01" value="${esc(value)}" placeholder="0.00">
-        <button class="small danger" data-remove title="Remove">✕</button>
-    </div>`;
 
 export default {
     async render(el) {
         if (!requireFolder(el)) return;
         const tab = TABS.find(t => t.id === location.hash.split('/')[1]) || TABS[0];
-        dirty = false;
         el.innerHTML = `
             <h1 class="page">Config</h1>
             <nav class="subnav">${TABS.map(t => `<a href="#config/${t.id}"${t === tab ? ' class="active"' : ''}>${esc(t.label)}</a>`).join('')}</nav>
             <div id="tab"></div>`;
         const body = el.querySelector('#tab');
         if (tab.id === 'merchants') return renderMerchants(body, () => this.render(el));
-        if (tab.id === 'categories') return this.categories(body, el);
-        return this.projection(body, el);
+        return this.categories(body, el);
     },
 
-    async projection(el, page) {
+    /** Variable categories (config.json `variable_categories`): the ones This Month projects to the end of the month. Saved on each tick. */
+    async variable(box) {
         let cfg, error = null;
         try { cfg = await loadConfig(); } catch (e) { error = e.message; }
-        const isNew = !cfg && !error;
         if (error) {
-            el.innerHTML = `<div class="banner bad">config.json isn't valid JSON (${esc(error)}). Fix it in a text editor, or delete it to start fresh here.</div>`;
+            box.innerHTML = `<h2>Variable Categories</h2><div class="banner bad">config.json isn't valid JSON (${esc(error)}). Fix it in a text editor, or delete it to start fresh here.</div>`;
             return;
         }
-        cfg = cfg || structuredClone(DEFAULT_CONFIG);
-
-        const fixed = Object.entries(cfg.fixed_expenses || {}).filter(([k, v]) => !k.startsWith('_') && typeof v === 'number');
-        const billsMode = hasBills(cfg); // fixed expenses then come from the Bills page
-        const fixedSum = fixed.reduce((a, [, v]) => a + v, 0);
-        const vars = new Set((cfg.variable_categories || []).filter(c => typeof c === 'string' && !c.startsWith('_')));
-        const varChoices = [...getCategories().filter(c => c !== 'Income'), ...[...vars].filter(c => !getCategories().includes(c))];
-
-        el.innerHTML = `<div id="cfg">
-            <div class="row" style="margin-bottom:6px">
-                <p class="lead" style="margin:0">How This Month projects the month. Saved to <code>config.json</code>; notes (keys starting with <code>_</code>) are kept. Your monthly income is on the <a href="#income">Income</a> page.</p>
-                <span class="spacer"></span>
-                <span id="total" class="muted" style="font-size:0.9em"></span>
-                <button class="primary" id="save">${isNew ? 'Create config.json' : 'Save'}</button>
-            </div>
-            ${isNew ? '<div class="banner">No config.json found. Fill this in and click <strong>Create config.json</strong>.</div>' : ''}
-            <section>
-                ${billsMode ? `<h2>Scheduled Bills <span class="sub">monthly equivalent</span></h2>
-                <p>Your ${fixed.length} active bills come to <strong>${esc(money(fixedSum))}</strong> a month. Add or change them on the <a href="#bills">Bills</a> page.</p>
-                <p class="note">config.json's <code>fixed_expenses</code> is kept in step with your bills, so the Python scripts use them too.</p>`
-                : `<h2>Fixed Expenses <span class="sub">same amount every month</span></h2>
-                <div id="fixed">${fixed.map(([k, v]) => kvRow(k, v, 'e.g. Internet')).join('')}</div>
-                <button class="small" id="add-fixed">+ Add bill</button>
-                <p class="note">Tip: set up scheduled bills on the <a href="#bills">Bills</a> page instead, to see which are paid and which are still due.</p>`}
-            </section>
-            <section style="margin-top:18px">
-                <h2>Variable Categories <span class="sub">day-scaled to project the full month</span></h2>
-                <div class="check-grid">${varChoices.map(c => `<label class="check"><input type="checkbox" value="${esc(c)}"${vars.has(c) ? ' checked' : ''}> ${esc(c)}</label>`).join('')}</div>
-                <p class="note">Projection = (spent so far ÷ days elapsed) × days in month. ${billsMode ? 'Scheduled bills are left out of this and added on top.' : 'Fixed expenses are added on top.'}</p>
-            </section></div>`;
-        const root = el.querySelector('#cfg');
-
-        const totals = () => {
-            if (billsMode) return;
-            const fix = [...el.querySelectorAll('#fixed .v')].reduce((a, i) => a + (parseFloat(i.value) || 0), 0);
-            el.querySelector('#total').textContent = `Fixed expenses ${money(fix)} a month`;
-        };
-        const markDirty = () => { dirty = true; totals(); };
-        root.addEventListener('input', markDirty);
-        root.addEventListener('change', markDirty);
-        root.addEventListener('click', e => {
-            if (e.target.matches('[data-remove]')) { e.target.closest('.kv-row').remove(); markDirty(); }
-        });
-        if (!billsMode) el.querySelector('#add-fixed').onclick = () => { el.querySelector('#fixed').insertAdjacentHTML('beforeend', kvRow('', '', 'e.g. Internet')); markDirty(); };
-        totals();
-
-        el.querySelector('#save').onclick = async () => {
-            const read = id => [...el.querySelectorAll(`#${id} .kv-row`)]
-                .map(r => [r.querySelector('.k').value.trim(), parseFloat(r.querySelector('.v').value) || 0])
-                .filter(([k]) => k);
-
-            // Rebuild in place so `_` notes and key order survive. Income is saved by the Bills page.
-            const out = {};
-            for (const [k, v] of Object.entries(cfg)) {
-                if (k === 'fixed_expenses' && !billsMode) {
-                    out.fixed_expenses = Object.fromEntries(Object.entries(v || {}).filter(([fk]) => fk.startsWith('_')));
-                    for (const [fk, fv] of read('fixed')) out.fixed_expenses[fk] = fv;
-                    continue;
-                }
-                if (k === 'variable_categories') {
-                    out.variable_categories = [
-                        ...(v || []).filter(c => typeof c === 'string' && c.startsWith('_')),
-                        ...[...el.querySelectorAll('.check-grid input:checked')].map(i => i.value),
-                    ];
-                    continue;
-                }
-                out[k] = v;
-            }
-            if (!out.fixed_expenses && !billsMode) out.fixed_expenses = Object.fromEntries(read('fixed'));
-            if (!out.variable_categories) out.variable_categories = [...el.querySelectorAll('.check-grid input:checked')].map(i => i.value);
-
+        const base = cfg || DEFAULT_CONFIG;
+        const vars = new Set((base.variable_categories || []).filter(c => typeof c === 'string' && !c.startsWith('_')));
+        const choices = [...getCategories().filter(c => c !== 'Income'), ...[...vars].filter(c => !getCategories().includes(c))];
+        box.innerHTML = `
+            <h2>Variable Categories <span class="sub">day-scaled to project the full month · saved as you tick</span></h2>
+            ${cfg ? '' : '<div class="banner">No <code>config.json</code> yet. Tick your variable categories and it is created.</div>'}
+            <div class="check-grid">${choices.map(c => `<label class="check"><input type="checkbox" value="${esc(c)}"${vars.has(c) ? ' checked' : ''}> ${esc(c)}</label>`).join('')}</div>
+            <p class="note">This Month projects these to the end of the month from your pace so far and your average. ${hasBills(base) ? 'Scheduled bills are left out of this and added on top.' : 'Fixed expenses are added on top.'}</p>`;
+        box.querySelector('.check-grid').addEventListener('change', async () => {
+            const picked = [...box.querySelectorAll('.check-grid input:checked')].map(i => i.value);
             try {
-                await fs.writeText(PATHS.config, JSON.stringify(out, null, 2) + '\n');
-                dirty = false;
-                toast('Saved config.json', 'ok');
-                this.render(page);
+                const now = (await loadConfig()) || structuredClone(DEFAULT_CONFIG);
+                now.variable_categories = [...(now.variable_categories || []).filter(c => typeof c === 'string' && c.startsWith('_')), ...picked];
+                await fs.writeText(PATHS.config, JSON.stringify(now, null, 2) + '\n');
+                toast('Saved variable categories', 'ok');
             } catch (e) {
                 toast(`Save failed: ${e.message}`, 'bad');
             }
-        };
+        });
     },
 
     async categories(el, page) {
         el.innerHTML = `
+            <section id="vars"><p class="muted">Loading…</p></section>
             <section id="cats">
                 <h2>Categories <span class="sub">add, rename or merge; changes apply right away</span></h2>
                 <div id="cat-list"><p class="muted">Counting…</p></div>
@@ -208,8 +136,8 @@ export default {
             } catch (e) { toast(e.message, 'bad'); }
         };
         el.querySelector('#new-cat').onkeydown = e => { if (e.key === 'Enter') el.querySelector('#add-cat').click(); };
+        this.variable(el.querySelector('#vars'));
         drawCats();
-
     },
 
     destroy() {
@@ -217,11 +145,6 @@ export default {
     },
 
     canLeave(unloading) {
-        if (!merchantsCanLeave(unloading)) return false;
-        if (!dirty) return true;
-        if (unloading) return false;
-        if (!confirm('You have unsaved config changes. Leave without saving?')) return false;
-        dirty = false;
-        return true;
+        return merchantsCanLeave(unloading);
     },
 };
