@@ -71,6 +71,27 @@ export function parseConfig(cfg) {
     return { income, fixed, variableCats };
 }
 
+/** Monthly income sources ([name, amount]) from the `monthly_income_<name>` keys. Edited on the Bills page. */
+export const incomeSources = cfg => Object.entries(cfg || {})
+    .filter(([k, v]) => k.startsWith('monthly_income') && typeof v === 'number')
+    .map(([k, v]) => [k.replace(/^monthly_income_?/, '').replace(/_/g, ' '), v]);
+
+/** A copy of cfg with its income keys replaced by `list` ([name, amount]), where the first one was (key order and `_` notes kept). */
+export function withIncomes(cfg, list) {
+    const out = {};
+    let written = false;
+    const write = () => {
+        for (const [name, v] of list) out['monthly_income_' + name.trim().replace(/\s+/g, '_')] = v;
+        written = true;
+    };
+    for (const [k, v] of Object.entries(cfg)) {
+        if (k.startsWith('monthly_income') && typeof v === 'number') { if (!written) write(); continue; }
+        out[k] = v;
+    }
+    if (!written) write();
+    return out;
+}
+
 export const DEFAULT_CONFIG = {
     _readme: 'BillsEtc config — copy this file to config.json and fill in your expected monthly values. Keys starting with _ are ignored by the scripts.',
     _income_note: 'Your typical monthly take-home pay (after taxes). Do not count bonuses or tax refunds here.',

@@ -207,7 +207,7 @@ export default {
             ${p.plan ? planHtml(p) : `<div class="banner">Set up your scheduled bills on the <a href="#bills">Bills</a> page to see how much you have left to spend this month.</div>`}
 
             <div class="cards"${p.plan ? ' hidden' : ''}>
-                <div class="card"><div class="label">Expected Income</div><div class="value" style="color:#2980b9">${money(p.income)}</div><div class="sub">per month, from config</div></div>
+                <div class="card"><div class="label">Expected Income</div><div class="value" style="color:#2980b9">${money(p.income)}</div><div class="sub">per month, from Bills</div></div>
                 <div class="card"><div class="label">Total Projected Spend</div><div class="value" style="color:var(--red)">${money(p.totalProjected)}</div><div class="sub">${p.bills ? 'scheduled bills + unscheduled projection' : 'fixed + variable projection'}</div></div>
                 <div class="card"><div class="label">${p.surplus >= 0 ? 'Projected Surplus' : 'Projected Deficit'}</div><div class="value" style="color:${sdColor}">${money(p.surplus, true)}</div><div class="sub">end-of-month estimate</div></div>
             </div>

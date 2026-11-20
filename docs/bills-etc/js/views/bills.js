@@ -1,7 +1,7 @@
-// Bills page: scheduled bills (config.json `scheduled_bills`), a 12-month payment grid and
-// suggestions from your history. This month's bill status is on the This Month page.
-import { loadConfig } from '../data.js';
-import { parseBills, hasBills, billMonth, paymentsByMonth, firstPaid, suggestBills, saveBills, allTransactions, addMonths, STATUS, EVERY } from '../bills.js';
+// Bills page: monthly income (config.json `monthly_income_*`), scheduled bills (`scheduled_bills`), a 12-month
+// payment grid and suggestions from your history. This month's bill status is on the This Month page.
+import { loadConfig, incomeSources } from '../data.js';
+import { parseBills, hasBills, billMonth, paymentsByMonth, firstPaid, suggestBills, saveBills, saveIncome, allTransactions, addMonths, STATUS, EVERY } from '../bills.js';
 import { merchantNameKey } from '../merchants.js';
 import { longMonthLabel, monthLabel, yearMonth, MONTH_NAMES } from '../dates.js';
 import { esc, money, toast } from '../util.js';
@@ -10,6 +10,7 @@ import { dataTable, moneyColumn, categoryColumn, closeFilterMenu } from '../data
 
 let remembered = null; // selected month while moving between pages
 let formOpen = false;  // an add/edit form with possible unsaved input
+let incomeOpen = false; // monthly income being edited
 
 const fmtDay = d => `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
@@ -18,7 +19,7 @@ export default {
     async render(el) {
         if (!requireFolder(el)) return;
         el.innerHTML = '<p class="muted">Loading your bills…</p>';
-        formOpen = false;
+        formOpen = incomeOpen = false;
         const cfg = (await loadConfig()) || {};
         const bills = parseBills(cfg);
         const rows = await allTransactions();
@@ -58,6 +59,11 @@ export default {
             ${bills.length ? '' : `<div class="banner"><strong>No scheduled bills yet.</strong> Add them from <strong>Suggested from your history</strong> below, or with <strong>+ Add a bill</strong>.
                 ${!hasBills(cfg) && legacy.length ? `Until you add one, This Month keeps using the ${legacy.length} fixed expenses from Config:
                 ${legacy.map(([k, v]) => `${esc(k.replace(/_/g, ' '))} ${esc(money(v))}`).join(' · ')}. Once you add a bill, your bills replace that list (a copy is kept in config.json).` : ''}</div>`}
+
+            <section>
+                <h2>Monthly income <span class="sub">take-home, after taxes</span><span class="spacer"></span><button class="small" id="income-edit">Edit</button></h2>
+                <div id="income"></div>
+            </section>
 
             <section>
                 <h2>Your bills <span class="sub">${bills.length} bill${bills.length === 1 ? '' : 's'}</span><span class="spacer"></span><button class="small" id="add">+ Add a bill</button></h2>
@@ -150,6 +156,64 @@ export default {
             }
         };
         $('#add').onclick = () => openForm({ every: 1, active: true }, 'Add a bill');
+
+        // ── Monthly income: read-only until Edit ──
+        const incomes = incomeSources(cfg);
+        const billsMonthly = bills.filter(b => b.active).reduce((a, b) => a + b.amount / b.every, 0);
+        const incomeRow = ([name, v]) => `
+            <div class="kv-row">
+                <input type="text" class="k" value="${esc(name)}" placeholder="source name">
+                <input type="number" class="v" step="0.01" value="${esc(v)}" placeholder="0.00">
+                <button type="button" class="small danger" data-remove title="Remove">✕</button>
+            </div>`;
+        const showIncome = () => {
+            const total = incomes.reduce((a, [, v]) => a + v, 0);
+            $('#income-edit').hidden = false;
+            $('#income').innerHTML = !incomes.length
+                ? '<p class="muted">No monthly income yet. Click <strong>Edit</strong> to add it.</p>'
+                : `<div class="table-wrap" style="max-width:420px"><table class="summary-table">
+                    <thead><tr><th>Source</th><th class="num">Per month</th></tr></thead>
+                    <tbody>${incomes.map(([name, v]) => `<tr><td>${esc(name || 'Income')}</td><td class="amt">${esc(money(v))}</td></tr>`).join('')}
+                        ${incomes.length > 1 ? `<tr class="total-row"><td><strong>Total</strong></td><td class="amt"><strong>${esc(money(total))}</strong></td></tr>` : ''}</tbody>
+                </table></div>
+                ${bills.length ? `<p>Income ${esc(money(total))} − active bills ${esc(money(billsMonthly))} a month = <strong>${esc(money(total - billsMonthly, true))}</strong> a month for everything else.</p>` : ''}
+                <p class="note">Don't count bonuses or tax refunds. This Month's Left to spend counts the paychecks that actually come in, not these amounts.</p>`;
+        };
+        const editIncome = () => {
+            incomeOpen = true;
+            $('#income-edit').hidden = true;
+            $('#income').innerHTML = `<div style="max-width:420px">
+                    <div id="income-rows">${(incomes.length ? incomes : [['', '']]).map(incomeRow).join('')}</div>
+                    <button type="button" class="small" id="income-add">+ Add income source</button>
+                </div>
+                <p class="note">Take-home pay a month, after taxes. Don't count bonuses or tax refunds.</p>
+                <div class="row"><button type="button" class="primary" id="income-save">Save</button><button type="button" id="income-cancel">Cancel</button></div>`;
+            const rowsEl = $('#income-rows');
+            rowsEl.addEventListener('click', e => { if (e.target.matches('[data-remove]')) e.target.closest('.kv-row').remove(); });
+            $('#income-add').onclick = () => { rowsEl.insertAdjacentHTML('beforeend', incomeRow(['', ''])); rowsEl.lastElementChild.querySelector('.k').focus(); };
+            $('#income-cancel').onclick = () => { incomeOpen = false; showIncome(); };
+            $('#income-save').onclick = async () => {
+                const list = [...rowsEl.querySelectorAll('.kv-row')]
+                    .map(r => [r.querySelector('.k').value.trim().replace(/\s+/g, ' '), parseFloat(r.querySelector('.v').value) || 0])
+                    .filter(([name, v]) => name || v);
+                const names = list.map(([name]) => name.toLowerCase());
+                const problem = list.some(([name]) => !name) ? 'Give each income source a name.'
+                    : names.some((n, i) => names.indexOf(n) !== i) ? 'Two income sources have the same name.'
+                    : '';
+                if (problem) { toast(problem, 'bad'); return; }
+                try {
+                    await saveIncome(list);
+                    incomeOpen = false;
+                    toast('Saved monthly income', 'ok');
+                    this.render(el);
+                } catch (e) {
+                    toast(`Save failed: ${e.message}`, 'bad');
+                }
+            };
+            rowsEl.querySelector('.k')?.focus();
+        };
+        $('#income-edit').onclick = editIncome;
+        showIncome();
 
         // ── Your bills ──
         dataTable($('#t-bills'), {
@@ -244,10 +308,10 @@ export default {
     },
 
     canLeave(unloading) {
-        if (!formOpen) return true;
+        if (!formOpen && !incomeOpen) return true;
         if (unloading) return false;
-        if (!confirm('You have a bill form open. Leave without saving?')) return false;
-        formOpen = false;
+        if (!confirm(formOpen ? 'You have a bill form open. Leave without saving?' : 'You are editing your monthly income. Leave without saving?')) return false;
+        formOpen = incomeOpen = false;
         return true;
     },
 

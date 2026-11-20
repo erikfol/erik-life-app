@@ -110,7 +110,7 @@ export async function processCurrentMonth({ useAI, log, signal }) {
     const cfgRaw = await loadConfig();
     if (!cfgRaw) { log('config.json not found. Create it on the Config page first.', 'err'); return null; }
     const config = parseConfig(cfgRaw);
-    if (config.income === 0) log('Warning: monthly income is 0 in config.json. Update it before trusting the projection.', 'err');
+    if (config.income === 0) log('Warning: monthly income is 0. Set it on the Bills page before trusting the projection.', 'err');
 
     const files = await fs.listFiles(PATHS.currentMonth);
     if (!files.length) { log(`No CSV found in ${PATHS.currentMonth}/. Import this month's bank export first.`, 'err'); return null; }

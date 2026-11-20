@@ -2,7 +2,7 @@
 // Saved in config.json `scheduled_bills`; a transaction is "scheduled" when its merchant is one of a
 // bill's merchants. Nothing is stored per transaction, so changing a bill re-tags all of history.
 import * as fs from './fs.js';
-import { PATHS, readTable, loadConfig, keyOf, DEFAULT_CONFIG } from './data.js';
+import { PATHS, readTable, loadConfig, keyOf, DEFAULT_CONFIG, withIncomes } from './data.js';
 import { withParsed } from './finance.js';
 import { merchantNameKey } from './merchants.js';
 import { yearMonth } from './dates.js';
@@ -230,4 +230,10 @@ export async function saveBills(bills, extra = {}) {
     Object.assign(cfg, extra);
     await fs.writeText(PATHS.config, JSON.stringify(cfg, null, 2) + '\n');
     return cfg;
+}
+
+/** Save the monthly income sources ([name, amount]) as config.json's `monthly_income_<name>` keys. */
+export async function saveIncome(list) {
+    const cfg = (await loadConfig()) || structuredClone(DEFAULT_CONFIG);
+    await fs.writeText(PATHS.config, JSON.stringify(withIncomes(cfg, list.map(([n, v]) => [n, round2(v)])), null, 2) + '\n');
 }
