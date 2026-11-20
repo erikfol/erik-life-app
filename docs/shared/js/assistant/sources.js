@@ -194,7 +194,7 @@ async function budgetSources() {
     const income = Object.fromEntries(Object.entries(cfg).filter(([k, v]) => k.startsWith('monthly_income') && typeof v === 'number'));
     return [
         tableSource('scheduled-bills', 'bills-etc/bills', 'Scheduled bills: day of the month, usual amount, every N months', parseBills(cfg).map(b => plain({ Bill: b.name, Day: b.day, Amount: b.amount, 'Every N months': b.every, Varies: b.varies, Active: b.active, Notes: b.notes, Merchants: b.merchants.join(', ') }))),
-        documentSource('budget-settings', 'bills-etc', 'Expected monthly income and the spending plan', { ...income, spending_plan: cfg.spending_plan ?? null }),
+        documentSource('budget-settings', 'bills-etc', 'Expected monthly income and the spending plan', { ...income, income_sources: cfg.income_sources ?? null, spending_plan: cfg.spending_plan ?? null }),
     ];
 }
 

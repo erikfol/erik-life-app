@@ -1,8 +1,8 @@
-// Income page: your expected monthly take-home (config.json `monthly_income_*`; the Bills page weighs it against your
-// bills) and your take-home pay history: every paycheck in the bank data (the same paychecks This Month's Left to spend
+// Income page: your expected take-home, entered per paycheck with how often it comes (config.json `income_sources`; the
+// amount a month is kept in `monthly_income_*`, which the Bills page weighs against your bills) and your take-home pay history: every paycheck in the bank data (the same paychecks This Month's Left to spend
 // uses), charted, with your notes on why it went up or down. Notes: inputs/income/pay_notes.csv (Date = the paycheck's
 // date, Note); a note belongs to the paycheck within a few days of its date.
-import { loadConfig, incomeSources } from '../data.js';
+import { loadConfig, paySources, incomeKey, PAY_EVERY, perMonth, perYear } from '../data.js';
 import { allTransactions, saveIncome } from '../bills.js';
 import { parsePlan, incomeMerchants, paydays } from '../plan.js';
 import { drawLines } from '../charts.js';
@@ -16,7 +16,6 @@ export const NOTES_PATH = 'inputs/income/pay_notes.csv';
 const NOTE_COLS = ['Date', 'Note'];
 const DAY = 864e5;
 const NEAR = 4;       // days: a note belongs to the paycheck this close to its date (deposits this close are one paycheck)
-const PER_YEAR = 26;  // paid every other week
 const SPIKE = 1.5;    // a paycheck this many times the usual one (e.g. with a bonus) doesn't stretch the chart
 const SAME = 1;       // dollars: paychecks closer than this are the same (they vary by a cent with rounding)
 
@@ -115,48 +114,62 @@ export default {
             </section>`}`;
         const $ = s => el.querySelector(s);
 
-        // ── Monthly income: read-only until Edit ──
-        const incomes = incomeSources(cfg);
-        const incomeRow = ([name, v]) => `
-            <div class="kv-row">
-                <input type="text" class="k" value="${esc(name)}" placeholder="source name">
-                <input type="number" class="v" step="0.01" value="${esc(v)}" placeholder="0.00">
+        // ── Monthly income: entered per paycheck (amount + how often), worked out a month; read-only until Edit ──
+        const sources = paySources(cfg);
+        const blank = () => ({ name: '', perPay: '', every: 'biweekly' });
+        const incomeRow = s => `
+            <div class="pay-row">
+                <input type="text" class="k" value="${esc(s.name)}" placeholder="source name" aria-label="Source">
+                <input type="number" class="v" step="0.01" min="0" value="${esc(s.perPay)}" placeholder="0.00" aria-label="Per paycheck">
+                <select class="e" aria-label="How often">${Object.entries(PAY_EVERY).map(([k, v]) => `<option value="${k}"${k === s.every ? ' selected' : ''}>${esc(v.label)}</option>`).join('')}</select>
                 <button type="button" class="small danger" data-remove title="Remove">✕</button>
             </div>`;
-        const fromPay = latest ? `<p class="note">At your latest paycheck (${esc(money(latest.amount))}, ${esc(dLong(latest.date))}) that's
-            ${esc(money(latest.amount * 2))} a month with two paychecks, or ${esc(money(latest.amount * PER_YEAR / 12))} averaged over ${PER_YEAR} a year.</p>` : '';
+        const extraNote = list => (list.some(s => PAY_EVERY[s.every].month * 12 !== PAY_EVERY[s.every].year)
+            ? `Per month counts the paychecks most months get (2 when it's every 2 weeks). Some months get an extra one, so over a whole year it averages ${esc(money(list.reduce((a, s) => a + perYear(s), 0) / 12))} a month.` : '');
+        const latestLine = latest ? `<p class="note">Latest paycheck in your bank data: <strong>${esc(money(latest.amount))}</strong> on ${esc(dLong(latest.date))}.</p>` : '';
         const showIncome = () => {
-            const total = incomes.reduce((a, [, v]) => a + v, 0);
+            const month = sources.reduce((a, s) => a + perMonth(s), 0);
             $('#income-edit').hidden = false;
-            $('#income').innerHTML = (!incomes.length
-                ? '<p class="muted">No monthly income yet. Click <strong>Edit</strong> to add it.</p>'
-                : `<div class="table-wrap" style="max-width:420px"><table class="summary-table">
-                    <thead><tr><th>Source</th><th class="num">Per month</th></tr></thead>
-                    <tbody>${incomes.map(([name, v]) => `<tr><td>${esc(name || 'Income')}</td><td class="amt">${esc(money(v))}</td></tr>`).join('')}
-                        ${incomes.length > 1 ? `<tr class="total-row"><td><strong>Total</strong></td><td class="amt"><strong>${esc(money(total))}</strong></td></tr>` : ''}</tbody>
-                </table></div>`)
-                + `${fromPay}<p class="note">Don't count bonuses or tax refunds. The <a href="#bills">Bills</a> page shows what's left after your bills. This Month's Left to spend counts the paychecks that actually come in instead.</p>`;
+            $('#income').innerHTML = (!sources.length
+                ? '<p class="muted">No income yet. Click <strong>Edit</strong> to add it.</p>'
+                : `<div class="table-wrap" style="max-width:640px"><table class="summary-table">
+                    <thead><tr><th>Source</th><th class="num">Per paycheck</th><th>How often</th><th class="num">Per month</th></tr></thead>
+                    <tbody>${sources.map(s => `<tr><td>${esc(s.name)}</td><td class="amt">${esc(money(s.perPay))}</td><td>${esc(PAY_EVERY[s.every].label)}</td><td class="amt">${esc(money(perMonth(s)))}</td></tr>`).join('')}
+                        <tr class="total-row"><td colspan="3"><strong>Total per month</strong></td><td class="amt"><strong>${esc(money(month))}</strong></td></tr></tbody>
+                </table></div>
+                ${extraNote(sources) ? `<p class="note">${extraNote(sources)}</p>` : ''}`)
+                + `${latestLine}<p class="note">Take-home, after taxes. Don't count bonuses or tax refunds. The <a href="#bills">Bills</a> page shows what's left after your bills. This Month's Left to spend counts the paychecks that actually come in instead.</p>`;
         };
         const editIncome = () => {
             incomeOpen = true;
             $('#income-edit').hidden = true;
-            $('#income').innerHTML = `<div style="max-width:420px">
-                    <div id="income-rows">${(incomes.length ? incomes : [['', '']]).map(incomeRow).join('')}</div>
+            $('#income').innerHTML = `<div style="max-width:640px">
+                    <div class="pay-row pay-head"><span>Source</span><span>Per paycheck</span><span>How often</span><span></span></div>
+                    <div id="income-rows">${(sources.length ? sources : [blank()]).map(incomeRow).join('')}</div>
                     <button type="button" class="small" id="income-add">+ Add income source</button>
                 </div>
-                ${fromPay}
+                <p class="note" id="income-sum"></p>
+                ${latestLine}
                 <div class="row"><button type="button" class="primary" id="income-save">Save</button><button type="button" id="income-cancel">Cancel</button></div>`;
             const rowsEl = $('#income-rows');
-            rowsEl.addEventListener('click', e => { if (e.target.matches('[data-remove]')) e.target.closest('.kv-row').remove(); });
-            $('#income-add').onclick = () => { rowsEl.insertAdjacentHTML('beforeend', incomeRow(['', ''])); rowsEl.lastElementChild.querySelector('.k').focus(); };
+            const read = () => [...rowsEl.querySelectorAll('.pay-row')]
+                .map(r => ({ name: r.querySelector('.k').value.trim().replace(/\s+/g, ' '), perPay: Math.abs(parseFloat(r.querySelector('.v').value)) || 0, every: r.querySelector('.e').value }))
+                .filter(s => s.name || s.perPay);
+            const sum = () => {
+                const list = read();
+                $('#income-sum').innerHTML = list.length ? `Comes to <strong>${esc(money(list.reduce((a, s) => a + perMonth(s), 0)))}</strong> a month. ${extraNote(list)}` : '';
+            };
+            rowsEl.addEventListener('input', sum);
+            rowsEl.addEventListener('change', sum);
+            rowsEl.addEventListener('click', e => { if (e.target.matches('[data-remove]')) { e.target.closest('.pay-row').remove(); sum(); } });
+            $('#income-add').onclick = () => { rowsEl.insertAdjacentHTML('beforeend', incomeRow(blank())); rowsEl.lastElementChild.querySelector('.k').focus(); };
             $('#income-cancel').onclick = () => { incomeOpen = false; showIncome(); };
+            sum();
             $('#income-save').onclick = async () => {
-                const list = [...rowsEl.querySelectorAll('.kv-row')]
-                    .map(r => [r.querySelector('.k').value.trim().replace(/\s+/g, ' '), parseFloat(r.querySelector('.v').value) || 0])
-                    .filter(([name, v]) => name || v);
-                const names = list.map(([name]) => name.toLowerCase());
-                const problem = list.some(([name]) => !name) ? 'Give each income source a name.'
-                    : names.some((n, i) => names.indexOf(n) !== i) ? 'Two income sources have the same name.'
+                const list = read();
+                const keys = list.map(s => incomeKey(s.name).toLowerCase());
+                const problem = list.some(s => !s.name) ? 'Give each income source a name.'
+                    : keys.some((n, i) => keys.indexOf(n) !== i) ? 'Two income sources have the same name.'
                     : '';
                 if (problem) { toast(problem, 'bad'); return; }
                 try {

@@ -58,7 +58,7 @@ Merchant names and forced categories come only from `merchant_rules` in `config.
 
 | Key | Purpose |
 |---|---|
-| `monthly_income_*` | Expected monthly take-home pay; summed by script 3. Edited on the GUI's Income page |
+| `monthly_income_*` | Expected monthly take-home pay; summed by script 3. Kept in step with `income_sources` (`{name, per_pay, every}`: each source's take-home per paycheck and how often it comes), which the GUI's Income page edits |
 | `fixed_expenses` | Bills that hit every month (~same amount) |
 | `variable_categories` | Categories that are day-scaled to project the full month |
 | `categories` | Your category list (optional; defaults to the built-in 12). Managed on the GUI's Config page |

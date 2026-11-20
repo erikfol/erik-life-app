@@ -2,7 +2,7 @@
 // Saved in config.json `scheduled_bills`; a transaction is "scheduled" when its merchant is one of a
 // bill's merchants. Nothing is stored per transaction, so changing a bill re-tags all of history.
 import * as fs from './fs.js';
-import { PATHS, readTable, loadConfig, keyOf, DEFAULT_CONFIG, withIncomes } from './data.js';
+import { PATHS, readTable, loadConfig, keyOf, DEFAULT_CONFIG, withIncomes, perMonth } from './data.js';
 import { withParsed } from './finance.js';
 import { merchantNameKey } from './merchants.js';
 import { yearMonth } from './dates.js';
@@ -232,8 +232,11 @@ export async function saveBills(bills, extra = {}) {
     return cfg;
 }
 
-/** Save the monthly income sources ([name, amount]) as config.json's `monthly_income_<name>` keys. */
+/** Save the income sources ([{ name, perPay, every }]) as config.json's `income_sources`, and each one's amount a month as
+ * `monthly_income_<name>`, which script 3, This Month, the Bills page and the Home chat read. */
 export async function saveIncome(list) {
     const cfg = (await loadConfig()) || structuredClone(DEFAULT_CONFIG);
-    await fs.writeText(PATHS.config, JSON.stringify(withIncomes(cfg, list.map(([n, v]) => [n, round2(v)])), null, 2) + '\n');
+    const out = withIncomes(cfg, list.map(s => [s.name, round2(perMonth(s))]),
+        { income_sources: list.map(s => ({ name: s.name, per_pay: round2(s.perPay), every: s.every })) });
+    await fs.writeText(PATHS.config, JSON.stringify(out, null, 2) + '\n');
 }

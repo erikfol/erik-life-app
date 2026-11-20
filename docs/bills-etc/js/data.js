@@ -71,26 +71,49 @@ export function parseConfig(cfg) {
     return { income, fixed, variableCats };
 }
 
-/** Monthly income sources ([name, amount]) from the `monthly_income_<name>` keys. Edited on the Bills page. */
+/** Monthly income sources ([name, amount a month]) from the `monthly_income_<name>` keys (kept in step by the Income page). */
 export const incomeSources = cfg => Object.entries(cfg || {})
     .filter(([k, v]) => k.startsWith('monthly_income') && typeof v === 'number')
     .map(([k, v]) => [k.replace(/^monthly_income_?/, '').replace(/_/g, ' '), v]);
 
-/** A copy of cfg with its income keys replaced by `list` ([name, amount]), where the first one was (key order and `_` notes kept). */
-export function withIncomes(cfg, list) {
+export const incomeKey = name => 'monthly_income_' + name.trim().replace(/\s+/g, '_');
+
+/** A copy of cfg with its income keys replaced by `list` ([name, amount]), where the first one was, followed by `extra`'s
+ * keys (key order and `_` notes kept). */
+export function withIncomes(cfg, list, extra = {}) {
     const out = {};
     let written = false;
     const write = () => {
-        for (const [name, v] of list) out['monthly_income_' + name.trim().replace(/\s+/g, '_')] = v;
+        for (const [name, v] of list) out[incomeKey(name)] = v;
+        Object.assign(out, extra);
         written = true;
     };
     for (const [k, v] of Object.entries(cfg)) {
+        if (k in extra) continue;
         if (k.startsWith('monthly_income') && typeof v === 'number') { if (!written) write(); continue; }
         out[k] = v;
     }
     if (!written) write();
     return out;
 }
+
+/** How often a source pays: `month` = paychecks in most months (what "per month" counts), `year` = paychecks a year. */
+export const PAY_EVERY = {
+    weekly: { label: 'Every week', month: 4, year: 52 },
+    biweekly: { label: 'Every 2 weeks', month: 2, year: 26 },
+    semimonthly: { label: 'Twice a month', month: 2, year: 24 },
+    monthly: { label: 'Once a month', month: 1, year: 12 },
+};
+
+/** Income sources as entered on the Income page, [{ name, perPay, every }]: config.json `income_sources`, or before that
+ * existed, one payment a month from each `monthly_income_*`. */
+export function paySources(cfg) {
+    if (!Array.isArray(cfg?.income_sources)) return incomeSources(cfg).map(([name, v]) => ({ name, perPay: v, every: 'monthly' }));
+    return cfg.income_sources.filter(s => s && typeof s.name === 'string' && s.name.trim())
+        .map(s => ({ name: s.name.trim(), perPay: Number.isFinite(+s.per_pay) ? +s.per_pay : 0, every: PAY_EVERY[s.every] ? s.every : 'monthly' }));
+}
+export const perMonth = s => s.perPay * PAY_EVERY[s.every].month;
+export const perYear = s => s.perPay * PAY_EVERY[s.every].year;
 
 export const DEFAULT_CONFIG = {
     _readme: 'BillsEtc config — copy this file to config.json and fill in your expected monthly values. Keys starting with _ are ignored by the scripts.',

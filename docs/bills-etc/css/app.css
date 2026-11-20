@@ -262,6 +262,8 @@ th.filtered .fbtn::before { content: '⧩ '; font-size: 0.9em; }
 
 /* ── Config editor ───────────────────────────────────────────────────── */
 .kv-row { display: grid; grid-template-columns: 1fr 140px 36px; gap: 8px; margin-bottom: 8px; align-items: center; }
+.pay-row { display: grid; grid-template-columns: 1fr 130px 150px 36px; gap: 8px; margin-bottom: 8px; align-items: center; }
+.pay-head { font-size: 0.8em; color: var(--muted); margin-bottom: 4px; }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 
 /* ── Toast ───────────────────────────────────────────────────────────── */
@@ -286,6 +288,8 @@ th.filtered .fbtn::before { content: '⧩ '; font-size: 0.9em; }
     section { padding: 16px; }
     section h2 { flex-wrap: wrap; } /* a link next to the heading goes under it */
     .kv-row { grid-template-columns: 1fr 100px 36px; }
+    .pay-row { grid-template-columns: 1fr 100px; }
+    .pay-head { display: none; }
 }
 
 .nowrap { white-space: nowrap; }
