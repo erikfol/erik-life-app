@@ -127,15 +127,19 @@ export default {
         const extraNote = list => (list.some(s => PAY_EVERY[s.every].month * 12 !== PAY_EVERY[s.every].year)
             ? `Per month counts the paychecks most months get (2 when it's every 2 weeks). Some months get an extra one, so over a whole year it averages ${esc(money(list.reduce((a, s) => a + perYear(s), 0) / 12))} a month.` : '');
         const latestLine = latest ? `<p class="note">Latest paycheck in your bank data: <strong>${esc(money(latest.amount))}</strong> on ${esc(dLong(latest.date))}.</p>` : '';
+        // Total per paycheck: only when every source is paid on the same schedule (otherwise their paychecks don't line up).
+        const payTotal = list => (list.length && list.every(s => s.every === list[0].every) ? list.reduce((a, s) => a + s.perPay, 0) : null);
         const showIncome = () => {
-            const month = sources.reduce((a, s) => a + perMonth(s), 0);
+            const month = sources.reduce((a, s) => a + perMonth(s), 0), perPay = payTotal(sources);
             $('#income-edit').hidden = false;
             $('#income').innerHTML = (!sources.length
                 ? '<p class="muted">No income yet. Click <strong>Edit</strong> to add it.</p>'
                 : `<div class="table-wrap" style="max-width:640px"><table class="summary-table">
                     <thead><tr><th>Source</th><th class="num">Per paycheck</th><th>How often</th><th class="num">Per month</th></tr></thead>
                     <tbody>${sources.map(s => `<tr><td>${esc(s.name)}</td><td class="amt">${esc(money(s.perPay))}</td><td>${esc(PAY_EVERY[s.every].label)}</td><td class="amt">${esc(money(perMonth(s)))}</td></tr>`).join('')}
-                        <tr class="total-row"><td colspan="3"><strong>Total per month</strong></td><td class="amt"><strong>${esc(money(month))}</strong></td></tr></tbody>
+                        <tr class="total-row"><td><strong>Total</strong></td>
+                            <td class="amt">${perPay != null ? `<strong>${esc(money(perPay))}</strong>` : '<span class="muted" title="Your sources are paid on different schedules, so their paychecks don\'t add up to one">—</span>'}</td>
+                            <td></td><td class="amt"><strong>${esc(money(month))}</strong></td></tr></tbody>
                 </table></div>
                 ${extraNote(sources) ? `<p class="note">${extraNote(sources)}</p>` : ''}`)
                 + `${latestLine}<p class="note">Take-home, after taxes. Don't count bonuses or tax refunds. The <a href="#bills">Bills</a> page shows what's left after your bills. This Month's Left to spend counts the paychecks that actually come in instead.</p>`;
@@ -157,7 +161,8 @@ export default {
                 .filter(s => s.name || s.perPay);
             const sum = () => {
                 const list = read();
-                $('#income-sum').innerHTML = list.length ? `Comes to <strong>${esc(money(list.reduce((a, s) => a + perMonth(s), 0)))}</strong> a month. ${extraNote(list)}` : '';
+                const perPay = payTotal(list);
+                $('#income-sum').innerHTML = list.length ? `Comes to ${perPay != null ? `<strong>${esc(money(perPay))}</strong> a paycheck and ` : ''}<strong>${esc(money(list.reduce((a, s) => a + perMonth(s), 0)))}</strong> a month. ${extraNote(list)}` : '';
             };
             rowsEl.addEventListener('input', sum);
             rowsEl.addEventListener('change', sum);
