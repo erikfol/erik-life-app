@@ -122,6 +122,66 @@
 }
 .dp .badge.good { background: transparent; color: var(--dp-good); border: 1px solid var(--dp-good); }
 
+/* ---------- leftovers ---------- */
+/* fresh (0–2 days) green, yellow (3–4 days, eat soon) and red (5+ days) — the same colours as the page banners. */
+.dp .leftover { font-size: .75rem; font-weight: 600; align-self: flex-start; max-width: 100%; padding: 1px 7px; border-radius: 8px; overflow-wrap: anywhere; }
+.dp .leftover.fresh { background: #e8f8ef; color: #1e7a46; }
+.dp .leftover.yellow { background: #fff8e1; color: #8a5a00; border: 1px solid #f0d77a; }
+.dp .leftover.red { background: #fdecea; color: #a8322a; border: 1px solid #f5c6c0; }
+.dp .leftover.gone { color: var(--muted); font-weight: 500; padding-left: 0; }
+.dp .cal-month .leftover { font-size: .7rem; padding: 0 5px; }
+.dp .cal-month .leftover.gone { padding: 0; }
+
+.dp .fridge {
+    background: var(--surface);
+    border: 1px solid var(--dp-border);
+    border-radius: var(--dp-radius);
+    box-shadow: var(--dp-shadow);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+.dp .fridge h2 { font-size: 1.05rem; margin-bottom: 8px; }
+.dp .fridge .hint { margin: 6px 0 0; font-size: .82rem; }
+.dp .fridge-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 7px 10px;
+    border: 1px solid var(--dp-border);
+    border-radius: var(--dp-radius);
+    margin-bottom: 6px;
+}
+.dp .fridge-row.yellow { background: #fff8e1; border-color: #f0d77a; color: #8a5a00; }
+.dp .fridge-row.red { background: #fdecea; border-color: #f5c6c0; color: #a8322a; }
+.dp .fridge-days {
+    flex: 0 0 auto;
+    min-width: 74px;
+    text-align: center;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e8f8ef;
+    color: #1e7a46;
+}
+.dp .fridge-row.yellow .fridge-days { background: #f5c518; color: #3d2e00; }
+.dp .fridge-row.red .fridge-days { background: #a8322a; color: #fff; }
+.dp .fridge-what { flex: 1 1 180px; min-width: 0; }
+.dp .fridge-what .link { font-weight: 700; color: inherit; text-decoration: none; text-align: left; }
+.dp .fridge-what .link:hover { text-decoration: underline; }
+.dp .fridge-what .from { font-size: .85rem; color: var(--muted); }
+.dp .fridge-row.yellow .from, .dp .fridge-row.red .from { color: inherit; opacity: .8; }
+.dp .fridge-what .why { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.dp .fridge-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+
+.dp .leftover-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; }
+.dp dialog .leftover-row label.check { flex: 1 1 160px; }
+.dp .leftover-row select { flex: 0 0 140px; width: 140px; }
+.dp .leftover-days { flex: 0 0 160px; font-size: .82rem; color: var(--muted); }
+.dp .leftover-days.yellow { color: #8a5a00; font-weight: 600; }
+.dp .leftover-days.red { color: #a8322a; font-weight: 600; }
+.dp #day-leftovers .hint { margin: 2px 0 0; font-size: .8rem; }
+
 /* ---------- cards ---------- */
 .dp .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
 .dp .card {

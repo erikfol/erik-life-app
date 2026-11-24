@@ -18,6 +18,7 @@ const ALERTS = {
     house: () => import('../../house/js/alerts.js'),
     pets: () => import('../../pets/js/alerts.js'),
     gifts: () => import('../../gifts/js/alerts.js'),
+    'dinner-planner': () => import('../../dinner-planner/js/alerts.js'),
 };
 
 const slot = id => document.querySelector(`.app[href="${id}/"] .alerts`);

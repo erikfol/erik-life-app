@@ -4,8 +4,13 @@
 import * as fs from '../../bills-etc/js/fs.js';
 import { esc, toast } from '../../bills-etc/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
+import { colourMenus } from '../../shared/js/navcolors.js';
 import * as store from './store.js';
 import { aiSettings, suggestMeals } from './ai.js';
+import { STATUS, fridgeItems, daysIn, levelOf, daysText, nameOf } from './leftovers.js';
+import alerts from './alerts.js';
+
+const menus = colourMenus(alerts); // the Calendar tab turns yellow / red with old leftovers in the fridge
 
 // 0 = weeks start on Sunday, 1 = Monday.
 const WEEK_START = 0;
@@ -256,12 +261,79 @@ function renderCalendar() {
         } else {
             body = state.view === 'week' ? `<span class="empty">${key < today ? 'Nothing logged' : '+ Plan dinner'}</span>` : '';
         }
-        // Quick actions for upcoming planned days, so you can reject a suggestion in one click (↻ only with one meal).
-        const quick = state.view === 'week' && key >= today && e
-            ? `<span class="day-actions">${meals.length === 1 ? '<button type="button" class="day-act" data-day-act="swap" title="Swap for another suggestion" aria-label="Swap meal">↻</button>' : ''}<button type="button" class="day-act" data-day-act="clear" title="Clear this day" aria-label="Clear day">✕</button></span>`
-            : '';
+        if (e && !e.skipped && key <= today) body += (e.leftovers || []).map(l => leftoverMark(key, l, e, today)).join('');
+        // Quick actions: 🥡 leftovers in the fridge, on today's and yesterday's dinner until it has some; and for
+        // upcoming planned days, rejecting a suggestion in one click (↻ only with one meal) or clearing the day.
+        const acts = [];
+        if (state.view === 'week' && e) {
+            if (canQuickLeftovers(key, e)) acts.push('<button type="button" class="day-act" data-day-act="leftovers" title="Put its leftovers in the fridge" aria-label="Leftovers in the fridge">🥡</button>');
+            if (key >= today && meals.length === 1) acts.push('<button type="button" class="day-act" data-day-act="swap" title="Swap for another suggestion" aria-label="Swap meal">↻</button>');
+            if (key >= today) acts.push('<button type="button" class="day-act" data-day-act="clear" title="Clear this day" aria-label="Clear day">✕</button>');
+        }
+        const quick = acts.length ? `<span class="day-actions">${acts.join('')}</span>` : '';
         return `<div role="button" tabindex="0" class="${classes.join(' ')}" data-date="${key}"><span class="date"><span>${label}</span>${badge}</span>${body}${quick}</div>`;
     }).join('');
+}
+
+// ---------- leftovers ----------
+
+const shortDate = key => fmt(parseKey(key), { weekday: 'short', month: 'short', day: 'numeric' });
+
+/** A day's leftovers on the calendar: in the fridge with its days (yellow / red when old), or how they went. */
+function leftoverMark(date, l, e, today) {
+    const name = nameOf(l, state.meals);
+    const who = e.mealIds.length > 1 ? `${name}: ` : ''; // which meal, on a day with several
+    const week = state.view === 'week';
+    if (l.status === 'fridge') {
+        const days = daysIn(date, l, today);
+        const tip = `${name} leftovers: ${days ? `${daysText(days)} in the fridge` : 'in the fridge since today'}`;
+        return `<span class="leftover ${levelOf(days) || 'fresh'}" title="${esc(tip)}">🥡 ${esc(week ? `${who}In the fridge · ${daysText(days)}` : `${days}d`)}</span>`;
+    }
+    const tip = `${name} leftovers: ${STATUS[l.status].toLowerCase()}${l.doneOn ? ` ${shortDate(l.doneOn)}` : ''}`;
+    return `<span class="leftover gone" title="${esc(tip)}">🥡${week ? ` ${esc(who + STATUS[l.status])}` : ''}</span>`;
+}
+
+/** The 🥡 button: today's or yesterday's dinner, eaten, with no leftovers marked yet. */
+function canQuickLeftovers(date, e) {
+    const today = todayKey();
+    return (date === today || date === dateKey(addDays(parseKey(today), -1)))
+        && !e.skipped && !e.leftovers?.length && (e.mealIds.some(mealById) || !!e.note);
+}
+
+/** 🥡 on a day: with one meal (or just a note) its leftovers go in the fridge; with several, the day opens to choose. */
+async function quickLeftovers(date) {
+    const e = state.plan[date];
+    const ids = e.mealIds.filter(mealById);
+    if (ids.length > 1) return openDay(date, null, { leftovers: true });
+    const mealId = ids[0] || '';
+    await store.setDay(date, { mealIds: ids, note: e.note, skipped: e.skipped, leftovers: [{ mealId, status: 'fridge' }] });
+    reload();
+    toast(`🥡 ${mealById(mealId)?.name || e.note} leftovers are in the fridge`, 'ok');
+}
+
+/** The "In the fridge" box above the calendar: what's in it, oldest first, with its days and Eaten / Thrown out. */
+function renderFridge() {
+    const items = fridgeItems(state.plan, state.meals, todayKey());
+    const box = $('#fridge');
+    box.hidden = !items.length;
+    box.innerHTML = items.length ? `<h2>🥡 In the fridge</h2>` + items.map(x => `
+        <div class="fridge-row ${x.level || 'fresh'}">
+            <span class="fridge-days">${esc(daysText(x.days))}</span>
+            <span class="fridge-what"><button type="button" class="link" data-left-open="${x.date}" title="Open this day">${esc(x.name)}</button>
+                <span class="from">from ${esc(shortDate(x.date))}</span>${x.level === 'red' ? ' <span class="why">past 4 days</span>' : x.level === 'yellow' ? ' <span class="why">eat soon</span>' : ''}</span>
+            <span class="fridge-acts">
+                <button type="button" class="btn small" data-left="eaten" data-date="${x.date}" data-meal="${esc(x.mealId)}">✓ Eaten</button>
+                <button type="button" class="btn small" data-left="tossed" data-date="${x.date}" data-meal="${esc(x.mealId)}">🗑 Thrown out</button>
+            </span>
+        </div>`).join('') + '<p class="hint">Leftovers keep 3–4 days in the fridge.</p>' : '';
+}
+
+async function leftoverAction(btn) {
+    const { date, meal } = btn.dataset;
+    const name = nameOf(state.plan[date]?.leftovers?.find(l => l.mealId === meal) || {}, state.meals);
+    await store.setLeftover(date, meal, btn.dataset.left);
+    reload();
+    toast(`${name} leftovers: ${STATUS[btn.dataset.left].toLowerCase()}`);
 }
 
 function shiftCursor(dir) {
@@ -386,10 +458,14 @@ function addDayMealRow(mealId = '') {
 
 const dayMealIds = () => [...new Set($$('.day-meal-row select').map(s => s.value).filter(Boolean))];
 
-function openDay(date, presetMealId) {
+let savedLeftovers = []; // the open day's leftovers as saved, for the rows' starting state and dates
+
+function openDay(date, presetMealId, { leftovers = false } = {}) {
     const e = state.plan[date] || {};
     const form = $('#day-form');
     $('#day-meal-rows').innerHTML = '';
+    $('#day-leftover-rows').innerHTML = '';
+    savedLeftovers = e.leftovers || [];
     const ids = presetMealId ? [presetMealId] : e.mealIds || [];
     (ids.length ? ids : ['']).forEach(id => addDayMealRow(id));
     form.note.value = e.note || '';
@@ -397,7 +473,62 @@ function openDay(date, presetMealId) {
     form.dataset.date = date;
     updateDayDialog();
     $('#day-dialog').showModal();
+    if (leftovers) {
+        $('#day-leftovers').scrollIntoView({ block: 'nearest' });
+        $('#day-leftovers input')?.focus();
+    }
 }
+
+/**
+ * The day dialog's 🥡 Had leftovers? rows: one per meal chosen (or the note, with no meal), today or earlier, not
+ * skipped. A row keeps what's ticked while the meals change; a new one starts as saved.
+ */
+function renderLeftoverRows() {
+    const form = $('#day-form');
+    const box = $('#day-leftovers');
+    const now = new Map($$('.leftover-row', box).map(r => [r.dataset.meal, { on: r.querySelector('input').checked, status: r.querySelector('select').value }]));
+    const ids = dayMealIds();
+    const keys = ids.length ? ids : form.note.value.trim() ? [''] : [];
+    $('#day-leftover-rows').innerHTML = keys.map(id => {
+        const saved = savedLeftovers.find(l => l.mealId === id);
+        const { on, status } = now.get(id) || { on: !!saved, status: saved?.status || 'fridge' };
+        const name = id ? mealById(id)?.name : form.note.value.trim();
+        return `<div class="leftover-row" data-meal="${esc(id)}">
+            <label class="check"><input type="checkbox" ${on ? 'checked' : ''}> ${esc(name || 'Leftovers')}</label>
+            <select aria-label="Where they are now" ${on ? '' : 'disabled'}>${Object.entries(STATUS).map(([v, label]) => `<option value="${v}" ${v === status ? 'selected' : ''}>${label}</option>`).join('')}</select>
+            <span class="leftover-days"></span>
+        </div>`;
+    }).join('');
+    $$('.leftover-row', box).forEach(updateLeftoverRow);
+    showLeftovers();
+}
+
+/** A row's select follows its tick, and the note after it says how long they've been (or were) in the fridge. */
+function updateLeftoverRow(row) {
+    const on = row.querySelector('input').checked;
+    const select = row.querySelector('select');
+    select.disabled = !on;
+    const date = $('#day-form').dataset.date;
+    const today = todayKey();
+    const saved = savedLeftovers.find(l => l.mealId === row.dataset.meal);
+    // Eaten or thrown out just now counts as today, as saving it will.
+    const doneOn = select.value === 'fridge' ? '' : saved?.status === select.value && saved.doneOn ? saved.doneOn : today;
+    const days = daysIn(date, { status: select.value, doneOn }, today);
+    const note = row.querySelector('.leftover-days');
+    note.className = `leftover-days ${on && select.value === 'fridge' ? levelOf(days) || '' : ''}`;
+    note.textContent = !on ? '' : select.value === 'fridge' ? (days ? `${daysText(days)} in the fridge` : 'in the fridge since today')
+        : `${shortDate(doneOn)}, ${days ? `after ${daysText(days)}` : 'the same day'}`;
+}
+
+/** Leftovers only once dinner's been: today or earlier, and not on a day you didn't have it. */
+function showLeftovers() {
+    const form = $('#day-form');
+    const date = form.dataset.date, today = todayKey();
+    $('#day-leftovers').hidden = date > today || (form.skipped.checked && date < today) || !$('.leftover-row');
+}
+
+const dayLeftovers = () => $$('.leftover-row').filter(r => r.querySelector('input').checked)
+    .map(r => ({ mealId: r.dataset.meal, status: r.querySelector('select').value }));
 
 function updateDayDialog() {
     const form = $('#day-form');
@@ -405,6 +536,7 @@ function updateDayDialog() {
     const isPast = date < todayKey();
     $('#day-dialog-title').textContent = fmt(parseKey(date), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     $$('.past-only', form).forEach(el => (el.hidden = !isPast));
+    renderLeftoverRows();
 
     const stats = computeStats();
     const sugg = rankDue(stats, { aroundDate: date, exclude: new Set(dayMealIds()) }).slice(0, 5);
@@ -418,7 +550,9 @@ async function saveDay(ev) {
     ev.preventDefault();
     const form = $('#day-form');
     const date = form.dataset.date;
-    await store.setDay(date, { mealIds: dayMealIds(), note: form.note.value, skipped: form.skipped.checked && date < todayKey() });
+    const skipped = form.skipped.checked && date < todayKey();
+    const leftovers = $('#day-leftovers').hidden ? [] : dayLeftovers();
+    await store.setDay(date, { mealIds: dayMealIds(), note: form.note.value, skipped, leftovers });
     $('#day-dialog').close();
     reload();
 }
@@ -463,13 +597,20 @@ function renderMeals() {
     };
     meals.sort(sorters[sort]);
 
+    // How many of its dinners had leftovers (only counted since leftovers are marked on the calendar).
+    const leftoverTimes = {};
+    for (const [date, e] of Object.entries(state.plan)) {
+        if (date > todayKey() || e.skipped) continue;
+        for (const l of e.leftovers || []) if (l.mealId) leftoverTimes[l.mealId] = (leftoverTimes[l.mealId] || 0) + 1;
+    }
+
     $('#meal-list').innerHTML = meals.length ? meals.map(m => `
         <article class="card">
             <h3><span>${esc(m.name)}</span><button class="link fav ${m.favorite ? 'on' : ''}" data-act="fav" data-id="${m.id}" title="Toggle favorite">${m.favorite ? '★' : '☆'}</button></h3>
             ${m.tags.length ? `<div class="tag-list">${m.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
             ${m.special ? '<div><span class="badge">Special: never auto-suggested</span></div>' : ''}
             ${m.special && !m.ingredients.length && !m.prepMinutes ? '' : `<div class="stats">${m.prepMinutes ? `⏱ ${m.prepMinutes} min · ` : ''}${m.ingredients.length} ingredient${m.ingredients.length === 1 ? '' : 's'}</div>`}
-            <div class="stats">${esc(describeStats(stats[m.id]))}</div>
+            <div class="stats">${esc(describeStats(stats[m.id]))}${leftoverTimes[m.id] ? ` · 🥡 leftovers ${leftoverTimes[m.id]}×` : ''}</div>
             ${m.ingredients.length ? `<details><summary>Ingredients</summary><ul>${m.ingredients.map(i => `<li>${esc(i.name)}${i.quantity ? ` — ${esc(i.quantity)}` : ''}</li>`).join('')}</ul></details>` : ''}
             ${m.notes ? `<details><summary>Notes</summary><p>${esc(m.notes).replace(/\n/g, '<br>')}</p></details>` : ''}
             <div class="actions">
@@ -719,6 +860,7 @@ function downloadExport(what) {
 // ---------- wiring ----------
 
 function renderAll() {
+    renderFridge();
     renderCalendar();
     renderMeals();
     renderIdeas();
@@ -746,9 +888,15 @@ function wire() {
     $('#calendar').onclick = guard(async ev => {
         const day = ev.target.closest('.day');
         if (!day) return;
-        const act = ev.target.closest('[data-day-act]');
-        if (act) return act.dataset.dayAct === 'swap' ? swapDay(day.dataset.date) : quickClearDay(day.dataset.date);
+        const act = ev.target.closest('[data-day-act]')?.dataset.dayAct;
+        if (act) return (act === 'swap' ? swapDay : act === 'leftovers' ? quickLeftovers : quickClearDay)(day.dataset.date);
         openDay(day.dataset.date);
+    });
+    $('#fridge').onclick = guard(async ev => {
+        const btn = ev.target.closest('[data-left]');
+        if (btn) return leftoverAction(btn);
+        const open = ev.target.closest('[data-left-open]');
+        if (open) openDay(open.dataset.leftOpen, null, { leftovers: true });
     });
     $('#calendar').onkeydown = ev => {
         if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList.contains('day')) {
@@ -769,6 +917,9 @@ function wire() {
         updateDayDialog();
     };
     $('#add-day-meal').onclick = () => addDayMealRow().querySelector('select').focus();
+    $('#day-form').skipped.onchange = showLeftovers;
+    $('#day-form').note.oninput = () => { if (!dayMealIds().length) renderLeftoverRows(); }; // a note-only day's leftovers
+    $('#day-leftover-rows').onchange = ev => updateLeftoverRow(ev.target.closest('.leftover-row'));
 
     $('#add-meal').onclick = () => openMealEditor(null);
     $('#add-ingredient').onclick = () => addIngredientRow().querySelector('input').focus();
@@ -850,6 +1001,7 @@ async function start() {
     wire();
     reload();
     showTab();
+    menus.ready();
 }
 
 (async () => {

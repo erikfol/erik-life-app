@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="css/dinner.css">
     <!-- app-version:start (written by tools/stamp_version.py) -->
     <script type="module">
-        const VERSION = "20261124114557";
-        const FILES = ["css/dinner.css", "js/ai.js", "js/app.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/datatable.js", "../bills-etc/js/dates.js", "../bills-etc/js/filtermenu.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/dropbox.js", "../shared/js/fileguard.js", "../shared/js/folder.js", "../shared/js/infobox.js", "../shared/js/recordtable.js", "../shared/js/navcolors.js", "../shared/js/lightbox.js", "../shared/js/infolinks.js"];
+        const VERSION = "20261124121251";
+        const FILES = ["css/dinner.css", "js/ai.js", "js/alerts.js", "js/app.js", "js/leftovers.js", "js/store.js", "../bills-etc/css/app.css", "../bills-etc/js/csv.js", "../bills-etc/js/datatable.js", "../bills-etc/js/dates.js", "../bills-etc/js/filtermenu.js", "../bills-etc/js/fs.js", "../bills-etc/js/util.js", "../shared/css/records.css", "../shared/js/dropbox.js", "../shared/js/fileguard.js", "../shared/js/folder.js", "../shared/js/infobox.js", "../shared/js/recordtable.js", "../shared/js/navcolors.js", "../shared/js/lightbox.js", "../shared/js/infolinks.js"];
         // After an update, fetch every file fresh once so new pages never run with old cached code.
         try {
             if (localStorage.getItem('dinner-planner-version') !== VERSION) {
@@ -41,6 +41,8 @@
         <div id="app" class="dp" hidden>
             <!-- Calendar -->
             <div id="tab-calendar" class="tab-panel">
+                <!-- Leftovers in the fridge, oldest first (js/app.js renderFridge); hidden while there are none. -->
+                <section id="fridge" class="fridge" hidden></section>
                 <div class="toolbar">
                     <div class="btn-group">
                         <button class="btn" id="cal-prev" aria-label="Previous">‹</button>
@@ -58,7 +60,7 @@
                     <button class="btn" id="shopping-list">🛒 Shopping list</button>
                 </div>
                 <div id="calendar"></div>
-                <p class="hint">Click a day to plan it. Meals on past days are your history, and the Ideas tab learns from them.</p>
+                <p class="hint">Click a day to plan it. Meals on past days are your history, and the Ideas tab learns from them. 🥡 on today's or yesterday's dinner puts its leftovers in the fridge.</p>
             </div>
 
             <!-- Meals -->
@@ -114,7 +116,7 @@
                     <p class="hint">Everything is saved automatically. These files are kept up to date in <code id="data-dir"></code> in your <code>erik-life-app</code> folder:</p>
                     <ul class="file-list">
                         <li><strong>meals.csv</strong>: every meal with its ingredients, notes, and how often you've had it</li>
-                        <li><strong>dinner-history.csv</strong>: every day on the calendar with its meal, notes, and whether you ate it</li>
+                        <li><strong>dinner-history.csv</strong>: every day on the calendar with its meal, notes, whether you ate it, and its leftovers</li>
                         <li><strong>db.json</strong>: the planner's own data file, which holds everything</li>
                     </ul>
                     <div class="toolbar">
@@ -172,6 +174,11 @@
                     <label>Or a note <input name="note" maxlength="200" placeholder="e.g. Leftovers, eating out, Grandma's"></label>
                     <label class="check past-only"><input type="checkbox" name="skipped"> We didn't end up having this</label>
                     <div id="day-suggestions" class="chips"></div>
+                    <fieldset id="day-leftovers" hidden>
+                        <legend>🥡 Had leftovers?</legend>
+                        <div id="day-leftover-rows"></div>
+                        <p class="hint">Tick each one with leftovers, then mark them eaten or thrown out when they're gone.</p>
+                    </fieldset>
                     <div class="dialog-actions">
                         <button type="button" class="btn danger" id="day-clear">Clear day</button>
                         <span class="spacer"></span>
