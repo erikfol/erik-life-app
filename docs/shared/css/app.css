@@ -1,48 +1,17 @@
-/* The look every section shares: colours, the top bar, layout, buttons, tables, column filters, cards, charts and the
-   toast. At the end, the parts of Bills Etc's pages other sections use too; the rest is bills-etc/css/bills.css. */
-:root {
-    --bg: #f5f7fa;
-    --surface: #ffffff;
-    --text: #2d2d2d;
-    --muted: #888;
-    --faint: #aaa;
-    --line: #f0f0f0;
-    --line-strong: #dde3f0;
-    --head: #f0f4ff;
-    --hover: #fafbff;
-    --navy: #1a1a2e;
-    --navy-2: #16213e;
-    --blue: #4a90d9;
-    --blue-text: #3a5ca8;
-    --green: #27ae60;
-    --red: #e74c3c;
-    --orange: #e67e22;
-    --purple: #7b2ff7;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* The look every section shares, after base.css: the top bar's layout, buttons, tables, column filters, cards, charts
+   and the toast. At the end, the parts of Bills Etc's pages other sections use too; the rest is bills-etc/css/bills.css. */
 [hidden] { display: none !important; }
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: var(--text);
-    background: var(--bg);
-    min-height: 100vh;
-}
 
 /* ── Top bar ─────────────────────────────────────────────────────────── */
-.topbar {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
-    color: #fff;
+.topbar { /* its colours and padding are in base.css */
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 10px 24px;
-    padding: 12px 24px;
     position: sticky;
     top: 0;
     z-index: 10;
 }
-.brand { font-weight: 700; font-size: 1.15em; letter-spacing: -0.3px; }
 .home-link { color: #aab4c8; text-decoration: none; font-size: 0.9em; padding: 4px 10px; margin-right: -12px; border-radius: 6px; }
 .home-link:hover { color: #fff; background: rgba(255,255,255,0.08); }
 #nav { display: flex; flex-wrap: wrap; gap: 4px; }
