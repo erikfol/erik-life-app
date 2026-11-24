@@ -3,7 +3,7 @@
 // by-hand and before-restore copies of db.json. inputs/ is kept out of git.
 import * as fs from '../../bills-etc/js/fs.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
-import { STATUS, nameOf } from './leftovers.js';
+import { STATUS, nameOf, limitsOf, limitsProblem } from './leftovers.js';
 
 export const DIR = 'inputs/dinner-planner';
 export const DB_PATH = `${DIR}/db.json`;
@@ -88,7 +88,7 @@ function sanitizeDb(input) {
         if (leftovers.length) plan[date].leftovers = leftovers;
     }
     const strings = a => (Array.isArray(a) ? a.filter(s => typeof s === 'string') : []);
-    return {
+    const out = {
         version: Number.isInteger(input.version) ? input.version : 1,
         meals: meals.filter(m => m.name),
         plan,
@@ -96,7 +96,11 @@ function sanitizeDb(input) {
         aiIdeas: Array.isArray(input.aiIdeas) ? input.aiIdeas : [],
         aiRejected: strings(input.aiRejected),
     };
+    if (input.settings?.leftovers) out.settings = { leftovers: leftoverSettings(limitsOf(input)) };
+    return out;
 }
+
+const leftoverSettings = ({ yellow, red }) => ({ yellowAfter: yellow, redAfter: red });
 
 /** A calendar day's meals (days saved before version 3 had one mealId). */
 export const mealsOf = e => (Array.isArray(e?.mealIds) ? e.mealIds : e?.mealId ? [e.mealId] : []);
@@ -190,6 +194,7 @@ export async function restore({ name, data: source }) {
     if (name) source = JSON.parse(await readBackup(String(name)) ?? 'null');
     if (!source) throw new Error('Backup not found');
     const next = sanitizeDb(source);
+    if (!next.settings && db.settings) next.settings = db.settings; // a backup from before Settings keeps today's
     await snapshot(`before-restore-${stamp()}.json`);
     for (const k of Object.keys(db)) delete db[k];
     Object.assign(db, next);
@@ -317,6 +322,14 @@ export async function setDay(date, { mealIds = [], note, skipped, leftovers } = 
         const kept = date > localDate() ? [] : normalizeLeftovers(leftovers ?? old, day, { old });
         db.plan[date] = kept.length ? { ...day, leftovers: kept } : day;
     }
+    await save();
+}
+
+/** Settings tab: leftovers turn yellow / red after more than this many days in the fridge ({ yellow, red }). */
+export async function setLeftoverLimits(limits) {
+    const problem = limitsProblem(limits);
+    if (problem) throw new Error(problem);
+    db.settings = { ...db.settings, leftovers: leftoverSettings(limits) };
     await save();
 }
 

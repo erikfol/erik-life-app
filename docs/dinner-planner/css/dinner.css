@@ -123,7 +123,7 @@
 .dp .badge.good { background: transparent; color: var(--dp-good); border: 1px solid var(--dp-good); }
 
 /* ---------- leftovers ---------- */
-/* fresh (0–2 days) green, yellow (3–4 days, eat soon) and red (5+ days) — the same colours as the page banners. */
+/* fresh green, then yellow and red after the Settings tab's days (more than 5 / 8 to start) — the banners' colours. */
 .dp .leftover { font-size: .75rem; font-weight: 600; align-self: flex-start; max-width: 100%; padding: 1px 7px; border-radius: 8px; overflow-wrap: anywhere; }
 .dp .leftover.fresh { background: #e8f8ef; color: #1e7a46; }
 .dp .leftover.yellow { background: #fff8e1; color: #8a5a00; border: 1px solid #f0d77a; }
@@ -310,3 +310,13 @@
     .dp .row { flex-direction: column; }
     .dp .row > label.narrow { flex: 1; }
 }
+
+/* ---------- settings ---------- */
+.dp .settings-form { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+.dp .settings-form label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 500; }
+.dp .settings-form input[type=number] { width: 80px; text-align: center; }
+.dp .settings-form .hint { margin: 0; }
+.dp .settings-form .hint.problem { color: var(--dp-danger); font-weight: 600; }
+.dp .swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto; }
+.dp .swatch.yellow { background: #f5c518; }
+.dp .swatch.red { background: #a8322a; }

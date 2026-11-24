@@ -7,7 +7,7 @@ import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import * as store from './store.js';
 import { aiSettings, suggestMeals } from './ai.js';
-import { STATUS, fridgeItems, daysIn, levelOf, daysText, nameOf } from './leftovers.js';
+import { STATUS, fridgeItems, daysIn, levelOf, daysText, nameOf, limitsOf, limitsProblem, DEFAULT_LIMITS } from './leftovers.js';
 import alerts from './alerts.js';
 
 const menus = colourMenus(alerts); // the Calendar tab turns yellow / red with old leftovers in the fridge
@@ -15,7 +15,7 @@ const menus = colourMenus(alerts); // the Calendar tab turns yellow / red with o
 // 0 = weeks start on Sunday, 1 = Monday.
 const WEEK_START = 0;
 
-const TABS = [['calendar', 'Calendar'], ['meals', 'Meals'], ['ideas', 'Ideas'], ['backup', 'Backup']];
+const TABS = [['calendar', 'Calendar'], ['meals', 'Meals'], ['ideas', 'Ideas'], ['backup', 'Backup'], ['settings', 'Settings']];
 
 const state = {
     meals: [],
@@ -28,6 +28,7 @@ const state = {
     shuffleIdeas: false,
     aiIdeas: [],
     ai: { enabled: false, loading: false, settings: null },
+    limits: { ...DEFAULT_LIMITS }, // leftovers turn yellow / red after more than this many days (Settings tab)
 };
 
 // ---------- utilities ----------
@@ -75,6 +76,7 @@ function reload() {
     state.plan = s.plan;
     state.dismissed = s.dismissed;
     state.aiIdeas = s.aiIdeas || [];
+    state.limits = limitsOf(s); // leftovers' yellow / red days (Settings tab)
     renderAll();
 }
 
@@ -287,7 +289,7 @@ function leftoverMark(date, l, e, today) {
     if (l.status === 'fridge') {
         const days = daysIn(date, l, today);
         const tip = `${name} leftovers: ${days ? `${daysText(days)} in the fridge` : 'in the fridge since today'}`;
-        return `<span class="leftover ${levelOf(days) || 'fresh'}" title="${esc(tip)}">🥡 ${esc(week ? `${who}In the fridge · ${daysText(days)}` : `${days}d`)}</span>`;
+        return `<span class="leftover ${levelOf(days, state.limits) || 'fresh'}" title="${esc(tip)}">🥡 ${esc(week ? `${who}In the fridge · ${daysText(days)}` : `${days}d`)}</span>`;
     }
     const tip = `${name} leftovers: ${STATUS[l.status].toLowerCase()}${l.doneOn ? ` ${shortDate(l.doneOn)}` : ''}`;
     return `<span class="leftover gone" title="${esc(tip)}">🥡${week ? ` ${esc(who + STATUS[l.status])}` : ''}</span>`;
@@ -313,19 +315,20 @@ async function quickLeftovers(date) {
 
 /** The "In the fridge" box above the calendar: what's in it, oldest first, with its days and Eaten / Thrown out. */
 function renderFridge() {
-    const items = fridgeItems(state.plan, state.meals, todayKey());
+    const { yellow, red } = state.limits;
+    const items = fridgeItems(state.plan, state.meals, todayKey(), state.limits);
     const box = $('#fridge');
     box.hidden = !items.length;
     box.innerHTML = items.length ? `<h2>🥡 In the fridge</h2>` + items.map(x => `
         <div class="fridge-row ${x.level || 'fresh'}">
             <span class="fridge-days">${esc(daysText(x.days))}</span>
             <span class="fridge-what"><button type="button" class="link" data-left-open="${x.date}" title="Open this day">${esc(x.name)}</button>
-                <span class="from">from ${esc(shortDate(x.date))}</span>${x.level === 'red' ? ' <span class="why">past 4 days</span>' : x.level === 'yellow' ? ' <span class="why">eat soon</span>' : ''}</span>
+                <span class="from">from ${esc(shortDate(x.date))}</span>${x.level ? ` <span class="why">over ${x.level === 'red' ? red : yellow} days</span>` : ''}</span>
             <span class="fridge-acts">
                 <button type="button" class="btn small" data-left="eaten" data-date="${x.date}" data-meal="${esc(x.mealId)}">✓ Eaten</button>
                 <button type="button" class="btn small" data-left="tossed" data-date="${x.date}" data-meal="${esc(x.mealId)}">🗑 Thrown out</button>
             </span>
-        </div>`).join('') + '<p class="hint">Leftovers keep 3–4 days in the fridge.</p>' : '';
+        </div>`).join('') + `<p class="hint">Yellow after ${yellow} days in the fridge, red after ${red}. <a href="#settings">Change</a></p>` : '';
 }
 
 async function leftoverAction(btn) {
@@ -515,7 +518,7 @@ function updateLeftoverRow(row) {
     const doneOn = select.value === 'fridge' ? '' : saved?.status === select.value && saved.doneOn ? saved.doneOn : today;
     const days = daysIn(date, { status: select.value, doneOn }, today);
     const note = row.querySelector('.leftover-days');
-    note.className = `leftover-days ${on && select.value === 'fridge' ? levelOf(days) || '' : ''}`;
+    note.className = `leftover-days ${on && select.value === 'fridge' ? levelOf(days, state.limits) || '' : ''}`;
     note.textContent = !on ? '' : select.value === 'fridge' ? (days ? `${daysText(days)} in the fridge` : 'in the fridge since today')
         : `${shortDate(doneOn)}, ${days ? `after ${daysText(days)}` : 'the same day'}`;
 }
@@ -804,6 +807,41 @@ async function aiAction(act, id) {
     reload();
 }
 
+// ---------- settings ----------
+
+/** Settings tab: when leftovers in the fridge turn yellow and red. */
+function renderSettings() {
+    const form = $('#leftover-settings');
+    form.yellow.value = state.limits.yellow;
+    form.red.value = state.limits.red;
+    updateSettingsPreview();
+}
+
+function settingsValues() {
+    const form = $('#leftover-settings');
+    const num = v => (v.trim() === '' ? NaN : Number(v));
+    return { yellow: num(form.yellow.value), red: num(form.red.value) };
+}
+
+/** Says when leftovers put in the fridge today would turn yellow and red; Save turns on once something changed. */
+function updateSettingsPreview() {
+    const limits = settingsValues();
+    const problem = limitsProblem(limits);
+    const on = n => shortDate(dateKey(addDays(new Date(), n + 1)));
+    const el = $('#leftover-preview');
+    el.classList.toggle('problem', !!problem);
+    el.textContent = problem || `Leftovers put in the fridge today would turn yellow on ${on(limits.yellow)} (${daysText(limits.yellow + 1)} in) and red on ${on(limits.red)} (${daysText(limits.red + 1)} in).`;
+    $('#leftover-save').disabled = !!problem || (limits.yellow === state.limits.yellow && limits.red === state.limits.red);
+}
+
+async function saveSettings(ev) {
+    ev.preventDefault();
+    await store.setLeftoverLimits(settingsValues());
+    reload();
+    updateSettingsPreview();
+    toast('Leftover colours saved', 'ok');
+}
+
 // ---------- backups ----------
 
 const BACKUP_KINDS = { daily: 'Start of day', manual: 'Backed up by hand', 'before-restore': 'Saved before a restore' };
@@ -873,6 +911,7 @@ function showTab() {
     if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
     $$('#nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + name));
     $$('.tab-panel').forEach(p => (p.hidden = p.id !== `tab-${name}`));
+    if (name === 'settings') renderSettings();
     if (name === 'backup') renderBackup().catch(err => toast(`Couldn't list backups: ${err.message}`, 'bad'));
 }
 
@@ -967,6 +1006,8 @@ function wire() {
         if (btn) await restore({ name: btn.dataset.restore }, btn.dataset.when);
     });
     $('#ai-form').onsubmit = guard(requestAiIdeas);
+    $('#leftover-settings').oninput = updateSettingsPreview;
+    $('#leftover-settings').onsubmit = guard(saveSettings);
     $('#ai-clear').onclick = guard(async () => {
         await store.removeAiIdeas();
         reload();
