@@ -1,0 +1,184 @@
+/* Bills Etc's own pages (Checking History, This Month, Savings, Utilities, Loan/CC, Setup's calendar …). Loaded right
+   after shared/css/app.css; the parts other sections use too stay there. */
+/* ── Dashboard ───────────────────────────────────────────────────────── */
+.dash-head { margin-bottom: 4px; }
+.month-nav { display: flex; align-items: center; gap: 6px; }
+.month-nav select { font-weight: 600; min-width: 170px; }
+.month-nav button { padding: 6px 12px; }
+.note-num { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; border-radius: 9px; background: #b9770e; color: #fff; font-size: 0.75em; font-weight: 700; text-align: center; padding: 0 4px; }
+.where-row {
+    display: grid; grid-template-columns: minmax(120px, 190px) 1fr 100px minmax(120px, 170px);
+    align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: none; border: none; border-radius: 6px; padding: 7px 8px; font-weight: 400;
+}
+.where-row:hover { background: var(--hover); }
+.where-row.active { background: #e3edff; }
+.where-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.where-name .muted { font-size: 0.8em; font-weight: 400; }
+.where-bar { height: 12px; background: #f0f2f7; border-radius: 6px; overflow: hidden; }
+.where-bar span { display: block; height: 100%; background: #4a90d9; border-radius: 6px; }
+.where-row.active .where-bar span { background: var(--navy-2); }
+.where-amt { text-align: right; font-family: Consolas, 'SF Mono', monospace; font-weight: 600; }
+.where-delta { font-size: 0.82em; }
+.dash-more { background: var(--surface); border-radius: 10px; padding: 14px 26px; margin-bottom: 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.dash-more > summary { cursor: pointer; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.9em; }
+.dash-more[open] > summary { margin-bottom: 14px; }
+.dash-more h3 { font-size: 0.95em; color: #555; margin: 14px 0 8px; }
+@media (max-width: 640px) {
+    .where-row { grid-template-columns: 1fr 90px; }
+    .where-bar { grid-column: 1 / -1; grid-row: 2; }
+    .where-delta { grid-column: 1 / -1; }
+}
+.save-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 10px; border-radius: 8px; background: #fffbea; border: 1px solid #f5e1a4; font-size: 0.9em; }
+.cell-input { width: 100%; min-width: 110px; }
+.merge-bar { position: sticky; top: 64px; z-index: 5; background: #eef4ff; border: 1px solid #c9dafc; border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 0.9em; }
+tr.selected-row td { background: #eef4ff; }
+h2.page-sub { font-size: 1.2em; }
+.bill-note { min-width: 240px; }
+.ledger-sub { font-size: 0.82em; color: var(--muted); margin-top: 2px; }
+.ledger-link { font-size: 0.82em; margin-left: 6px; }
+.add-preview { font-size: 0.9em; color: #555; margin: 4px 0 12px; min-height: 1.2em; }
+.yr-charts { margin-top: 18px; }
+.paid-tag { margin-left: 6px; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+.paid-btn { margin-left: 6px; text-transform: none; letter-spacing: 0; padding: 2px 10px; }
+.paid-undo { padding: 1px 8px; font-size: 0.75em; color: #888; background: #fff; }
+.unpaid-list .nowrap { display: inline-flex; align-items: center; gap: 6px; margin: 2px 10px 2px 0; }
+/* All bills tables: about half their full height, scrolling inside with the header kept in view. */
+.short-table .table-wrap { max-height: 450px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.short-table thead th { position: sticky; top: 0; z-index: 1; }
+.paid-edit { display: inline-flex; align-items: center; gap: 4px; }
+.paid-edit input { padding: 2px 6px; font-size: 0.85em; }
+.year-chips { gap: 6px; margin-bottom: 12px; }
+.sheet-grid .table-wrap { max-height: 450px; overflow: auto; border: 1px solid var(--line-strong); border-radius: 6px; }
+.sheet-table th { position: sticky; top: 0; z-index: 1; font-size: 0.85em; }
+.sheet-table td { padding: 2px 4px; }
+.sheet-table input { font: inherit; font-size: 0.88em; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; width: auto; }
+.sheet-table input:hover { border-color: var(--line-strong); background: #fff; }
+.sheet-table input:focus { border-color: var(--blue); background: #fff; }
+.sheet-table input.changed { background: #fffbea; border-color: #f5e1a4; }
+.sheet-table .rownum { color: var(--faint); font-size: 0.8em; text-align: right; }
+.loan-grid { max-height: 450px; overflow: auto; border: 1px solid var(--line-strong); border-radius: 6px; }
+.loan-grid input[type=date] { width: 140px; }
+.loan-grid input[type=number] { width: 110px; }
+.loan-grid input[data-k=notes] { width: 100%; min-width: 180px; }
+/* A credit card's one Activity grid: Min payment / Made only on payments, Paid back? only on the rest */
+.card-grid tr[data-kind=payment] td.act-only > *, .card-grid tr[data-kind=activity] td.pay-only > * { visibility: hidden; }
+.loan-tables > div + div { margin-top: 22px; }
+.badge-warn { color: var(--orange); font-weight: 600; }
+/* Loan/CC: statuses, insights, planner */
+.badge-plan { background: #e8f0fe; color: var(--blue-text); }
+tr.planned-row td { font-style: italic; color: #7a8599; }
+.planner-controls { align-items: flex-end; gap: 14px; }
+.planner-controls input[type=range] { flex: 1; min-width: 160px; margin-bottom: 8px; }
+.planner-result { margin: 10px 0 8px; font-size: 0.95em; }
+.scen-table td, .scen-table th { padding: 6px 10px; }
+.scen-row { cursor: pointer; }
+.scen-row:hover td { background: #eef4ff; }
+/* Loan/CC: collapsible accounts */
+.loan-head { cursor: pointer; user-select: none; }
+.loan-chevron { color: var(--muted); width: 14px; display: inline-block; }
+.loan-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.9em; color: #555; margin: -4px 0 4px; }
+.loan:not(.collapsed) .loan-summary { display: none; }
+/* Loan/CC totals */
+.totals-cards { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.totals-table td, .totals-table th { padding: 7px 10px; }
+.totals-row { cursor: pointer; }
+.totals-row:hover td { background: #eef4ff; }
+/* Savings */
+.sav-cards { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.bucket-list { display: flex; flex-direction: column; gap: 2px; }
+.bucket-row { display: grid; grid-template-columns: minmax(150px, 230px) 1fr 90px 110px 130px; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 6px; list-style: none; cursor: pointer; font-size: 0.92em; }
+.bucket-row::-webkit-details-marker { display: none; }
+.bucket-row.static { cursor: default; }
+.bucket-row:hover { background: var(--hover); }
+details.bucket[open] > .bucket-row { background: #eef4ff; }
+.b-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-amt { text-align: right; font-family: Consolas, 'SF Mono', monospace; font-weight: 600; }
+.b-check { text-align: right; font-size: 0.88em; color: var(--green); }
+.b-date { font-size: 0.82em; text-align: right; }
+.b-notes { margin: 2px 8px 10px; padding: 10px 14px; background: #f8faff; border-left: 3px solid var(--line-strong); border-radius: 4px; font-size: 0.88em; line-height: 1.6; color: #444; }
+/* Savings → Where the money is: the Grand total row under the buckets */
+.bucket-total { margin-top: 10px; padding-top: 6px; border-top: 2px solid var(--line-strong); }
+.bucket-total .bucket-row:hover { background: none; }
+.bucket-total .b-name, .bucket-total .b-amt { font-weight: 700; }
+.bucket-total .total-note { font-size: 0.82em; }
+details.bucket-group { margin-top: 14px; }
+details.bucket-group > summary { cursor: pointer; margin-bottom: 8px; }
+.upd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.b-grid textarea, .loan-grid textarea { font: inherit; font-size: 0.85em; width: 260px; min-height: 34px; }
+@media (max-width: 640px) {
+    .bucket-row { grid-template-columns: 1fr 80px; }
+    .bucket-row .where-bar, .bucket-row .b-check, .bucket-row .b-date, .bucket-row .total-note { display: none; }
+}
+.deposit-btn { padding: 2px 8px; font-size: 0.85em; color: var(--green); border-color: #bfe8cf; background: #f2fbf5; font-family: Consolas, 'SF Mono', monospace; }
+.deposit-btn:hover { background: #dff5e7; }
+.due-tag { color: var(--orange); font-weight: 600; font-size: 0.95em; }
+/* Savings → Where the money is: money to move out of savings */
+.move-box { border: 1px solid #f0e08a; background: #fffdf2; border-radius: 8px; padding: 8px 14px 12px; margin: 6px 0 14px; }
+.move-table td:first-child, .move-table th:first-child { width: 28px; text-align: center; }
+.move-bar { gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.move-bar input[type=date] { width: 150px; }
+.move-tag { color: #8a6d00; font-weight: 600; font-size: 0.95em; }
+.b-notes.b-moves { background: #fffbe0; border-radius: 6px; margin-bottom: 4px; }
+/* Mini-splits */
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 18px; font-size: 0.92em; }
+.spec-label { display: block; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 2px; }
+.log-grid input[data-k=work], .log-grid input[data-k=notes] { width: 100%; min-width: 180px; }
+/* Bills */
+.late-cell { color: var(--orange); font-weight: 600; }
+.missed-cell { color: var(--red); font-weight: 700; }
+.bill-grid td, .bill-grid th { white-space: nowrap; font-size: 0.88em; }
+.sched-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.8em; background: #e8f0fe; color: var(--blue-text); white-space: nowrap; }
+.sched-tag.unsched { background: #f0f0f0; color: #888; }
+/* Loan form */
+.form-sub { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 14px 0 8px; font-weight: 600; }
+.form-sub:first-of-type { margin-top: 4px; }
+.form-sub .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.due-where { display: inline-block; min-width: 110px; font-size: 0.8em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.8; }
+/* ── Setup: bills & paydays calendar (views/billcal.js) ─────────────── */
+.cal-head { margin-bottom: 12px; }
+.cal-sums { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; font-size: 0.88em; }
+.cal-sum .lbl { color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.82em; }
+.cal-sum strong { font-family: Consolas, 'SF Mono', monospace; }
+.out-amt { color: var(--red); font-weight: 600; font-family: Consolas, 'SF Mono', monospace; }
+.cal-day {
+    min-width: 0; min-height: 92px; display: flex; flex-direction: column; gap: 3px;
+    padding: 4px 5px 5px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer;
+}
+.cal-day.weekend { background: #fafbfd; }
+.cal-day.blank { background: transparent; border-color: transparent; cursor: default; }
+.cal-day:not(.blank):hover { border-color: #a9bde6; }
+.cal-day.today { border: 2px solid var(--blue); padding: 3px 4px 4px; }
+.cal-day.picked { background: #eef4ff; border-color: var(--navy-2); }
+.cal-day:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.cal-num { display: flex; align-items: center; gap: 6px; font-size: 0.8em; font-weight: 600; color: #555; }
+.cal-day.past .cal-num { color: var(--faint); }
+.cal-today-tag { background: var(--blue); color: #fff; border-radius: 8px; padding: 0 6px; font-size: 0.85em; }
+.cal-items { display: flex; flex-direction: column; gap: 3px; }
+/* One bill or payday: its name on its own line (whole, wrapping if long), the amount under it; the left stripe shows the status. */
+.cal-item { display: block; padding: 3px 6px 3px 7px; border: 1px solid transparent; border-left: 3px solid; border-radius: 5px; line-height: 1.25; }
+.cal-item .n { display: block; font-size: 0.82em; font-weight: 600; overflow-wrap: break-word; }
+.cal-item .a { display: block; text-align: right; font-size: 0.76em; font-family: Consolas, 'SF Mono', monospace; margin-top: 1px; }
+.cal-item.pay { background: #e8f8ef; border-left-color: var(--green); color: #17663a; }
+.cal-item.pay .a { font-weight: 700; }
+.cal-item.pay.expected { background: var(--surface); border-color: #9bd6b3; border-style: dashed; border-left: 3px solid #9bd6b3; }
+.cal-item.bill.due { background: #eef3fc; border-left-color: var(--blue); color: #1d3f80; }
+.cal-item.bill.paid { background: #f4f5f7; border-left-color: #b3bac6; color: #333a44; }
+.cal-item.bill.paid .a { color: #666; }
+.cal-item.bill.late, .cal-item.bill.missed { background: #fdecea; border-left-color: var(--red); color: #8f2a21; }
+.cal-item.bill.unknown { background: var(--surface); border-color: #ccc; border-style: dashed; border-left: 3px solid #bbb; color: #555; }
+.cal-compact { display: none; }
+.cal-flag { color: var(--red); font-weight: 700; }
+.cal-detail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fbfcff; }
+.cal-detail .table-wrap { margin-top: 8px; }
+@media (max-width: 900px) {
+    .cal-day { padding: 3px; }
+    .cal-item { padding: 2px 4px 2px 5px; }
+}
+@media (max-width: 640px) {
+    .cal-day { min-height: 54px; padding: 3px; border-radius: 6px; }
+    .cal-day.today { padding: 2px; }
+    .cal-items, .cal-today-tag { display: none; }
+    .cal-compact { display: flex; flex-direction: column; font-size: 0.68em; line-height: 1.25; }
+    .cal-compact .income-amt, .cal-compact .out-amt { text-align: left; font-family: inherit; }
+}
