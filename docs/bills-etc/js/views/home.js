@@ -1,13 +1,13 @@
-import * as fs from '../fs.js';
+import * as fs from '../../../shared/js/fs.js';
 import { FOLDER_LABEL } from '../../../shared/js/dropbox.js';
 import { ollamaSettings, pingOllama, aiEnabled, setAiEnabled } from '../ollama.js';
 import { PATHS, readTable, readBankCsv, keyOf } from '../data.js';
-import { parseCSV } from '../csv.js';
-import { parseDate, yearMonth, monthLabel } from '../dates.js';
+import { parseCSV } from '../../../shared/js/csv.js';
+import { parseDate, yearMonth, monthLabel } from '../../../shared/js/dates.js';
 import { backfill, processCurrentMonth, planClose, closeMonth, currentMonthChanges, openMonth, routeBankFile } from '../workflow.js';
-import { esc, money, toast } from '../util.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
 import { refreshStatus } from '../app.js';
-import { dataTable, closeFilterMenu } from '../datatable.js';
+import { dataTable, closeFilterMenu } from '../../../shared/js/datatable.js';
 import renderUpdates from './updates.js';
 import renderCalendar from './billcal.js';
 

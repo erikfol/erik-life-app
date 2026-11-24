@@ -1,7 +1,7 @@
 // An estimate of the Claude credits left. Anthropic has no way for an app to read the balance, so you enter what its
 // Billing page shows and each question's cost (from the token counts Claude reports) is taken off that, in
 // inputs/assistant/credits.json: { balance, setOn: 'YYYY-MM-DD', spent, questions }. Entering the balance again starts over.
-import * as fs from '../../../bills-etc/js/fs.js';
+import * as fs from '../fs.js';
 
 const CREDITS_PATH = 'inputs/assistant/credits.json';
 

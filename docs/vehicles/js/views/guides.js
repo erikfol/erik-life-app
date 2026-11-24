@@ -1,34 +1,16 @@
 // A vehicle's Guides tab: long how-to notes (draining, winterizing, …), each collapsed until its title is clicked,
 // each with its own reference images. Kept on the vehicle in vehicles.json as guides: [{ id, title, text }];
 // a guide's images are the files in inputs/vehicles/guides/<vehicle id>/<guide id>/.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { STORE } from '../vehicles.js';
-import { renderGallery, listImages, releaseGalleries } from './gallery.js';
+import { renderGallery, listImages, releaseGalleries } from '../../../shared/js/gallery.js';
+import { textHtml } from '../../../shared/js/guidetext.js';
 
 let draft = null; // { start, read } while a guide is being edited
 
 export const guidesUnsaved = () => !!draft && draft.read() !== draft.start;
 export const forgetGuides = () => { draft = null; };
 
-/**
- * Guide text → HTML: '1. …' lines become numbered steps, '- …' lines bullets, '[ ] …' / '[x] …' checklist items,
- * '## …' small headings, blank lines spacing. House's Future improvements use it too.
- */
-export function textHtml(text) {
-    return text.split('\n').map(line => {
-        const t = line.trim();
-        if (!t) return '<div class="g-gap"></div>';
-        const head = /^#{1,3}\s+(.*)$/.exec(t);
-        if (head) return `<h4 class="g-head">${esc(head[1])}</h4>`;
-        const check = /^\[([ xX])\]\s*(.*)$/.exec(t);
-        if (check) return `<div class="g-step${check[1] === ' ' ? '' : ' g-done'}"><span class="g-num">${check[1] === ' ' ? '☐' : '☑'}</span><span>${esc(check[2])}</span></div>`;
-        const step = /^(\d+[.)])\s+(.*)$/.exec(t);
-        if (step) return `<div class="g-step"><span class="g-num">${esc(step[1])}</span><span>${esc(step[2])}</span></div>`;
-        const bullet = /^[-•*]\s+(.*)$/.exec(t);
-        if (bullet) return `<div class="g-step"><span class="g-num">•</span><span>${esc(bullet[1])}</span></div>`;
-        return `<p>${esc(t)}</p>`;
-    }).join('');
-}
 
 const newId = (guides, title) => {
     const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guide';

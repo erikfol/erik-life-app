@@ -5,10 +5,10 @@
 import { loadConfig, paySources, incomeKey, PAY_EVERY, perMonth, perYear } from '../data.js';
 import { allTransactions, saveIncome } from '../bills.js';
 import { parsePlan, incomeMerchants, paydays } from '../plan.js';
-import { drawLines } from '../charts.js';
-import { parseCSV, toCSV } from '../csv.js';
+import { drawLines } from '../../../shared/js/charts.js';
+import { parseCSV, toCSV } from '../../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../../shared/js/fileguard.js';
-import { esc, money, toast } from '../util.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { MON, dLong, isoDate, dateOf, card, axisMoney, setResize, clearResize, yearChips } from './utilcommon.js';
 

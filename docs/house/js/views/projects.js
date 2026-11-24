@@ -3,11 +3,11 @@
 // plan it — status, plan & notes (headings, bullets, a [ ]/[x] step checklist), materials (with prices), measurements &
 // specs, photos & sketches, and the Future updates linked to it (their Project column). Its estimated total is what the
 // materials cost (each one's price times its quantity).
-import { esc, toast, money } from '../../../bills-etc/js/util.js';
+import { esc, toast, money } from '../../../shared/js/util.js';
 import { recordTable, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
-import { renderGallery } from '../../../vehicles/js/views/gallery.js';
-import { textHtml } from '../../../vehicles/js/views/guides.js';
+import { renderGallery } from '../../../shared/js/gallery.js';
+import { textHtml } from '../../../shared/js/guidetext.js';
 import {
     HOUSE_DIR, HOUSE_PATH, IMPROVEMENT_STATUSES, FUTURE_UPDATES, MATERIAL_COLUMNS, PROJECT_SPECS, houseProjects, projectsInfo, projectDir,
     materialCost, saveHouses, loadTable, saveTable,

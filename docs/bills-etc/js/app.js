@@ -1,6 +1,6 @@
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { pingOllama, ollamaSettings, aiEnabled } from './ollama.js';
-import { esc } from './util.js';
+import { esc } from '../../shared/js/util.js';
 import { syncCategories } from './categories.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';

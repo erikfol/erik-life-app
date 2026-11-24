@@ -1,3 +1,5 @@
+/* The look every section shares: colours, the top bar, layout, buttons, tables, column filters, cards, charts and the
+   toast. From "Dashboard" down are Bills Etc's own pages, though a few of those classes are used elsewhere too. */
 :root {
     --bg: #f5f7fa;
     --surface: #ffffff;

@@ -1,8 +1,8 @@
 // One person's page — a banner for their next date, their dates & information, what's coming up (each date's gifts
 // this time, and what was given before), every gift for them, and their gifts on the Christmas lists — and the
 // "Add person" page.
-import { esc, toast, money } from '../../../bills-etc/js/util.js';
-import { dataTable } from '../../../bills-etc/js/datatable.js';
+import { esc, toast, money } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import {

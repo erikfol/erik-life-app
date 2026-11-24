@@ -1,13 +1,13 @@
 // The workflow steps (load, categorize, close the month), ported from the Python scripts; run from the Setup page. Each takes a `log(text, kind)` callback.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS, MASTER_COLS, CACHE_COLS, readTable, writeTable, readBankCsv, keyOf, loadConfig, parseConfig } from './data.js';
 import { aiCategorize } from './ollama.js';
 import { categorizeByRules } from './rules.js';
 import { buildHistory, historyLookup, merchantKey } from './history.js';
 import { applyMerchantRules, rulesOnly, knownMerchants, snapMerchant } from './merchants.js';
-import { parseDate, yearMonth, longMonthLabel, normalizeDateCell } from './dates.js';
+import { parseDate, yearMonth, longMonthLabel, normalizeDateCell } from '../../shared/js/dates.js';
 import { computeProjection } from './finance.js';
-import { amountOf, money } from './util.js';
+import { amountOf, money } from '../../shared/js/util.js';
 
 /** Remembers how each current-month row was categorized on the last step-3 run (key → source). */
 export const lastSources = new Map();

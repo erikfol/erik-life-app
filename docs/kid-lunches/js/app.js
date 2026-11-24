@@ -1,8 +1,8 @@
 // Kid Lunches: a week/month calendar like the Dinner Planner's, with a lunch box for each kid on every day. Each part of
 // the box (store.COMPARTMENTS) only takes that kid's items for it, set in ✎ Box. Uses the same folder as Bills Etc (the
 // browser remembers it for the whole site); the data lives in inputs/kid-lunches/ (js/store.js).
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc, toast } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc, toast } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import * as store from './store.js';
 import * as school from './school.js';

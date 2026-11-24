@@ -13,8 +13,8 @@
 // Timeshare loans also keep their annual maintenance fees, for tracking only (they don't change the balance):
 //   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Paid?, Notes, Invoice   (Paid?: Yes / Not Yet, like Home Heating's;
 //                Invoice: the names of its images / PDFs, kept in invoices/<id>/)
-import * as fs from './fs.js';
-import { parseCSV, toCSV } from './csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
 

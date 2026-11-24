@@ -1,10 +1,10 @@
 // A vehicle's Notes tab: a running log of dated notes (newest first) with a search box; each note has a title, text
 // and optional images. Kept on the vehicle in vehicles.json as notes: [{ id, date, title, text }]; a note's images
 // are the files in inputs/vehicles/notes/<vehicle id>/<note id>/.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { showDate } from '../../../shared/js/recordtable.js';
 import { STORE } from '../vehicles.js';
-import { renderGallery, releaseGalleries } from './gallery.js';
+import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
 
 let draft = null; // { start, read } while a note is being edited
 

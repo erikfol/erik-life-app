@@ -1,7 +1,7 @@
 // The Plan & investments page: the plan's information, where the money is invested (each fund's share and expense
 // ratio, with what they add up to), the IRS limits (with a reminder each fall to add the next year's), and the plan's
 // documents (PDFs or photos).
-import { esc, money } from '../../../bills-etc/js/util.js';
+import { esc, money } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import {

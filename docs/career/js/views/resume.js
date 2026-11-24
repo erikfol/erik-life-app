@@ -2,7 +2,7 @@
 // the bullet points (Work History → Accomplishments) that share its keywords, matching certifications and achievements —
 // and lays them out as a resume you can adjust (every part has a checkbox), print / save as PDF, copy as text, and save
 // with the posting it was made for. No AI and nothing sent anywhere: see js/match.js for how matching works.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { loadAll, loadResumes, saveResumes, RESUMES_PATH } from '../career.js';
 import { readPosting, score, mentions, words, stem, stemsIn } from '../match.js';
 

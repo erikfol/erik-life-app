@@ -1,9 +1,8 @@
 // The Overview page: where this season's return stands (a banner, with the documents still to come), cards (the next
 // deadline, the last return, refunds over the years, the preparer's fees), the information and websites, each year's
 // return, and the refund or amount owed by year.
-import { esc, money } from '../../../bills-etc/js/util.js';
-import { drawBars } from '../../../bills-etc/js/charts.js';
-import { card, setResize, clearResize } from '../../../bills-etc/js/views/utilcommon.js';
+import { esc, money } from '../../../shared/js/util.js';
+import { drawBars, card, setResize, clearResize } from '../../../shared/js/charts.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import { infoLinks } from '../../../shared/js/infolinks.js';

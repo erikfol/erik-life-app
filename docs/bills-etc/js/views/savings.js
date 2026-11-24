@@ -10,13 +10,13 @@ import {
 import { loadAccounts, loadActivity as loadCardActivity, isCard } from '../loans.js';
 import { PATHS, readTable } from '../data.js';
 import { normalizeMaster, monthlyBreakdown } from '../finance.js';
-import { yearMonth } from '../dates.js';
-import { drawBars, drawLines } from '../charts.js';
+import { yearMonth } from '../../../shared/js/dates.js';
+import { drawBars, drawLines } from '../../../shared/js/charts.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
-import { esc, money, sum, toast } from '../util.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { depositsDue, PAYCHECK_EVERY, savingsActivityAge, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
-import { dataTable, closeFilterMenu } from '../datatable.js';
+import { dataTable, closeFilterMenu } from '../../../shared/js/datatable.js';
 import { dLong, today, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize, axisMoney, sameDay, sameAmount, dupText } from './utilcommon.js';
 
 const DAY = 864e5;

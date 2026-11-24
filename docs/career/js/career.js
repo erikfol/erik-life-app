@@ -1,8 +1,8 @@
 // Working Career data: everything in inputs/career/ of the connected folder (kept out of git like all of inputs/).
 // The profile is a JSON file of label/value fields; every other page is one or more CSV tables (the shared record
 // table's columns); tailored resumes are kept in resumes.json.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const CAREER_DIR = 'inputs/career';

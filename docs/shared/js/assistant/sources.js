@@ -1,8 +1,8 @@
 // Everything the Home page's assistant knows, read once per conversation. Money that the app works out rather than stores
 // (card and loan balances, savings, utility charges) comes from the same code the pages use, so the answers agree with
 // them. Every value goes through the privacy filter (scrub.js) here, so nothing later can see the originals.
-import * as fs from '../../../bills-etc/js/fs.js';
-import { parseRecords } from '../../../bills-etc/js/csv.js';
+import * as fs from '../fs.js';
+import { parseRecords } from '../csv.js';
 import { parseBillDate } from '../../../bills-etc/js/sheet.js';
 import { loadConfig } from '../../../bills-etc/js/data.js';
 import { allTransactions, parseBills } from '../../../bills-etc/js/bills.js';

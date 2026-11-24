@@ -3,11 +3,11 @@
 // banner like a pet's above it. A section with
 // accounts (the HSA: FLORES, WealthCare…) has a box per account instead, like a Loan/CC card: the account's title,
 // sign-in hint, website and total balance above its own table of entries.
-import { esc, toast, money } from '../../../bills-etc/js/util.js';
+import { esc, toast, money } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import { infoLinks, cleanUrl } from '../../../shared/js/infolinks.js';
-import { appointmentStatus } from '../../../pets/js/pets.js';
+import { appointmentStatus } from '../../../shared/js/appointments.js';
 import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,

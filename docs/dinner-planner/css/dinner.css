@@ -1,5 +1,5 @@
 /* Dinner Planner, from the old Node app's styles.css in the Life App's colors. Everything sits inside .dp so none of it
-   reaches the shared top bar, folder page or toast from bills-etc/css/app.css. */
+   reaches the shared top bar, folder page or toast from shared/css/app.css. */
 .dp {
     --dp-surface-2: #f3f5fa;
     --dp-border: var(--line-strong);

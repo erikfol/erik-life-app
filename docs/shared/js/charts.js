@@ -1,6 +1,27 @@
 // Canvas charts, ported from the HTML report that script 2 generates.
 import { esc } from './util.js';
 
+export const axisMoney = v => (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
+export const axisNum = v => Math.round(v).toLocaleString('en-US');
+
+/** A KPI card. `sub` is HTML; `value` is plain text. */
+export const card = (label, value, sub, color = '') => `
+    <div class="card"><div class="label">${label}</div>
+    <div class="value"${color ? ` style="color:${color}"` : ''}>${esc(value)}</div>
+    <div class="sub cmp">${sub}</div></div>`;
+
+// One window resize handler for whichever sub-page is showing.
+let onResize = null;
+export function setResize(fn) {
+    clearResize();
+    onResize = fn;
+    window.addEventListener('resize', onResize);
+}
+export function clearResize() {
+    if (onResize) window.removeEventListener('resize', onResize);
+    onResize = null;
+}
+
 export const CHART_COLORS = ['#4a90d9', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#e91e63', '#607d8b', '#34495e'];
 const FONT = '-apple-system, BlinkMacSystemFont, sans-serif';
 

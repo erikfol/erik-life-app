@@ -1,7 +1,7 @@
 // Christmas: one list per year (#christmas/<year>, a pill for each year, "＋ Add year" #christmas/add) — who's getting
 // what, with links, prices and status — with the year's totals and a By person table that also lists who was on the
 // year before's list but has nothing yet.
-import { esc, toast, money } from '../../../bills-etc/js/util.js';
+import { esc, toast, money } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import {
     saveData, christmasPath, christmasColumns, CHRISTMAS_CHOICES, loadChristmas, saveChristmas, christmas, inDays, showDay, tally, isFor,

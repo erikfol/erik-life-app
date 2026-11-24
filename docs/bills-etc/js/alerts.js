@@ -2,7 +2,7 @@
 // it and the Home page counts it. Each check follows the same rule as the banner on its own page. The rules of pages
 // that load app.js (Savings, Loan/CC, Electric, This Month) live here and those pages import them: importing app.js
 // would start the Bills Etc app on the Home page, so nothing here may.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS } from './data.js';
 import { loadSavings, loadActivity as loadSavingsActivity, loadSettings, loadMoves, movesByBucket } from './savings.js';
 import { loadElectric } from './electric.js';
@@ -12,7 +12,7 @@ import { loadPropane } from './propane.js';
 import { loadTaxes } from './taxes.js';
 import { loadAccounts, loadPayments, loadActivity, ledger, owesBack, isCard, hasMaintenance, loadFees, unpaidFees } from './loans.js';
 import { parseBillDate } from './sheet.js';
-import { esc, money, sum } from './util.js';
+import { esc, money, sum } from '../../shared/js/util.js';
 import { dLong, addMonths, today } from './views/utilcommon.js';
 import { portalLink as waterPortal } from './views/water.js';
 import { portalLink as taxPortal, taxDetailsOn } from './views/taxes.js';

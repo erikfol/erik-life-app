@@ -1,5 +1,5 @@
 /* Gifts, Bday, Anniversary: the status badges, a person's Coming up boxes and Christmas's By person table; the tables
-   and the information box use the shared styles (records.css, vehicles.css). */
+   and the information box use the shared styles (records.css, sections.css). */
 .cat-badge.st-idea { background: #f3e8ff; color: var(--purple); }
 .cat-badge.st-todo { background: var(--head); color: var(--blue-text); }
 .cat-badge.st-waiting { background: #fff8e1; color: #8a5a00; }

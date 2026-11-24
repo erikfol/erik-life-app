@@ -1,4 +1,4 @@
-/* Vehicles: the information box (the maintenance table uses shared/css/records.css). */
+/* The information box, photos, service places and guides that the Home sections share, and Vehicles' mileage. The tables use records.css. */
 .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px 24px; }
 .info-item dt { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 3px; }
 .info-item dd { font-size: 0.98em; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -1,6 +1,6 @@
 // Optional AI meal ideas from Claude, ported from the old Node app. Off until inputs/dinner-planner/.env has a line
 // ANTHROPIC_API_KEY=… (optionally DINNER_AI_MODEL=…). The key stays on this computer except in the request to Anthropic.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { DIR, localDate, normalizeMeal, cleanStr, mealsOf } from './store.js';
 
 export const ENV_PATH = `${DIR}/.env`;

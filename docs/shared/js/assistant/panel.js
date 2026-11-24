@@ -1,6 +1,6 @@
 // The chat box along the bottom of the Home page. An answer is only ever put on the page as text, and only the app's
 // own pages become links (chat.js PAGES), so nothing in an answer can run or send your data anywhere.
-import * as fs from '../../../bills-etc/js/fs.js';
+import * as fs from '../fs.js';
 import { loadCredits, setBalance, addSpend, creditsLeft } from './credits.js';
 
 const el =(tag, cls, text) => {

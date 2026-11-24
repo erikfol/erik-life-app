@@ -1,7 +1,7 @@
 // Menu colours, like Pets' names: a link in a section's menu, or in a page's tabs or pills, is red or yellow while that
 // part of the section has a red or yellow banner (point at it to see what). The items come from the section's
 // alerts.js — the same ones the Home page counts — each with the link (href) of the page it's on.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from './fs.js';
 
 /**
  * Colour the menus from `load` (the section's alerts(): [{ level: 'red' | 'yellow', text, href }]). Call ready() from

@@ -1,5 +1,5 @@
 // Water bills: inputs/water/master_water.csv, one row per quarter (kept by hand, usually tab-separated from Excel).
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { readSheet, insertRow, addColumn, parseBillDate, parseMoney, num, sheetDate, sheetMoney } from './sheet.js';
 
 export const WATER_PATH = 'inputs/water/master_water.csv';

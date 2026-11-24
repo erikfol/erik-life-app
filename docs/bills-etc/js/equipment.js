@@ -1,7 +1,7 @@
 // Mini-split heat pumps (Utilities → Electric → Mini-Splits): inputs/electric/minisplits.json.
 // Each unit: {id, name, brand, indoorModel, outdoorModel, btu, tons, coverage, seer2, hspf2, status, installed,
 // notes, log: [{date (YYYY-MM-DD), work, cost, notes}]}.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 
 export const EQUIPMENT_PATH = 'inputs/electric/minisplits.json';
 

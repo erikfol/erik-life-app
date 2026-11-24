@@ -2,9 +2,9 @@
 import {
     loadWater, addWaterBill, setWaterPaid, calcWater, nextQuarter, quarterDates, recalcWaterRow, waterDupKey, WATER_CALCULATED, WATER_PATH,
 } from '../water.js';
-import { drawBars } from '../charts.js';
-import { esc, money, sum, toast } from '../util.js';
-import { dataTable } from '../datatable.js';
+import { drawBars } from '../../../shared/js/charts.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import { editableSheet } from './sheeteditor.js';
 import {
     dLong, period, addMonths, today, axisMoney, axisNum, isoDate, dateOf, numOf,

@@ -1,7 +1,7 @@
 // Guards against an old page overwriting newer data: remembers when each file was last changed at the time this page
 // read it, and refuses to save over a file that has changed since (another tab, an older copy of the app still open,
 // or a program). Without this, saving in a tab opened earlier writes back the old data it loaded.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from './fs.js';
 
 const seen = new Map(); // path → lastModified (ms) when this page last read or wrote it; null = didn't exist
 

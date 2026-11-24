@@ -2,7 +2,7 @@
 // `merchant_rules`), shared with the Python scripts. A rule: { name?, match: [spellings], bank_text: [pieces],
 // category? }. Keep merchantNameKey(), compactText() and applyMerchantRules() identical to bills_config.py.
 // Also: find spellings of the same merchant and merge them.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS, DEFAULT_CONFIG, readTable, writeTable, loadConfig } from './data.js';
 import { renamed } from './rules.js';
 

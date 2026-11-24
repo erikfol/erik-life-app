@@ -1,12 +1,12 @@
 // Left to spend this month: expected paychecks − scheduled bills − savings transfers − everything else spent.
 // Paydays and the per-paycheck savings transfer are learned from history; config.json `spending_plan`
 // can pin the paycheck merchant, the paycheck amount and the savings per paycheck.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS, loadConfig } from './data.js';
 import { merchantNameKey } from './merchants.js';
 import { renamed } from './rules.js';
-import { yearMonth } from './dates.js';
-import { round2 } from './util.js';
+import { yearMonth } from '../../shared/js/dates.js';
+import { round2 } from '../../shared/js/util.js';
 
 const DAY = 86400000;
 const SAME_PAYDAY = 4;  // deposits (and reversals) this many days apart are one paycheck

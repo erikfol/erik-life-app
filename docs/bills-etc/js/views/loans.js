@@ -5,12 +5,12 @@ import {
     ACCOUNT_TYPES, ACTIVITY_TYPES, LOANS_DIR, cleanUrl, isLoan, LOAN_KINDS, loanTerms, amortize, scheduledBalance, nextDueDate, aprText, impliedApr,
     isCard, PAID_BACK, owesBack, setActivityPaidBack, hasMaintenance, loadFees, saveFees, unpaidFees, FEE_PAID, feeInvoicesDir,
 } from '../loans.js';
-import { drawBars, drawLines } from '../charts.js';
+import { drawBars, drawLines } from '../../../shared/js/charts.js';
 import { parseBillDate, sheetDate } from '../sheet.js';
-import { esc, money, sum, toast } from '../util.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { amountDue, staleCards, notPaidBack, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js'; // shared with Setup and the Home page
-import { dataTable, closeFilterMenu } from '../datatable.js';
+import { dataTable, closeFilterMenu } from '../../../shared/js/datatable.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
 import {
     MON, dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf, card, dateCol, moneyCol, setResize, clearResize,

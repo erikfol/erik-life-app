@@ -1,8 +1,8 @@
 // Utilities → Property Taxes: half-year bills from inputs/taxes_property_enfield/master_taxes_property.csv.
 import { loadTaxes, addTaxBill, recalcTaxRow, taxDupKey, TAX_CALCULATED, TAX_PATH } from '../taxes.js';
-import { drawBars } from '../charts.js';
-import { esc, money, sum, toast } from '../util.js';
-import { dataTable } from '../datatable.js';
+import { drawBars } from '../../../shared/js/charts.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import { editableSheet } from './sheeteditor.js';
 import {
     dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf,

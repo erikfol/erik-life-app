@@ -4,9 +4,9 @@ import {
     loadDeliveries, loadPriceChecks, addDelivery, addPriceCheck, setPaidBack, daysBetween, seasonOf, seasonLabel,
     recalcDeliveryRow, deliveryDupKey, priceCheckDupKey, DELIVERY_CALCULATED, HEAT_PATH, PRICE_PATH,
 } from '../heating.js';
-import { drawBars } from '../charts.js';
-import { esc, money, sum, toast } from '../util.js';
-import { dataTable } from '../datatable.js';
+import { drawBars } from '../../../shared/js/charts.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import { editableSheet } from './sheeteditor.js';
 import {
     MON, dLong, today, axisMoney, axisNum, isoDate, dateOf, numOf,

@@ -1,8 +1,8 @@
 // Health: General Health / Dental / Eye / HSA pages (#general, #dental, #eye, #hsa). Uses the same folder as Bills Etc
 // (the browser remembers it for the whole site); the records live in inputs/health/. General Health, Dental and Eye also
 // have future appointments. A name in the menu is red or yellow while its page has a red or yellow banner.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { SECTIONS } from './records.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';

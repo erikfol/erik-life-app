@@ -1,4 +1,4 @@
-/* Working Career: the tables and the Profile box use the shared styles (records.css, vehicles.css); this is the Resume
+/* Working Career: the tables and the Profile box use the shared styles (records.css, sections.css); this is the Resume
    Builder — what goes in on the left, the resume on the right (one above the other on a narrow window) — and how the
    resume prints. */
 main:has(.rb) { max-width: 1440px; }

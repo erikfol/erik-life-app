@@ -4,8 +4,8 @@
 // whose activity isn't updated in STALE_DAYS (yellow) or VERY_STALE_DAYS (red), as its "Activity not updated" banners
 // (views/section.js draws them from staleAccounts here).
 import { SECTIONS, loadRecords, loadAccounts, appointmentsSection, accountSection, owedRecords } from './records.js';
-import { money } from '../../bills-etc/js/util.js';
-import { appointmentStatus } from '../../pets/js/pets.js';
+import { money } from '../../shared/js/util.js';
+import { appointmentStatus } from '../../shared/js/appointments.js';
 
 // Like Bills Etc → Loan/CC → Credit Cards: an account whose newest entry, or the last time it was marked checked, is
 // STALE_DAYS or more ago gets a yellow banner (red from VERY_STALE_DAYS), so you know to look at its activity.

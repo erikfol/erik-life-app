@@ -1,6 +1,6 @@
 // Home heating oil: deliveries in inputs/heat_home/master_heat_home.csv and Heatable price checks in
 // inputs/heat_home/heatable_cost_trend.csv (both kept by hand, usually tab-separated from Excel).
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { readSheet, insertRow, addColumn, parseBillDate, parseMoney, num, sheetDate, sheetMoney } from './sheet.js';
 
 export const HEAT_PATH = 'inputs/heat_home/master_heat_home.csv';

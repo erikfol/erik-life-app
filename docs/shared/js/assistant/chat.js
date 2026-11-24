@@ -1,7 +1,7 @@
 // The Home page's assistant talking to Claude. There is no server: this page calls the API itself, with the key from
 // inputs/assistant/.env (ANTHROPIC_API_KEY=…, and ASSISTANT_MODEL=… to use another model). Claude only ever gets a short
 // summary and what the lookups in tools.js return, all of it already through the privacy filter.
-import * as fs from '../../../bills-etc/js/fs.js';
+import * as fs from '../fs.js';
 import { TOOLS, runTool, describeTool } from './tools.js';
 import { costOf } from './credits.js';
 

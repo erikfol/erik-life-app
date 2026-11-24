@@ -1,10 +1,10 @@
-import * as fs from '../fs.js';
+import * as fs from '../../../shared/js/fs.js';
 import { PATHS, loadConfig, DEFAULT_CONFIG } from '../data.js';
 import { getCategories } from '../rules.js';
 import { categoryUsage, addCategory, renameCategory, removeCategory, validateName, LOCKED } from '../categories.js';
-import { esc, toast } from '../util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
-import { closeFilterMenu } from '../datatable.js';
+import { closeFilterMenu } from '../../../shared/js/datatable.js';
 import { hasBills } from '../bills.js';
 import { renderMerchants, merchantsCanLeave } from './merchantrules.js';
 

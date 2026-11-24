@@ -1,8 +1,8 @@
 // Dinner Planner, ported from the old Node app (dinner-planner/public/app.js): Calendar (#calendar), Meals (#meals),
 // Ideas (#ideas) and Backup (#backup). Uses the same folder as Bills Etc (the browser remembers it for the whole site);
 // the data lives in inputs/dinner-planner/ (js/store.js), and nothing needs a server.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc, toast } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc, toast } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import * as store from './store.js';

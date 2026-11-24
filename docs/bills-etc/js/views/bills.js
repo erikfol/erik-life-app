@@ -3,10 +3,10 @@
 import { loadConfig, incomeSources } from '../data.js';
 import { parseBills, hasBills, billMonth, paymentsByMonth, firstPaid, suggestBills, saveBills, allTransactions, addMonths, STATUS, EVERY } from '../bills.js';
 import { merchantNameKey } from '../merchants.js';
-import { longMonthLabel, monthLabel, yearMonth, MONTH_NAMES } from '../dates.js';
-import { esc, money, toast } from '../util.js';
+import { longMonthLabel, monthLabel, yearMonth, MONTH_NAMES } from '../../../shared/js/dates.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
-import { dataTable, moneyColumn, categoryColumn, closeFilterMenu } from '../datatable.js';
+import { dataTable, moneyColumn, categoryColumn, closeFilterMenu } from '../../../shared/js/datatable.js';
 
 let remembered = null; // selected month while moving between pages
 let formOpen = false;  // an add/edit form with possible unsaved input

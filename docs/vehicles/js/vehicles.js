@@ -1,7 +1,7 @@
 // Vehicles: the list (with each vehicle's information) in inputs/vehicles/vehicles.json, and one maintenance CSV
 // per vehicle next to it. inputs/ is kept out of git.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const VEHICLES_DIR = 'inputs/vehicles';

@@ -1,10 +1,10 @@
 // One policy's page (information, contacts, documents and photos, records table), and the "Add policy" page.
 // Contacts and documents use the Vehicles service-places and gallery views.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
-import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
-import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
+import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
+import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../shared/js/places.js';
 import {
     INSURANCE_PATH, STORE, savePolicies, newPolicy, recordsPath, documentsDir, RECORD_COLUMNS, loadRecords, saveRecords, invoicesDir,
 } from '../insurance.js';

@@ -3,12 +3,12 @@ import { computeProjection, statusBadge } from '../finance.js';
 import { parseBills, hasBills, billMatcher, schedColumn, paymentsByMonth, billMonth, firstPaid, allTransactions, STATUS } from '../bills.js';
 import { leftToSpend, savePlan } from '../plan.js';
 import { lastSources, currentMonthChanges } from '../workflow.js';
-import { MONTH_NAMES, parseDate, yearMonth } from '../dates.js';
-import { esc, money, toast } from '../util.js';
+import { MONTH_NAMES, parseDate, yearMonth } from '../../../shared/js/dates.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { lastBankUpdate, updatedLevel } from '../alerts.js'; // shared with Setup and the Home page
 import { notesText } from '../celledit.js';
-import { dataTable, dateColumn, moneyColumn, categoryColumn, closeFilterMenu } from '../datatable.js';
+import { dataTable, dateColumn, moneyColumn, categoryColumn, closeFilterMenu } from '../../../shared/js/datatable.js';
 
 const fmtDay = d => `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 

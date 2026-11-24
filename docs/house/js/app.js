@@ -2,8 +2,8 @@
 // etc., its first pill being #<id>/heating; a project's page #<id>/projects/<project id>; the Maintenance tab #<id>/maintenance)
 // plus "＋ Add house" (#new); the menu is built from house.json.
 // Uses the same folder as Bills Etc (the browser remembers it for the whole site); the data lives in inputs/house/.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { loadHouses, AREAS, houseProjects } from './house.js';
 import alerts from './alerts.js';

@@ -8,8 +8,8 @@
 // Records are read with the CSV reader and written back field by field, so untouched parts stay byte-for-byte.
 // The account's deposits and withdrawals are kept in activity.csv; "Available In Account" is the running balance from
 // a starting balance (savings_settings.json), written into the sheet whenever the activity changes.
-import * as fs from './fs.js';
-import { parseRecords, parseCSV, toCSV } from './csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseRecords, parseCSV, toCSV } from '../../shared/js/csv.js';
 import { parseBillDate, parseMoney } from './sheet.js';
 
 export const SAVINGS_PATH = 'inputs/savings/master_savings.csv';

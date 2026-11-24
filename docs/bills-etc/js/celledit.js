@@ -1,7 +1,7 @@
 // Editable Merchant / Category / Notes cells, shared by Finance Table and Checking History.
 import { getCategories } from './rules.js';
 import { addCategory } from './categories.js';
-import { esc, toast } from './util.js';
+import { esc, toast } from '../../shared/js/util.js';
 
 export const NEW_CATEGORY = '__new__'; // category names can't start with _, so this can't clash
 

@@ -2,8 +2,8 @@
 // statement's period, starting balance, net transactions, investment returns and current balance), the investments (investments.csv) and the plan's documents (documents.csv,
 // with the files in documents/), each change to what you put in (contribution_changes.csv) and the IRS limits
 // (irs_limits.csv). inputs/ is kept out of git.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const K_DIR = 'inputs/401k';

@@ -1,8 +1,8 @@
 // Gifts, Bday, Anniversary: one page per person (#<id>), the Christmas lists (#christmas/<year>, #christmas/add) and
 // "＋ Add person" (#new); the menu is built from gifts.json. Uses the same folder as Bills Etc (the browser remembers
 // it for the whole site); the data lives in inputs/gifts/.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { loadData, comingChristmas } from './gifts.js';
 import alerts from './alerts.js';

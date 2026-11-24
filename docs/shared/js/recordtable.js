@@ -1,9 +1,9 @@
 // Editable record table shared by the Home-page sections (Health, Vehicles): read-only with Excel-style sort and
 // filter on every column until Edit is pressed; then every cell is an input, rows can be added, removed and moved up
 // and down, and Save hands the rows back to be written. The rows keep the order they're saved in.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc, toast, money } from '../../bills-etc/js/util.js';
-import { dataTable, closeFilterMenu } from '../../bills-etc/js/datatable.js';
+import * as fs from './fs.js';
+import { esc, toast, money } from './util.js';
+import { dataTable, closeFilterMenu } from './datatable.js';
 import { moveButtons } from './infobox.js';
 import { openLightbox } from './lightbox.js';
 

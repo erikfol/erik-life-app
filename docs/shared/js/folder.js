@@ -1,8 +1,8 @@
 // Folder connection for the Home-page sections (Health, Vehicles). They use the same folder as Bills Etc: the
 // browser remembers it for the whole site, so it's usually already connected.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from './fs.js';
 import * as dbx from './dropbox.js';
-import { esc, toast } from '../../bills-etc/js/util.js';
+import { esc, toast } from './util.js';
 
 export function refreshStatus() {
     const f = document.getElementById('st-folder');

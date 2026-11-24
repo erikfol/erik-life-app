@@ -1,8 +1,8 @@
 // Utilities → Propane: oven propane fill-ups from inputs/propane_oven/master_propane_oven.csv.
 import { loadPropane, addPropaneFill, daysBetween, recalcPropaneRow, propaneDupKey, PROPANE_CALCULATED, PROPANE_PATH } from '../propane.js';
-import { drawBars } from '../charts.js';
-import { esc, money, sum, toast } from '../util.js';
-import { dataTable } from '../datatable.js';
+import { drawBars } from '../../../shared/js/charts.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import { editableSheet } from './sheeteditor.js';
 import {
     MON, dLong, addMonths, today, axisMoney, isoDate, dateOf, numOf,

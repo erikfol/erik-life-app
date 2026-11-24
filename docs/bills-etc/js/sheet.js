@@ -1,7 +1,7 @@
 // Hand-kept utility sheets (inputs/<utility>/master_<utility>.csv): usually tab-separated from Excel,
 // with dates like 22/Jul/2026 and Excel accounting amounts like ' $25.15 ' / ' $(1,003.21)'.
-import * as fs from './fs.js';
-import { parseRecords } from './csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseRecords } from '../../shared/js/csv.js';
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

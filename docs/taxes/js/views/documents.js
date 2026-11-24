@@ -2,7 +2,7 @@
 // documents to gather for that year's return, ticked off as they come in (✓ Received) with their files, and the things
 // to remember for it as the year goes (donations, medical bills, energy improvements, questions for the preparer),
 // with receipts. A new year starts with the year before's list.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import {
     DOCUMENT_COLUMNS, DOCUMENT_CHOICES, DEFAULT_DOCUMENTS, NOTE_COLUMNS, documentsPath, documentsDir, notesPath, notesDir,

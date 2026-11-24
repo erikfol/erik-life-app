@@ -2,8 +2,8 @@
 // the employer match, auto-increase and birth year (for the catch-up) — and what that adds up to: each paycheck, a year,
 // this year against the IRS limit, and the match. Kept in 401k.json's `contributions` (a change to what you put in
 // also goes into Contribution changes: the Overview does that, from onSaved).
-import { esc, money, toast } from '../../../bills-etc/js/util.js';
-import { dLong } from '../../../bills-etc/js/views/utilcommon.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
+import { dLong } from '../../../shared/js/dates.js';
 import {
     CONTRIBUTION_TYPES, PAY_EVERY, contributionMath, matchText, yearPaychecks, irsLimit, loadPlan, savePlan, amountOf,
 } from '../401k.js';

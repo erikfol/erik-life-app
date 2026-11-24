@@ -3,8 +3,8 @@
 // phone, Dropbox sign-in. Each
 // section's rules are in its own alerts.js, which its pages use for their banners too, so the counts always agree.
 import * as dbx from './dropbox.js';
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from './fs.js';
+import { esc } from './util.js';
 import { backupPanel } from './backup.js';
 import { assistantPanel } from './assistant/panel.js';
 

@@ -1,8 +1,8 @@
 // Vehicles: one page per vehicle (#<id>, its Guides and Notes tabs #<id>/guides, #<id>/notes) plus "＋ Add vehicle" (#new); the menu is
 // built from vehicles.json.
 // Uses the same folder as Bills Etc (the browser remembers it for the whole site); the data lives in inputs/vehicles/.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { loadVehicles } from './vehicles.js';
 import alerts from './alerts.js';

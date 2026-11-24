@@ -1,8 +1,8 @@
 // An area's Future improvements (e.g. Heating/Cooling's heat pump water heater): upgrade ideas and plans, each collapsed
 // until its title is clicked, with a status, an estimated cost and free text (headings, bullets, a ☐ next-steps checklist).
 // Kept on the house in house.json as areas.<area id>.improvements: [{ id, title, status, cost, text }].
-import { esc, toast } from '../../../bills-etc/js/util.js';
-import { textHtml } from '../../../vehicles/js/views/guides.js';
+import { esc, toast } from '../../../shared/js/util.js';
+import { textHtml } from '../../../shared/js/guidetext.js';
 import { IMPROVEMENT_STATUSES, areaImprovements, saveHouses } from '../house.js';
 
 let draft = null; // { start, read } while an improvement is being edited

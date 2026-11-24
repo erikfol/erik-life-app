@@ -1,8 +1,8 @@
 // "Edit" for the hand-kept utility sheets: swaps a page's table for an editable grid of the file's own rows and
 // columns. Only the cells you change are rewritten on Save; everything else in the file stays byte-for-byte.
 import { readSheet, sheetMoney } from '../sheet.js';
-import * as fs from '../fs.js';
-import { esc, toast } from '../util.js';
+import * as fs from '../../../shared/js/fs.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { sameDay, sameAmount, dupText } from './utilcommon.js';
 
 /** How a raw cell shows in the grid: trimmed, '$   22.75' → '$22.75'. */

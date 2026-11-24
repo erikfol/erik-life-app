@@ -3,8 +3,8 @@
 import { loadConfig } from '../data.js';
 import { allTransactions, addMonths, STATUS } from '../bills.js';
 import { calendarMonth } from '../calendar.js';
-import { yearMonth, longMonthLabel, MONTH_NAMES } from '../dates.js';
-import { esc, money } from '../util.js';
+import { yearMonth, longMonthLabel, MONTH_NAMES } from '../../../shared/js/dates.js';
+import { esc, money } from '../../../shared/js/util.js';
 import { dShort } from './utilcommon.js';
 
 const AHEAD = 12;     // months you can look ahead

@@ -2,8 +2,8 @@
 // from your folder (the Dropbox folder on this PC) into a new dated folder inside a backup folder you choose on this PC,
 // and logs each backup in backups.json in your folder, so the Home page can say how many days it's been since the last.
 // A tablet or phone can't make one (no folders there), but shows how long ago the last one was.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from './fs.js';
+import { esc } from './util.js';
 
 /** What a backup copies, from the top of your folder. Anything else there (like Dropbox's desktop.ini) is left out. */
 const DATA = ['config.json', 'inputs', 'output_master_data', 'reports', 'backups.json'];

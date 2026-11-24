@@ -1,6 +1,6 @@
 // Links with sign-in hints on a heading (Health's General information, 401(k)'s Balance history): each shows as a
 // "Name ↗" button that opens the site in a new tab; ✎ Links (or ＋ Link) edits the list.
-import { esc, toast } from '../../bills-etc/js/util.js';
+import { esc, toast } from './util.js';
 import { moveButtons, moveItem } from './infobox.js';
 
 /** 'flores247.com' → 'https://flores247.com'; '' stays ''; null if it isn't a web address. */

@@ -1,8 +1,8 @@
 // One pet's page (appointment banner, information, photos, future appointments, records table), and the "Add pet" page. The information box works like Vehicles'.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
-import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
+import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
 import { PETS_PATH, ageText, savePets, newPet, recordsPath, photosDir, RECORD_COLUMNS, loadRecords, saveRecords,
     appointmentsPath, APPOINTMENT_COLUMNS, loadAppointments, saveAppointments, appointmentStatus, invoicesDir } from '../pets.js';
 

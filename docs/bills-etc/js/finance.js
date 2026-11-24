@@ -1,7 +1,7 @@
 // Report and projection math — ports of scripts 2 and 3.
-import { parseDate, yearMonth, monthLabel } from './dates.js';
+import { parseDate, yearMonth, monthLabel } from '../../shared/js/dates.js';
 import { normalizeCategory, renamed } from './rules.js';
-import { amountOf, money, round2 } from './util.js';
+import { amountOf, money, round2 } from '../../shared/js/util.js';
 
 /** Attach parsed _date, _ym, _amt to each row (non-destructive). */
 export function withParsed(rows) {

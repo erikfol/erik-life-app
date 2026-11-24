@@ -5,12 +5,12 @@
 // each with maintenance too (and its schedule items' due banners, or Future improvements); Projects is
 // views/projects.js; Maintenance (the schedule) is views/schedule.js. Also the "Add house" page. Service companies and
 // photos use the Vehicles views.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import { infoLinks } from '../../../shared/js/infolinks.js';
-import { renderGallery, releaseGalleries } from '../../../vehicles/js/views/gallery.js';
-import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../vehicles/js/views/places.js';
+import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
+import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../shared/js/places.js';
 import { renderImprovements, improvementsUnsaved, forgetImprovements } from './improvements.js';
 import { renderProjectList, renderProject, projectUnsaved, forgetProject } from './projects.js';
 import { renderScheduleTab, pageBanners, bannersHtml, pageSchedule, scheduleUnsaved, forgetSchedule } from './schedule.js';

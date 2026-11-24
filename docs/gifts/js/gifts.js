@@ -1,8 +1,8 @@
 // Gifts, Bday, Anniversary: the people (each with their dates and information) and the list of Christmas years in
 // inputs/gifts/gifts.json; one gifts CSV per person and one per Christmas year next to it. inputs/ is kept out of git,
 // so names and dates are only ever in your folder.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const GIFTS_DIR = 'inputs/gifts';

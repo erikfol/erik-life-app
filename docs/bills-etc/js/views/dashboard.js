@@ -1,13 +1,13 @@
 import { PATHS, readTable, writeTable, loadConfig } from '../data.js';
 import { parseBills, hasBills, billMatcher, schedColumn } from '../bills.js';
 import { normalizeMaster, buildReport, reportSummaryText, monthlyBreakdown, baseline } from '../finance.js';
-import { drawMonthBars, drawTrends, CHART_COLORS } from '../charts.js';
+import { drawMonthBars, drawTrends, CHART_COLORS } from '../../../shared/js/charts.js';
 import { generate, insightsPrompt, aiEnabled } from '../ollama.js';
-import { monthLabel, longMonthLabel, yearMonth, MONTH_NAMES } from '../dates.js';
-import { esc, money, mdToHtml, toast } from '../util.js';
+import { monthLabel, longMonthLabel, yearMonth, MONTH_NAMES } from '../../../shared/js/dates.js';
+import { esc, money, mdToHtml, toast } from '../../../shared/js/util.js';
 import { bindCellEditing, merchantInput, categorySelect, notesInput, merchantText, categoryText, notesText } from '../celledit.js';
 import { requireFolder } from '../app.js';
-import { dataTable, dateColumn, moneyColumn, closeFilterMenu } from '../datatable.js';
+import { dataTable, dateColumn, moneyColumn, closeFilterMenu } from '../../../shared/js/datatable.js';
 import { renamed, getCategories } from '../rules.js';
 
 let onResize = null;

@@ -2,7 +2,7 @@
 // soon (yellow), the schedule table (editable; Status, Next due and Last done worked out from every Maintenance table
 // of the house) — and the log for work that isn't on one of the system pages. Also the due banners at the top of a
 // system page (Oil furnace, Septic…), from its schedule items.
-import { esc } from '../../../bills-etc/js/util.js';
+import { esc } from '../../../shared/js/util.js';
 import { recordTable } from '../../../shared/js/recordtable.js';
 import {
     MAINTENANCE_PAGES, pageHref, schedulePath, houseLogPath, scheduleColumns, loadSchedule, saveSchedule, maintenanceColumns,

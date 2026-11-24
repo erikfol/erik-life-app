@@ -1,9 +1,9 @@
 // Image galleries (a vehicle's Photos, a guide's images): the images in one folder, shown as thumbnails; click one
 // to see it large. "＋ Add …" copies picked images into that folder (it never deletes; remove an image from the
 // folder itself).
-import * as fs from '../../../bills-etc/js/fs.js';
-import { esc, toast } from '../../../bills-etc/js/util.js';
-import { openLightbox, closeLightbox } from '../../../shared/js/lightbox.js';
+import * as fs from './fs.js';
+import { esc, toast } from './util.js';
+import { openLightbox, closeLightbox } from './lightbox.js';
 
 const IMAGE = /\.(png|jpe?g|gif|webp|heic|bmp)$/i;
 const open = new Map(); // gallery element → its object URLs, released when it re-draws or the page changes

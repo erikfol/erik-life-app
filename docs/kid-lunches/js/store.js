@@ -1,9 +1,9 @@
 // Kid Lunches data: inputs/kid-lunches/lunches.json holds the kids, what may go in each part of each kid's lunch box, and
 // each day's lunches. lunches.csv is a spreadsheet copy (Date, Day, a column per kid) rewritten after every change. The kids'
 // names live only in those files (inputs/ is kept out of git), not in this code.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
-import { parseDate } from '../../bills-etc/js/dates.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { parseDate } from '../../shared/js/dates.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const DIR = 'inputs/kid-lunches';

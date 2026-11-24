@@ -1,8 +1,8 @@
 // Config → Merchants: one table of your merchant rules plus the merchant names no rule covers yet.
 // A rule says "bank text containing X → name it Y and/or categorize it Z" (config.json merchant_rules).
 import { getCategories } from '../rules.js';
-import { esc, toast } from '../util.js';
-import { dataTable } from '../datatable.js';
+import { esc, toast } from '../../../shared/js/util.js';
+import { dataTable } from '../../../shared/js/datatable.js';
 import {
     merchantSummary, suggestGroups, mergeMerchants, getMerchantRules, saveRule, removeRule, applyRuleToExisting,
     sharedBankText, compactText, merchantNameKey, MIN_BANK_TEXT,

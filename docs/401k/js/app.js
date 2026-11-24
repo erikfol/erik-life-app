@@ -1,8 +1,8 @@
 // 401(k): the Overview (#overview: balance, contributions against the IRS limit, the balance over time and its
 // history) and Plan & investments (#plan). Uses the same folder as Bills Etc (the browser remembers it for the whole
 // site); the data lives in inputs/401k/. A name in the menu is red or yellow while its page has a red or yellow banner.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';

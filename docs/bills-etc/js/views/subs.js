@@ -1,7 +1,7 @@
 // Forgettable Subs page: subscriptions that are easy to forget about, in one table that's read-only (sort and filter on
 // every column) until Edit, then every cell can be changed and rows added or removed. Saved in its own CSV.
-import { parseCSV, toCSV } from '../csv.js';
-import { esc } from '../util.js';
+import { parseCSV, toCSV } from '../../../shared/js/csv.js';
+import { esc } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { readTracked, writeTracked } from '../../../shared/js/fileguard.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';

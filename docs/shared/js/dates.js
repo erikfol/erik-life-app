@@ -43,6 +43,17 @@ export function longMonthLabel(ym) {
     return `${MONTH_NAMES[+m - 1]} ${y}`;
 }
 
+// ── Dates kept as YYYY-MM-DD (what <input type=date> gives) and how they're shown ──
+export const MON = MONTHS;
+export const dShort = d => `${MON[d.getMonth()]} ${d.getDate()}`;
+export const dLong = d => `${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+/** Same day n months later, kept within the month (Jan 31 + 1 → Feb 28). */
+export const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n,
+    Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate()));
+export const today = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
+export const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const dateOf = v => { const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], m[2] - 1, +m[3]) : null; };
+
 /** Normalize a date cell to DD-Mmm-YY, or '' if it can't be parsed (pandas NaT). */
 export function normalizeDateCell(value) {
     const d = parseDate(value);

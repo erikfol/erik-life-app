@@ -2,8 +2,8 @@
 // return) and a Documents page per tax year (#documents/<year>, #documents/add). Uses the same folder as Bills Etc (the
 // browser remembers it for the whole site); the data lives in inputs/taxes/. Overview in the menu is red or yellow while
 // its banner is.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import alerts from './alerts.js';

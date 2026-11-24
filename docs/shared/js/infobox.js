@@ -1,6 +1,6 @@
 // The information box on Vehicles, House and Pets pages: label/value fields shown read-only until Edit; while editing,
 // fields can be changed, added, removed and moved up or down. Also the ↑ ↓ buttons other edit lists use.
-import { esc, toast } from '../../bills-etc/js/util.js';
+import { esc, toast } from './util.js';
 
 /** ↑ ↓ buttons for one item of an edit list; moveItem() handles their clicks. */
 export const moveButtons = () => `<span class="move-btns">`

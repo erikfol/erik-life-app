@@ -2,7 +2,7 @@
 // The folder handle is remembered in IndexedDB so it can be reconnected after a reload.
 // Signed in to Dropbox on this device (a tablet or phone, which can't open a local folder): the same files are read
 // and written in the Dropbox app folder instead (shared/js/dropbox.js). Decided when the page loads.
-import * as dbx from '../../shared/js/dropbox.js';
+import * as dbx from './dropbox.js';
 
 const DROPBOX = { name: 'Dropbox', kind: 'dropbox' };
 let root = dbx.signedIn() ? DROPBOX : null;

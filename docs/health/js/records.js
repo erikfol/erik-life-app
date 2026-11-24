@@ -1,6 +1,6 @@
 // Health records: one CSV per section in inputs/health/ of the connected folder (kept out of git like all of inputs/).
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const HEALTH_DIR = 'inputs/health';

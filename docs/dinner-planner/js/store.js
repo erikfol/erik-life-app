@@ -1,7 +1,7 @@
 // Dinner Planner data, ported from the old Node app (server.js + backup.js). Everything is in inputs/dinner-planner/db.json;
 // meals.csv and dinner-history.csv are spreadsheet copies rewritten after every change; backups/ holds start-of-day,
 // by-hand and before-restore copies of db.json. inputs/ is kept out of git.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { STATUS, OUT, nameOf, limitsOf, limitsProblem, leftoverKeys, outLabel } from './leftovers.js';
 

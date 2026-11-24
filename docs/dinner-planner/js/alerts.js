@@ -1,6 +1,6 @@
 // Dinner Planner's red and yellow items, for the Home page's counts and the menu colours: leftovers in the fridge
 // longer than the yellow or red number of days on the Settings tab, as the "In the fridge" box on the Calendar shows them.
-import * as fs from '../../bills-etc/js/fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { DB_PATH, localDate } from './store.js';
 import { fridgeItems, alertText, limitsOf } from './leftovers.js';
 

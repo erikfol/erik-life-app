@@ -2,10 +2,10 @@
 import {
     loadElectric, sameBillLastYear, addElectricBill, serviceDays, chargeOf, recalcElectricRow, electricDupKey, ELECTRIC_CALCULATED, ELECTRIC_PATH,
 } from '../electric.js';
-import { drawBars } from '../charts.js';
-import { esc, money, sum, toast } from '../util.js';
+import { drawBars } from '../../../shared/js/charts.js';
+import { esc, money, sum, toast } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
-import { dataTable, closeFilterMenu } from '../datatable.js';
+import { dataTable, closeFilterMenu } from '../../../shared/js/datatable.js';
 import {
     MON, dLong, period, addMonths, today, billText, billClass, axisMoney, axisNum,
     isoDate, dateOf, numOf, card, vsEarlier, dateCol, moneyCol, setResize, clearResize, yearChips, sameDay, sameAmount, dupText,

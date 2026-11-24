@@ -1,7 +1,7 @@
 // Pets: the list (with each pet's information) in inputs/pets/pets.json, and one records CSV per pet next to it.
 // inputs/ is kept out of git.
-import * as fs from '../../bills-etc/js/fs.js';
-import { parseCSV, toCSV } from '../../bills-etc/js/csv.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const PETS_DIR = 'inputs/pets';
@@ -110,19 +110,4 @@ export async function saveAppointments(p, rows) {
     await writeTracked(appointmentsPath(p), toCSV(APPOINTMENT_COLUMNS.map(c => c.name), rows));
 }
 
-/**
- * The banner at the top of a pet's page: the next appointment on or after `today` (rows with a YYYY-MM-DD Date).
- * { level: 'none' } (red) when there isn't one, 'soon' (yellow) when it's within 14 days, else 'later' (green);
- * with next (the row) and days (0 = today).
- */
-export function appointmentStatus(rows, today = new Date()) {
-    const SOON_DAYS = 14;
-    const pad = n => String(n).padStart(2, '0');
-    const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-    const next = rows.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.Date || '') && r.Date >= todayIso)
-        .sort((a, b) => a.Date.localeCompare(b.Date) || String(a.Time || '').localeCompare(String(b.Time || '')))[0];
-    if (!next) return { level: 'none' };
-    const [y, m, d] = next.Date.split('-').map(Number);
-    const days = Math.round((new Date(y, m - 1, d) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
-    return { level: days <= SOON_DAYS ? 'soon' : 'later', next, days };
-}
+export { appointmentStatus } from '../../shared/js/appointments.js';

@@ -1,8 +1,8 @@
 // Working Career: Profile, Work History, Skills, Education, Achievements, References, Job Search and Resume Builder
 // (#profile, #work, …, #resume; see PAGES in career.js). Uses the same folder as Bills Etc (the browser remembers it for
 // the whole site); the data lives in inputs/career/.
-import * as fs from '../../bills-etc/js/fs.js';
-import { esc } from '../../bills-etc/js/util.js';
+import * as fs from '../../shared/js/fs.js';
+import { esc } from '../../shared/js/util.js';
 import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { PAGES, CAREER_DIR } from './career.js';
 import { renderPage, hasUnsavedEdits, forget } from './views/page.js';

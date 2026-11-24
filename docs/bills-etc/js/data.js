@@ -1,8 +1,8 @@
 // Paths and file formats shared with the Python scripts.
-import * as fs from './fs.js';
-import { parseCSV, toCSV } from './csv.js';
-import { normalizeDateCell, parseDate } from './dates.js';
-import { amountOf } from './util.js';
+import * as fs from '../../shared/js/fs.js';
+import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { normalizeDateCell, parseDate } from '../../shared/js/dates.js';
+import { amountOf } from '../../shared/js/util.js';
 
 export const PATHS = {
     pastMonths: 'inputs/past_months',

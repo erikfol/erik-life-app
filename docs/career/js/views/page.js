@@ -1,6 +1,6 @@
 // A Working Career page: the Profile (an information box, like a pet's) or one or more record tables (Work History,
 // Skills, Education…), each read-only with sort and filter until ✎ Edit.
-import { esc } from '../../../bills-etc/js/util.js';
+import { esc } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import { PROFILE_PATH, TABLES, tablePath, loadTable, saveTable, loadProfile, saveProfile } from '../career.js';

@@ -4,7 +4,7 @@
 // paychecks This Month's Left to spend counts).
 import { parseBills, billMatcher, paymentsByMonth, paymentMonth, billMonth, firstPaid } from './bills.js';
 import { payRhythm, monthChecks } from './plan.js';
-import { round2 } from './util.js';
+import { round2 } from '../../shared/js/util.js';
 
 const sumOf = list => round2(list.reduce((a, x) => a + x.amount, 0));
 const TO_COME = ['due', 'late', 'unknown']; // not paid yet, still expected to come out

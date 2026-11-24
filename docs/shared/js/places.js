@@ -1,9 +1,8 @@
 // A vehicle's service places (shops, marinas): name, address (map link), phone (call link), hours, notes.
 // Kept on the vehicle in vehicles.json as places: [{ name, address, phone, hours, notes, crossed? }]; read-only until Edit.
 // crossed: true marks a place not to use any more (name struck through, card dimmed), kept for its notes.
-import { esc, toast } from '../../../bills-etc/js/util.js';
-import { moveButtons, moveItem } from '../../../shared/js/infobox.js';
-import { STORE } from '../vehicles.js';
+import { esc, toast } from './util.js';
+import { moveButtons, moveItem } from './infobox.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const FIELDS = ['name', 'address', 'phone', 'hours', 'notes'];
@@ -28,8 +27,8 @@ function hoursHtml(hours) {
     }).join('')}</table>`;
 }
 
-/** list: every vehicle (saved back whole). store: how to save and what to say (vehicles.js STORE, or another app's). */
-export function renderPlaces(el, list, v, store = STORE) {
+/** list: every vehicle, house or policy (saved back whole). store: how to save and what to say (the section's STORE). */
+export function renderPlaces(el, list, v, store) {
     const show = () => {
         draft = null;
         const places = v.places || [];

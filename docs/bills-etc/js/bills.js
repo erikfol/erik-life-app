@@ -1,12 +1,12 @@
 // Scheduled bills: payments that leave on (roughly) the same day every month or every few months.
 // Saved in config.json `scheduled_bills`; a transaction is "scheduled" when its merchant is one of a
 // bill's merchants. Nothing is stored per transaction, so changing a bill re-tags all of history.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS, readTable, loadConfig, keyOf, DEFAULT_CONFIG, withIncomes, perMonth } from './data.js';
 import { withParsed } from './finance.js';
 import { merchantNameKey } from './merchants.js';
-import { yearMonth } from './dates.js';
-import { round2, esc } from './util.js';
+import { yearMonth } from '../../shared/js/dates.js';
+import { round2, esc } from '../../shared/js/util.js';
 
 export const EVERY = { 1: 'Monthly', 2: 'Every 2 months', 3: 'Every 3 months', 6: 'Twice a year', 12: 'Yearly' };
 const GRACE_DAYS = 3; // a payment this many days after its due date is still on time

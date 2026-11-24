@@ -1,11 +1,11 @@
 // One vehicle's page, in three tabs: Overview (information, current mileage, the maintenance schedule and current tires for cars,
 // service places, photos, maintenance table), Guides (long how-to notes with reference images) and Notes (a dated log).
 // Also the "Add vehicle" page.
-import { esc, toast } from '../../../bills-etc/js/util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
-import { renderGallery, releaseGalleries } from './gallery.js';
-import { renderPlaces, placesUnsaved, forgetPlaces } from './places.js';
+import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
+import { renderPlaces, placesUnsaved, forgetPlaces } from '../../../shared/js/places.js';
 import { renderGuides, guidesUnsaved, forgetGuides } from './guides.js';
 import { renderNotes, notesUnsaved, forgetNotes } from './notes.js';
 import {
@@ -14,7 +14,7 @@ import {
     hasSchedule, schedulePath, scheduleColumns, loadSchedule, saveSchedule, currentReading, scheduleStatus, dueText, nextDueText,
     lastText, soonOf, SOON_DAYS, invoicesDir, hasTires, currentTires, treadPath, TREAD_COLUMNS, loadTread, saveTread,
     lowestTread, treadLevel, treadMiles, latestTread, TREAD_LOW, TREAD_WORN, tireInfoOf, newTread, tireWarranty,
-    treadForecast,
+    treadForecast, STORE,
 } from '../vehicles.js';
 
 let table = null;
@@ -298,7 +298,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
             save: async rows => { await saveMileage(v, rows); saved.readings = rows; now.innerHTML = currentMileage(v, rows); redraw(); },
         });
     }
-    renderPlaces(el.querySelector('#places'), list, v);
+    renderPlaces(el.querySelector('#places'), list, v, STORE);
     renderGallery(el.querySelector('#photos'), photosDir(v), { noun: 'photo' }).catch(err => {
         el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
     });

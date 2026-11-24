@@ -1,6 +1,6 @@
 // User-defined categories, stored in config.json as `categories` (the list) and
 // `category_renames` (old → new). Renaming rewrites every data file that uses the old name.
-import * as fs from './fs.js';
+import * as fs from '../../shared/js/fs.js';
 import { PATHS, DEFAULT_CONFIG, readTable, writeTable, loadConfig } from './data.js';
 import { DEFAULT_CATEGORIES, setCategorySettings, renamed } from './rules.js';
 import { setMerchantRules } from './merchants.js';

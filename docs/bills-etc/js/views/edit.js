@@ -1,9 +1,9 @@
 import { PATHS, readTable, writeTable, loadConfig } from '../data.js';
 import { parseBills, hasBills, billMatcher, scheduleLabel, schedTag } from '../bills.js';
-import { parseDate, yearMonth, monthLabel } from '../dates.js';
-import { esc, money, amountOf, toast } from '../util.js';
+import { parseDate, yearMonth, monthLabel } from '../../../shared/js/dates.js';
+import { esc, money, amountOf, toast } from '../../../shared/js/util.js';
 import { bindCellEditing, merchantInput, categorySelect, notesInput, merchantText, categoryText, notesText } from '../celledit.js';
-import { openFilterMenu, closeFilterMenu } from '../filtermenu.js';
+import { openFilterMenu, closeFilterMenu } from '../../../shared/js/filtermenu.js';
 import { requireFolder } from '../app.js';
 
 const MAX_ROWS = 400;

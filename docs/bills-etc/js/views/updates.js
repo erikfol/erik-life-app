@@ -3,7 +3,7 @@
 // counts the same list).
 import { updateAccount } from '../loans.js';
 import { dueItems } from '../alerts.js';
-import { esc, toast } from '../util.js';
+import { esc, toast } from '../../../shared/js/util.js';
 import { today } from './utilcommon.js';
 
 /** Fill el with the list. A source that can't be read shows as its own line instead of hiding the rest. */

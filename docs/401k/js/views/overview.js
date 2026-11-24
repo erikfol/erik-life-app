@@ -2,9 +2,9 @@
 // transactions for each period; this year's contributions against the IRS limit and the employer's, estimated from
 // Contributions), Contributions (what goes in each paycheck), Contribution changes (each change to it), the balance
 // over time, and the balance history.
-import { esc, money, toast } from '../../../bills-etc/js/util.js';
-import { drawLines } from '../../../bills-etc/js/charts.js';
-import { card, dLong, dateOf, setResize, clearResize } from '../../../bills-etc/js/views/utilcommon.js';
+import { esc, money, toast } from '../../../shared/js/util.js';
+import { drawLines, card, setResize, clearResize } from '../../../shared/js/charts.js';
+import { dLong, dateOf } from '../../../shared/js/dates.js';
 import { recordTable, closeFilterMenu } from '../../../shared/js/recordtable.js';
 import {
     BALANCES_PATH, PLAN_PATH, BALANCE_COLUMNS, BALANCE_CHOICES, loadBalances, saveBalances, loadPlan, savePlan, ledger, summary, notAddingUp, irsLimit,
