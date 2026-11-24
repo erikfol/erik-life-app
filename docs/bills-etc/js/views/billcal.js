@@ -72,7 +72,7 @@ export default async function renderCalendar(el) {
         cfg = (await loadConfig()) || {};
         rows = await allTransactions();
     } catch (e) {
-        el.innerHTML = `<div class="banner bad">Couldn't load the calendar: ${esc(e.message)}</div>`;
+        el.innerHTML = `<div class="banner red">Couldn't load the calendar: ${esc(e.message)}</div>`;
         return;
     }
     const today = new Date();
@@ -105,7 +105,7 @@ export default async function renderCalendar(el) {
         try { cal = calendarMonth({ cfg, rows, ym: shownYm, today }); } catch (e) {
             console.error(e);
             $('#cal-grid').innerHTML = '';
-            $('#cal-msg').innerHTML = `<div class="banner bad">Couldn't work out ${esc(longMonthLabel(shownYm))}: ${esc(e.message)}</div>`;
+            $('#cal-msg').innerHTML = `<div class="banner red">Couldn't work out ${esc(longMonthLabel(shownYm))}: ${esc(e.message)}</div>`;
             return;
         }
         const i = yms.indexOf(shownYm);

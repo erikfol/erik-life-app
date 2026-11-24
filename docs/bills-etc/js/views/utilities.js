@@ -85,7 +85,7 @@ async function renderElectric(el) {
         return;
     }
     if (data.missing.length) {
-        el.innerHTML = `<div class="banner bad"><code>${esc(ELECTRIC_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Service Date Start, Service Date End, kWh's used and Amount due.</div>`;
+        el.innerHTML = `<div class="banner red"><code>${esc(ELECTRIC_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Service Date Start, Service Date End, kWh's used and Amount due.</div>`;
         return;
     }
     const { bills } = data;
@@ -472,13 +472,13 @@ async function renderElectric(el) {
         ? `<div class="banner row">
             <span>📬 <strong>There's a new electric statement to add.</strong> Your last bill was due ${esc(dLong(lastDue))}, so the next one was due around ${esc(dLong(nextDue))}.</span>
             <span class="spacer"></span><button class="primary small" id="catchup-add">Add it now</button></div>`
-        : `<div class="banner ok">✓ <strong>All electric statements are caught up.</strong> The next one is due around ${esc(dLong(nextDue))}.</div>`;
+        : `<div class="banner green">✓ <strong>All electric statements are caught up.</strong> The next one is due around ${esc(dLong(nextDue))}.</div>`;
     // Details come after the due date (electricDetailsOn), so this stays until the statement is added.
     // Green while waiting; yellow from that day on (something to do).
     const detailsOn = electricDetailsOn(last);
     $('#details-soon').innerHTML = today() >= detailsOn
         ? `<div class="banner">🔎 <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this month's bill.</strong> ${portalLink}</div>`
-        : `<div class="banner ok">🗓️ <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this month's bill.</strong></div>`;
+        : `<div class="banner green">🗓️ <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this month's bill.</strong></div>`;
     $('#catchup-add')?.addEventListener('click', () => $('#add-open').click());
     form.oninput = preview;
     form.onsubmit = async e => {

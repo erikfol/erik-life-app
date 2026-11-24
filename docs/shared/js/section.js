@@ -55,7 +55,7 @@ export function startSection({ what, where, alerts, hasUnsavedEdits = () => fals
             await draw(hash, page);
         } catch (e) {
             console.error(e);
-            viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
+            viewEl.innerHTML = `<div class="banner red"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
         }
     }
 

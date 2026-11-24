@@ -11,12 +11,12 @@ export default async function renderUpdates(el) {
     el.innerHTML = '<p class="muted">Checking what\'s due…</p>';
     const items = await dueItems(today());
     if (!items.length) {
-        el.innerHTML = '<div class="banner ok">✓ <strong>Nothing to update.</strong> Savings, This Month, utilities, loans and credit cards are all caught up.</div>';
+        el.innerHTML = '<div class="banner green">✓ <strong>Nothing to update.</strong> Savings, This Month, utilities, loans and credit cards are all caught up.</div>';
         return;
     }
-    const red = items.filter(x => x.level === 'stale').length;
+    const red = items.filter(x => x.level === 'red').length;
     el.innerHTML = `<p class="muted" style="margin-bottom:10px">${items.length} thing${items.length === 1 ? '' : 's'} to look at${red ? `, ${red} overdue` : ''}.</p>
-        <div class="due-list">${items.map(x => `<div class="banner updated-${x.level} row">
+        <div class="due-list">${items.map(x => `<div class="banner ${x.level} row">
             <span><span class="due-where">${esc(x.where)}</span> ${x.text}</span>
             <span class="spacer"></span>
             ${x.checkId ? `<button type="button" class="small" data-activity-checked="${esc(x.checkId)}" title="You looked at the statement and there's nothing new to add. Saves today's date on the card; no activity row is added.">✓ Checked – no new activity</button>` : ''}

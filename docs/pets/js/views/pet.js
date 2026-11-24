@@ -26,12 +26,12 @@ const ageItem = f => {
 /** Red: no future appointment; yellow: the next one is within 2 weeks; green: one is booked further out. */
 const appointmentBanner = (name, rows) => {
     const s = appointmentStatus(rows);
-    if (s.level === 'none') return `<div class="banner bad"><strong>No future appointment</strong> for ${esc(name)}. Add one under Future appointments.</div>`;
+    if (s.level === 'none') return `<div class="banner red"><strong>No future appointment</strong> for ${esc(name)}. Add one under Future appointments.</div>`;
     const r = s.next;
     const what = `${esc(showDate(r.Date))}${r.Time ? ` at ${esc(r.Time)}` : ''}${r.Description ? ` — ${esc(r.Description)}` : ''}`;
     return s.level === 'soon'
         ? `<div class="banner"><strong>Appointment coming up ${inDays(s.days)}:</strong> ${what}</div>`
-        : `<div class="banner ok"><strong>Next appointment ${inDays(s.days)}:</strong> ${what}</div>`;
+        : `<div class="banner green"><strong>Next appointment ${inDays(s.days)}:</strong> ${what}</div>`;
 };
 
 /** list: every pet (saved back whole); onListChanged(goTo) re-draws the menu and opens #goTo. */
@@ -85,7 +85,7 @@ export async function renderPet(el, list, p, onListChanged) {
         },
     });
     renderGallery(el.querySelector('#photos'), photosDir(p), { noun: 'photo' }).catch(err => {
-        el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
+        el.querySelector('#photos').innerHTML = `<div class="banner red">Couldn't load photos: ${esc(err.message)}</div>`;
     });
     // Location (in both tables) offers what's been typed before plus every pet's Vet.
     const vets = [...new Set(list.flatMap(x => (x.info || []).filter(f => /\bvet\b/i.test(f.label) && f.value.trim()).map(f => f.value.trim())))];

@@ -22,7 +22,7 @@ export async function askForFolder(el, { what, where, onConnected }) {
     el.innerHTML = `
         <section>
             <h2>Connect your folder</h2>
-            ${moved ? `<div class="banner bad" style="margin-bottom:12px">${esc(fs.movedMessage(rem.handle))} Choose it again where it is now.</div>` : ''}
+            ${moved ? `<div class="banner red" style="margin-bottom:12px">${esc(fs.movedMessage(rem.handle))} Choose it again where it is now.</div>` : ''}
             ${fs.folderStuck() ? `<div class="banner" style="margin-bottom:12px">Chrome didn’t answer about your saved folder. Choose it again: <code>Dropbox\\Apps\\ErikLifeApp</code>.</div>` : ''}
             <p>${esc(what)} are saved in <code>${esc(where)}</code> inside your <code>erik-life-app</code> folder
             (the same folder Bills Etc uses). <code>inputs/</code> is never put on GitHub.</p>

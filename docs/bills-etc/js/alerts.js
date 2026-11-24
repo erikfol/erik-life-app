@@ -18,8 +18,8 @@ import { daysBetween, dateOf } from '../../shared/js/dates.js';
 
 const DAY = 864e5;
 const days = n => `${n} day${n === 1 ? '' : 's'}`;
-/** Levels, worst first; the names match the .banner.updated-* colours. The Home page counts stale as red, the rest yellow. */
-export const LEVELS = ['stale', 'old', 'aging'];
+/** Levels, worst first, named for their banner colour (.banner.red …). The Home page counts orange as yellow. */
+export const LEVELS = ['red', 'orange', 'yellow'];
 
 // ── Rules the pages share ────────────────────────────────────────────────────
 
@@ -77,11 +77,11 @@ export async function lastBankUpdate() {
     const [bankFile] = await fs.listFiles(PATHS.currentMonth);
     return (bankFile && await fs.modifiedAt(`${PATHS.currentMonth}/${bankFile}`)) || await fs.modifiedAt(PATHS.processed);
 }
-/** This Month's "Last updated" banner: { age (days), level }: fresh 0–3 days old (green), aging 4–10, old 11–20, stale 21+. */
+/** This Month's "Last updated" banner: { age (days), level }: green 0–3 days old, yellow 4–10, orange 11–20, red 21+. */
 export function updatedLevel(updated) {
     const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const age = Math.max(0, Math.round((day(new Date()) - day(updated)) / DAY));
-    return { age, level: age <= 3 ? 'fresh' : age <= 10 ? 'aging' : age <= 20 ? 'old' : 'stale' };
+    return { age, level: age <= 3 ? 'green' : age <= 10 ? 'yellow' : age <= 20 ? 'orange' : 'red' };
 }
 
 // ── The list ─────────────────────────────────────────────────────────────────
@@ -94,20 +94,20 @@ async function savingsItems(t0) {
     const behind = data.buckets.map(b => ({ b, n: depositsDue(b) })).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
     if (behind.length) {
         const most = behind[0].n;
-        out.push({ level: most <= 2 ? 'aging' : most <= 4 ? 'old' : 'stale', where, href,
+        out.push({ level: most <= 2 ? 'yellow' : most <= 4 ? 'orange' : 'red', where, href,
             text: `<strong>${most} paycheck deposit${most === 1 ? '' : 's'} behind</strong> · ${behind.map(x => `${esc(x.b.name)} ${x.n}×`).join(', ')}` });
     }
     // Account activity not updated in 20+ (yellow) or 40+ days (red), as the Savings banner
     const [activity, settings] = await Promise.all([loadSavingsActivity(), loadSettings()]);
     const a = savingsActivityAge(activity, settings, t0);
     if (a.days >= STALE_DAYS) {
-        out.push({ level: a.days >= VERY_STALE_DAYS ? 'stale' : 'aging', where, href,
+        out.push({ level: a.days >= VERY_STALE_DAYS ? 'red' : 'yellow', where, href,
             text: `<strong>Account activity not updated</strong> · ${a.lastEntry ? `last entry ${esc(dLong(a.lastEntry))}` : 'no entries yet'}${a.checked ? `, checked ${esc(dLong(a.checked))}` : ''}${Number.isFinite(a.days) ? ` (${days(a.days)})` : ''}` });
     }
     // Money to move out of savings (paid from checking for a bucket), as the Savings banner: yellow until marked moved
     const moves = movesByBucket(await loadMoves());
     if (moves.length) {
-        out.push({ level: 'aging', where, href,
+        out.push({ level: 'yellow', where, href,
             text: `<strong>Money to move out of savings</strong> · ${esc(money(sum(moves.map(g => g.total))))}: ${moves.map(g => `${esc(g.bucket)} ${esc(money(g.total))}`).join(', ')}` });
     }
     return out;
@@ -117,7 +117,7 @@ async function monthItems() {
     const updated = await lastBankUpdate();
     if (!updated) return [];
     const { age, level } = updatedLevel(updated);
-    return level === 'fresh' ? [] : [{ level, where: 'This Month', href: '#month',
+    return level === 'green' ? [] : [{ level, where: 'This Month', href: '#month',
         text: `<strong>Bank data last added ${age === 1 ? 'yesterday' : `${days(age)} ago`}</strong> (${esc(dLong(updated))}) · add a new bank export` }];
 }
 
@@ -127,8 +127,8 @@ async function electricItems(t0) {
     const last = bills.at(-1), lastDue = last.due || last.end;
     const nextDue = addMonths(lastDue, 1), detailsOn = electricDetailsOn(last);
     const where = 'Electric', href = '#utilities/electric';
-    if (t0 >= nextDue) return [{ level: 'aging', where, href, text: `<strong>New statement to add</strong> · the next one was due around ${esc(dLong(nextDue))} ${electricPortal}` }];
-    if (detailsOn < nextDue && t0 >= detailsOn) return [{ level: 'aging', where, href, text: `<strong>This month's bill details should be available</strong> (since ${esc(dLong(detailsOn))}) ${electricPortal}` }];
+    if (t0 >= nextDue) return [{ level: 'yellow', where, href, text: `<strong>New statement to add</strong> · the next one was due around ${esc(dLong(nextDue))} ${electricPortal}` }];
+    if (detailsOn < nextDue && t0 >= detailsOn) return [{ level: 'yellow', where, href, text: `<strong>This month's bill details should be available</strong> (since ${esc(dLong(detailsOn))}) ${electricPortal}` }];
     return [];
 }
 
@@ -140,10 +140,10 @@ async function waterItems(t0) {
     const nextDue = addMonths(lastDue, 3), detailsOn = addMonths(nextDue, -1);
     const nq = last.q ? nextQuarter(last) : null;
     const nqText = nq ? `Q${nq.q} ${nq.year}` : 'next quarter';
-    if (t0 >= nextDue) out.push({ level: 'aging', where, href, text: `<strong>New statement to add (${esc(nqText)})</strong> · it was due around ${esc(dLong(nextDue))} ${waterPortal}` });
-    else if (t0 >= detailsOn) out.push({ level: 'aging', where, href, text: `<strong>${esc(nqText)} details should be available</strong> (since ${esc(dLong(detailsOn))}) ${waterPortal}` });
+    if (t0 >= nextDue) out.push({ level: 'yellow', where, href, text: `<strong>New statement to add (${esc(nqText)})</strong> · it was due around ${esc(dLong(nextDue))} ${waterPortal}` });
+    else if (t0 >= detailsOn) out.push({ level: 'yellow', where, href, text: `<strong>${esc(nqText)} details should be available</strong> (since ${esc(dLong(detailsOn))}) ${waterPortal}` });
     for (const b of bills.filter(x => !x.isPaid)) {
-        out.push({ level: 'stale', where, href, text: `<strong>Not paid yet: Q${b.q} ${b.year}</strong> · ${esc(money(b.total))}${b.due ? `, due ${esc(dLong(b.due))}` : ''}` });
+        out.push({ level: 'red', where, href, text: `<strong>Not paid yet: Q${b.q} ${b.year}</strong> · ${esc(money(b.total))}${b.due ? `, due ${esc(dLong(b.due))}` : ''}` });
     }
     return out;
 }
@@ -151,7 +151,7 @@ async function waterItems(t0) {
 async function heatingItems() {
     const deliveries = (await loadDeliveries())?.deliveries;
     if (!deliveries?.length) return [];
-    return deliveries.filter(d => !d.isPaidBack).map(d => ({ level: 'stale', where: 'Home Heating', href: '#utilities/heating',
+    return deliveries.filter(d => !d.isPaidBack).map(d => ({ level: 'red', where: 'Home Heating', href: '#utilities/heating',
         text: `<strong>Not paid back yet: ${esc(dLong(d.date))} delivery</strong> · ${esc(money(d.actual))} (${esc(d.paidBack || 'blank')})` }));
 }
 
@@ -162,7 +162,7 @@ async function propaneItems(t0) {
     if (!gaps.length) return [];
     const nextFill = new Date(fills.at(-1).date.getTime() + Math.round(sum(gaps) / gaps.length) * DAY);
     const detailsOn = addMonths(nextFill, -1);
-    return t0 >= detailsOn ? [{ level: 'aging', where: 'Propane', href: '#utilities/propane',
+    return t0 >= detailsOn ? [{ level: 'yellow', where: 'Propane', href: '#utilities/propane',
         text: `<strong>Next fill-up expected around ${esc(dLong(nextFill))}</strong> · time to check the tank and get the details` }] : [];
 }
 
@@ -174,8 +174,8 @@ async function taxItems(t0) {
     const next = last.half === 1 ? `${last.year} 2nd half` : `${last.year + 1} 1st half`;
     const expected = addMonths(lastBilled, 6), detailsOn = taxDetailsOn(last);
     const where = 'Property Taxes', href = '#utilities/taxes';
-    if (t0 >= expected) return [{ level: 'aging', where, href, text: `<strong>New bill to add (${esc(next)})</strong> · it was billed around ${esc(dLong(expected))} ${taxPortal}` }];
-    if (t0 >= detailsOn) return [{ level: 'aging', where, href, text: `<strong>${esc(next)} details should be available</strong> (since ${esc(dLong(detailsOn))}) ${taxPortal}` }];
+    if (t0 >= expected) return [{ level: 'yellow', where, href, text: `<strong>New bill to add (${esc(next)})</strong> · it was billed around ${esc(dLong(expected))} ${taxPortal}` }];
+    if (t0 >= detailsOn) return [{ level: 'yellow', where, href, text: `<strong>${esc(next)} details should be available</strong> (since ${esc(dLong(detailsOn))}) ${taxPortal}` }];
     return [];
 }
 
@@ -190,24 +190,24 @@ async function loanCardItems(t0) {
     for (const { account, payments } of all) {
         for (const p of payments.filter(x => !x.made && x.date && x.date - t0 <= 14 * DAY)) {
             const late = p.date < t0;
-            out.push({ level: late ? 'stale' : 'aging', ...tab(account),
+            out.push({ level: late ? 'red' : 'yellow', ...tab(account),
                 text: `<strong>${esc(account.title)}: ${late ? 'payment not made' : 'payment coming up'}</strong> · ${esc(money(amountDue(p)))}${Number.isFinite(p.payment) ? '' : ' minimum'} ${late ? 'was due' : 'due'} ${esc(dLong(p.date))}` });
         }
     }
     // Card activity not updated (the Credit Cards tab only)
     for (const x of staleCards(all.filter(x => isCard(x.account)), t0)) {
-        out.push({ level: x.days >= VERY_STALE_DAYS ? 'stale' : 'aging', ...tab(x.account), checkId: x.account.id,
+        out.push({ level: x.days >= VERY_STALE_DAYS ? 'red' : 'yellow', ...tab(x.account), checkId: x.account.id,
             text: `<strong>${esc(x.account.title)}: activity not updated</strong> · ${x.lastEntry ? `last entry ${esc(dLong(x.lastEntry))}` : 'no activity yet'}${x.checked ? `, checked ${esc(dLong(x.checked))}` : ''}${Number.isFinite(x.days) ? ` (${days(x.days)})` : ''}` });
     }
     // Activity not paid back yet (red, as Home Heating's)
     for (const { account, a } of notPaidBack(all)) {
-        out.push({ level: 'stale', ...tab(account),
+        out.push({ level: 'red', ...tab(account),
             text: `<strong>${esc(account.title)}: not paid back yet</strong> · ${a.date ? esc(dLong(a.date)) : 'no date'} ${esc(a.description || a.type)} ${esc(money(a.amount))}${a.paidBack === 'Not yet' ? '' : ` (${esc(a.paidBack)})`}` });
     }
     // Timeshare maintenance fees marked Not Yet (red, as on the Loans tab)
     for (const { account, fees } of all) {
         for (const g of unpaidFees(fees)) {
-            out.push({ level: 'stale', ...tab(account), text: `<strong>${esc(account.title)}: ${esc(g.year || '(no year)')} maintenance fees not paid yet</strong> · ${esc(money(g.total))}` });
+            out.push({ level: 'red', ...tab(account), text: `<strong>${esc(account.title)}: ${esc(g.year || '(no year)')} maintenance fees not paid yet</strong> · ${esc(money(g.total))}` });
         }
     }
     return out;
@@ -219,11 +219,11 @@ const SOURCES = [
 ];
 
 /**
- * Everything to look at, worst first: [{ level ('stale' | 'old' | 'aging'), where, href, text (HTML), checkId? }].
- * A source that can't be read is its own 'old' item instead of hiding the rest.
+ * Everything to look at, worst first: [{ level ('red' | 'orange' | 'yellow'), where, href, text (HTML), checkId? }].
+ * A source that can't be read is its own orange item instead of hiding the rest.
  */
 export async function dueItems(t0 = today()) {
-    const results = await Promise.all(SOURCES.map(([name, fn]) => fn(t0).catch(e => [{ level: 'old', where: name, text: `<strong>Couldn't check</strong> · ${esc(e.message)}` }])));
+    const results = await Promise.all(SOURCES.map(([name, fn]) => fn(t0).catch(e => [{ level: 'orange', where: name, text: `<strong>Couldn't check</strong> · ${esc(e.message)}` }])));
     return results.flat().sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level));
 }
 
@@ -235,5 +235,5 @@ export default async function alerts() {
         d.querySelectorAll('a').forEach(a => a.remove());
         return d.textContent.replace(/\s+/g, ' ').trim();
     };
-    return (await dueItems()).map(x => ({ level: x.level === 'stale' ? 'red' : 'yellow', text: `${x.where}: ${plain(x.text)}`, href: x.href }));
+    return (await dueItems()).map(x => ({ level: x.level === 'red' ? 'red' : 'yellow', text: `${x.where}: ${plain(x.text)}`, href: x.href }));
 }

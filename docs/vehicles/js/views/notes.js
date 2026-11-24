@@ -54,7 +54,7 @@ export function renderNotes(el, list, v, store = STORE) {
     cards.forEach(card => {
         const n = notes[+card.dataset.i];
         renderGallery(card.querySelector('.note-gallery'), noteDir(v, n), { noun: 'image', compact: true })
-            .catch(err => { card.querySelector('.note-gallery').innerHTML = `<div class="banner bad">Couldn't load images: ${esc(err.message)}</div>`; });
+            .catch(err => { card.querySelector('.note-gallery').innerHTML = `<div class="banner red">Couldn't load images: ${esc(err.message)}</div>`; });
         card.querySelector('[data-edit]').onclick = () => edit(card.querySelector('.note-body'), n);
     });
 

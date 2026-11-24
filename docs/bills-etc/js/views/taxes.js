@@ -35,7 +35,7 @@ export default async function renderTaxes(el) {
         return;
     }
     if (data.missing.length) {
-        el.innerHTML = `<div class="banner bad"><code>${esc(TAX_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Year, Half and Amount Due.</div>`;
+        el.innerHTML = `<div class="banner red"><code>${esc(TAX_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Year, Half and Amount Due.</div>`;
         return;
     }
     const { bills } = data;
@@ -300,13 +300,13 @@ export default async function renderTaxes(el) {
         ? `<div class="banner row">
             <span>📬 <strong>There's a new property tax bill to add (${esc(nextText)}).</strong> Your last bill (${esc(billLabel(last))}) was billed ${esc(dLong(lastBilled))}, so the next one was billed around ${esc(dLong(expected))}.</span>
             <span class="spacer"></span><button class="primary small" id="catchup-add">Add it now</button></div>`
-        : `<div class="banner ok">✓ <strong>All property tax bills are caught up.</strong> The next one (${esc(nextText)}) is billed around ${esc(dLong(expected))}.</div>`;
+        : `<div class="banner green">✓ <strong>All property tax bills are caught up.</strong> The next one (${esc(nextText)}) is billed around ${esc(dLong(expected))}.</div>`;
     // Details come around the 25th of May / November (taxDetailsOn) — usually after the billing date — so this
     // stays until the bill is added. Green while waiting; yellow from that day on (something to do).
     const detailsOn = taxDetailsOn(last);
     $('#details-soon').innerHTML = today() >= detailsOn
         ? `<div class="banner">🔎 <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this half (${esc(nextText)}).</strong> ${portalLink}</div>`
-        : `<div class="banner ok">🗓️ <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this half (${esc(nextText)}).</strong></div>`;
+        : `<div class="banner green">🗓️ <strong>Around ${esc(dLong(detailsOn))} you should be able to get the details of this half (${esc(nextText)}).</strong></div>`;
 
     // ── Add a bill: the next half, prefilled from the latest bill of the same half and the latest assessment ──
     const form = $('#add-form');

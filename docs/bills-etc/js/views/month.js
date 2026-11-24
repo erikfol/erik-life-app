@@ -83,7 +83,7 @@ function updatedBanner(p) {
     const { age, level } = updatedLevel(p.updated);
     const ago = age === 0 ? 'today' : age === 1 ? 'yesterday' : `${age} days ago`;
     const when = p.updated.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-    return `<div class="banner updated-${level}"><strong>Last updated ${ago}</strong> · ${esc(when)}${p.dataThrough ? ` · bank data through ${esc(shortDay(p.dataThrough))}` : ''}
+    return `<div class="banner ${level}"><strong>Last updated ${ago}</strong> · ${esc(when)}${p.dataThrough ? ` · bank data through ${esc(shortDay(p.dataThrough))}` : ''}
         ${age > 3 ? ' · <a href="#home">Add a new bank export on Setup</a>' : ''}</div>`;
 }
 
@@ -199,7 +199,7 @@ export default {
                 <button id="reload">Refresh</button>
             </div>
             <p class="lead">${p.ended ? 'Completed month: totals are actual, not projected.' : `Day ${p.daysElapsed} of ${p.daysInMonth} · ${p.pctMonth}% through the month`}${p.dataThrough ? ` · bank data through ${esc(shortDay(p.dataThrough))}` : ''}</p>
-            ${p.changes ? `<div class="banner bad"><strong>Your bank file has changed since this page's data was loaded</strong>
+            ${p.changes ? `<div class="banner red"><strong>Your bank file has changed since this page's data was loaded</strong>
                 (${[p.changes.added && `${p.changes.added} new row${p.changes.added === 1 ? '' : 's'}`, p.changes.gone && `${p.changes.gone} row${p.changes.gone === 1 ? '' : 's'} no longer in it, e.g. pending charges that have posted`].filter(Boolean).join(', ')}), so they aren't shown here yet.
                 Click <strong>Refresh</strong> on <a href="#home">Setup</a> to load them; your edits are kept.</div>` : ''}
             ${p.ended ? `<div class="banner">This file is for ${esc(label)}, which has ended. When you've finished fixing its categories, close it with <strong>Close month</strong> on <a href="#home">Setup</a>, then add this month's bank export there to see a live projection.</div>` : ''}

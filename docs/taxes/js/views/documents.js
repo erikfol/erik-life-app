@@ -33,11 +33,11 @@ function progressBanner(year, rows, saved) {
     const p = docsProgress(rows);
     if (!p.needed) return '';
     const start = saved ? '' : ' · the starting list: change it with ✎ Edit';
-    if (!p.waiting.length) return `<div class="banner ok">✓ <strong>All ${p.needed} documents are in</strong> for the ${esc(year)} return.</div>`;
+    if (!p.waiting.length) return `<div class="banner green">✓ <strong>All ${p.needed} documents are in</strong> for the ${esc(year)} return.</div>`;
     // a document on the list more than once (e.g. a 1098 from each mortgage servicer) says who it's from
     const twice = d => rows.filter(r => r.Document === d).length > 1;
     const name = r => `${r.Document || 'a document'}${twice(r.Document) && r.From ? ` (${r.From})` : ''}`;
-    return `<div class="banner info"><strong>${p.received} of ${p.needed} documents in</strong> for the ${esc(year)} return · still to come:
+    return `<div class="banner blue"><strong>${p.received} of ${p.needed} documents in</strong> for the ${esc(year)} return · still to come:
         ${p.waiting.map(r => esc(name(r))).join(', ')}${start}</div>`;
 }
 

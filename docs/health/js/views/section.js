@@ -26,18 +26,18 @@ const owedBanner = rows => {
     const o = owedRecords(rows);
     if (!o.rows.length) return '';
     const each = o.rows.map(r => `${esc(showDate(r.Date) || 'undated')}${r.Description ? ` ${esc(r.Description)}` : ''}: ${esc(money(o.owe(r)))}`);
-    return `<div class="banner bad"><strong>You owe ${esc(money(o.total))}</strong> · not paid yet: ${each.join('; ')}. Set Paid? to Paid in Records once it's paid.</div>`;
+    return `<div class="banner red"><strong>You owe ${esc(money(o.total))}</strong> · not paid yet: ${each.join('; ')}. Set Paid? to Paid in Records once it's paid.</div>`;
 };
 
 /** Like a pet's (pets/js/views/pet.js): red with no future appointment, yellow when the next is within 2 weeks, else green. */
 const appointmentBanner = rows => {
     const s = appointmentStatus(rows);
-    if (s.level === 'none') return '<div class="banner bad"><strong>No future appointment.</strong> Add one under Future appointments.</div>';
+    if (s.level === 'none') return '<div class="banner red"><strong>No future appointment.</strong> Add one under Future appointments.</div>';
     const r = s.next;
     const what = `${esc(showDate(r.Date))}${r.Time ? ` at ${esc(r.Time)}` : ''}${r.Description ? ` — ${esc(r.Description)}` : ''}`;
     return s.level === 'soon'
         ? `<div class="banner"><strong>Appointment coming up ${inDays(s.days)}:</strong> ${what}</div>`
-        : `<div class="banner ok"><strong>Next appointment ${inDays(s.days)}:</strong> ${what}</div>`;
+        : `<div class="banner green"><strong>Next appointment ${inDays(s.days)}:</strong> ${what}</div>`;
 };
 
 export async function renderSection(el, section) {
@@ -146,9 +146,9 @@ function staleBanners(list, entries) {
             ].filter(Boolean).join(', ')}${Number.isFinite(x.days) ? ` <span class="muted">(${x.days} days)</span>` : ''}</span>
             <button type="button" class="small" data-activity-checked="${esc(x.a.id)}" title="You looked at the account and there's nothing new to add. Saves today's date on the account; no entry is added.">✓ Checked – no new activity</button>
         </div>`;
-    const banner = (l, level, head) => (l.length ? `<div class="banner updated-${level}"><strong>${head}</strong>${l.map(item).join('')}</div>` : '');
-    return banner(stale.filter(x => x.days >= VERY_STALE_DAYS), 'stale', `Activity not updated in ${VERY_STALE_DAYS}+ days`)
-        + banner(stale.filter(x => x.days < VERY_STALE_DAYS), 'aging', `Activity not updated in ${STALE_DAYS}+ days`);
+    const banner = (l, level, head) => (l.length ? `<div class="banner ${level}"><strong>${head}</strong>${l.map(item).join('')}</div>` : '');
+    return banner(stale.filter(x => x.days >= VERY_STALE_DAYS), 'red', `Activity not updated in ${VERY_STALE_DAYS}+ days`)
+        + banner(stale.filter(x => x.days < VERY_STALE_DAYS), 'yellow', `Activity not updated in ${STALE_DAYS}+ days`);
 }
 
 /** The activity banners, every account's box, then ＋ Add account. */

@@ -50,7 +50,7 @@ export function requireFolder(el) {
     el.innerHTML = `
         <section>
             <h2>No folder connected</h2>
-            <div class="banner bad" id="moved-here" style="margin-bottom:12px" hidden></div>
+            <div class="banner red" id="moved-here" style="margin-bottom:12px" hidden></div>
             <p>Connect your <code>erik-life-app</code> folder on the <a href="#home">Setup</a> page first.
             Nothing is uploaded.</p>
             <div class="row" style="margin-top:12px"><button class="primary" id="reconnect-here" hidden></button></div>
@@ -97,7 +97,7 @@ async function route(force = false) {
         view = (await (VIEWS[name] || VIEWS.home)()).default;
     } catch (e) { // e.g. no connection while the page's code is fetched
         console.error(e);
-        viewEl.innerHTML = `<div class="banner bad"><strong>Couldn't load this page:</strong> ${esc(e.message)} Check the connection and reload (F5).</div>`;
+        viewEl.innerHTML = `<div class="banner red"><strong>Couldn't load this page:</strong> ${esc(e.message)} Check the connection and reload (F5).</div>`;
         return;
     }
     current?.destroy?.();
@@ -111,7 +111,7 @@ async function route(force = false) {
         await view.render(viewEl);
     } catch (e) {
         console.error(e);
-        viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
+        viewEl.innerHTML = `<div class="banner red"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
     }
 }
 

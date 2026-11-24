@@ -33,10 +33,10 @@ function banner(year, rows) {
     const when = `Christmas ${inDays(days)} (${esc(showDay(date))})`;
     if (!t.count) return `<div class="banner"><strong>${when}</strong> — nothing on the ${esc(year)} list yet.</div>`;
     if (t.todo) {
-        return `<div class="banner${level === 'red' ? ' bad' : ''}"><strong>${when}:</strong> ${t.todo} of ${t.count} gift${t.count === 1 ? '' : 's'} still to buy (${esc(money(t.toBuy))})${
+        return `<div class="banner${level === 'red' ? ' red' : ''}"><strong>${when}:</strong> ${t.todo} of ${t.count} gift${t.count === 1 ? '' : 's'} still to buy (${esc(money(t.toBuy))})${
             t.waiting ? `, ${t.waiting} on the way` : ''}.</div>`;
     }
-    return `<div class="banner ok"><strong>${when}:</strong> everything's bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
+    return `<div class="banner green"><strong>${when}:</strong> everything's bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
 }
 
 const cards = t => `<div class="cards">

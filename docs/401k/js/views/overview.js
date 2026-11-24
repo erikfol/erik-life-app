@@ -32,8 +32,8 @@ export async function renderOverview(el) {
     const redraw = () => { const y = scrollY; setTimeout(async () => { forget(); await renderOverview(el); scrollTo(0, y); }); };
     el.innerHTML = `
         <h1 class="page">401(k)</h1>
-        ${status.level ? `<div class="banner ${status.level === 'red' ? 'updated-stale' : 'updated-aging'}"><strong>${esc(status.text)}</strong>${pts.length ? ` · last entry ${esc(longDate(S.last.date))}` : ''}</div>`
-            : pts.length ? `<div class="banner ok">✓ <strong>Balance up to date</strong> · last entry ${esc(longDate(S.last.date))}</div>` : ''}
+        ${status.level ? `<div class="banner ${status.level}"><strong>${esc(status.text)}</strong>${pts.length ? ` · last entry ${esc(longDate(S.last.date))}` : ''}</div>`
+            : pts.length ? `<div class="banner green">✓ <strong>Balance up to date</strong> · last entry ${esc(longDate(S.last.date))}</div>` : ''}
         <p class="lead">Balances kept in <code>${esc(BALANCES_PATH)}</code>. The plan's information, investments and documents are on <a href="#plan">Plan &amp; investments</a>.</p>
         <div class="cards kpis" id="cards"></div>
         <section>
@@ -142,6 +142,6 @@ export async function renderOverview(el) {
         save: async r => { await saveBalances(r); redraw(); },
     });
     const off = notAddingUp(pts);
-    el.querySelector('#balance-check').innerHTML = off.length ? `<div class="banner updated-aging" style="margin-top:10px">⚠ ${off.map(p =>
+    el.querySelector('#balance-check').innerHTML = off.length ? `<div class="banner yellow" style="margin-top:10px">⚠ ${off.map(p =>
         `<strong>${esc(longDate(p.date))}</strong> doesn't add up: starting + net transactions + returns = ${esc(money(p.start + p.net + p.returns))}, not ${esc(money(p.balance))}`).join('<br>⚠ ')}</div>` : '';
 }

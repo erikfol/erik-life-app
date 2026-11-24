@@ -54,15 +54,15 @@ function dateBanner(next, gifts) {
     const when = `${esc(next.label)} ${inDays(next.days)} (${esc(showDay(next.date))}${m ? `, ${esc(m)}` : ''})`;
     const level = dateLevel(next, gifts);
     if (level === 'red') {
-        return `<div class="banner bad"><strong>${when}</strong> — nothing planned yet. Add a gift below with Year ${year} and Occasion “${esc(next.label)}”${
+        return `<div class="banner red"><strong>${when}</strong> — nothing planned yet. Add a gift below with Year ${year} and Occasion “${esc(next.label)}”${
             t.ideas ? ` (there ${t.ideas === 1 ? 'is 1 idea' : `are ${t.ideas} ideas`})` : ''}.</div>`;
     }
     if (level === 'yellow') {
         return `<div class="banner"><strong>${when}:</strong> ${t.todo === t.count ? `${plural(t.count, 'gift')} planned, none bought yet`
             : `${t.todo} of ${t.count} gifts still to buy`}.</div>`;
     }
-    if (next.days > DATE_SOON_DAYS) return `<div class="banner ok"><strong>Next: ${when}.</strong>${t.count || t.ideas ? ` ${tallyText(t)}.` : ''}</div>`;
-    return `<div class="banner ok"><strong>${when}:</strong> ${t.count === 1 ? 'the gift is' : `all ${t.count} gifts are`} bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
+    if (next.days > DATE_SOON_DAYS) return `<div class="banner green"><strong>Next: ${when}.</strong>${t.count || t.ideas ? ` ${tallyText(t)}.` : ''}</div>`;
+    return `<div class="banner green"><strong>${when}:</strong> ${t.count === 1 ? 'the gift is' : `all ${t.count} gifts are`} bought${t.waiting ? ` (${t.waiting} on the way)` : ''}.</div>`;
 }
 
 /** One box under Coming up: the occasion, this time's gifts and totals, and what was given the last few times. */

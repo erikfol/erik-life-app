@@ -23,7 +23,7 @@ function investmentsNote(rows, balance) {
     const known = funds.filter(f => Number.isFinite(f.er)), knownPct = known.reduce((t, f) => t + f.pct, 0);
     const avg = knownPct ? known.reduce((t, f) => t + f.pct * f.er, 0) / knownPct : NaN;
     const off = Math.abs(total - 100) > 0.05;
-    return `<div class="banner ${off ? 'updated-aging' : 'ok'}" style="margin-bottom:10px">${off ? '' : '✓ '}The shares add up to <strong>${+total.toFixed(2)}%</strong>${off ? ' (should be 100%)' : ''}`
+    return `<div class="banner ${off ? 'yellow' : 'green'}" style="margin-bottom:10px">${off ? '' : '✓ '}The shares add up to <strong>${+total.toFixed(2)}%</strong>${off ? ' (should be 100%)' : ''}`
         + (Number.isFinite(avg) ? ` · average expense ratio <strong>${+avg.toFixed(3)}%</strong>${Number.isFinite(balance) ? `, about ${esc(money(balance * avg / 100))} a year on today's balance` : ''}` : '')
         + '</div>';
 }
@@ -31,7 +31,7 @@ function investmentsNote(rows, balance) {
 /** Yellow while this year's IRS limits, or from Nov 15 next year's, aren't in the table (as the Home page counts it). */
 function limitsBanner(rows) {
     const s = limitsStatus(limitsOf(rows));
-    return s ? `<div class="banner updated-aging"><strong>${esc(s.text)}.</strong> The IRS announces each year's limits in the fall:
+    return s ? `<div class="banner yellow"><strong>${esc(s.text)}.</strong> The IRS announces each year's limits in the fall:
         add ${s.year}'s to IRS limits below from <a href="${esc(IRS_LIMITS_URL)}" target="_blank" rel="noopener">the IRS page ↗</a>.</div>` : '';
 }
 

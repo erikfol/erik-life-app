@@ -31,7 +31,7 @@ export default {
         let cfg, error = null;
         try { cfg = await loadConfig(); } catch (e) { error = e.message; }
         if (error) {
-            box.innerHTML = `<h2>Variable Categories</h2><div class="banner bad">config.json isn't valid JSON (${esc(error)}). Fix it in a text editor, or delete it to start fresh here.</div>`;
+            box.innerHTML = `<h2>Variable Categories</h2><div class="banner red">config.json isn't valid JSON (${esc(error)}). Fix it in a text editor, or delete it to start fresh here.</div>`;
             return;
         }
         const base = cfg || DEFAULT_CONFIG;

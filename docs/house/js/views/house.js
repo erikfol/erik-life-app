@@ -99,7 +99,7 @@ export async function renderHouse(el, list, h, onListChanged, tab = null, page =
     })];
     renderPlaces(el.querySelector('#places'), list, h, STORE);
     renderGallery(el.querySelector('#photos'), photosDir(h), { noun: 'photo' }).catch(err => {
-        el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
+        el.querySelector('#photos').innerHTML = `<div class="banner red">Couldn't load photos: ${esc(err.message)}</div>`;
     });
 }
 
@@ -175,7 +175,7 @@ async function renderArea(el, list, h, tab, a) {
         }, { title: esc(b.label), example: 'Company site' }));
     });
     renderGallery(el.querySelector('#photos'), photosDir(h, a), { noun: gallery.noun }).catch(err => {
-        el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load ${esc(gallery.noun)}s: ${esc(err.message)}</div>`;
+        el.querySelector('#photos').innerHTML = `<div class="banner red">Couldn't load ${esc(gallery.noun)}s: ${esc(err.message)}</div>`;
     });
     if (a.improvements) renderImprovements(el.querySelector('#improvements'), list, h, a);
     if (a.maintenance) maint = recordTable(el.querySelector('#maintenance'), {

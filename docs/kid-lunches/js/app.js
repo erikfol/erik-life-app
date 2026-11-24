@@ -728,7 +728,7 @@ async function start() {
         await Promise.all([store.load(), school.load()]);
     } catch (e) {
         console.error(e);
-        viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
+        viewEl.innerHTML = `<div class="banner red"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
         return;
     }
     try { state.view = localStorage.getItem('kid-lunches-view') || 'week'; } catch { /* storage blocked */ }

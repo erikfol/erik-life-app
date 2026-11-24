@@ -41,7 +41,7 @@ export default async function renderHeating(el) {
         return;
     }
     if (data.missing.length) {
-        el.innerHTML = `<div class="banner bad"><code>${esc(HEAT_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Date Delivered, Gallons and Actual Price.</div>`;
+        el.innerHTML = `<div class="banner red"><code>${esc(HEAT_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects Date Delivered, Gallons and Actual Price.</div>`;
         return;
     }
     const { deliveries } = data;
@@ -405,11 +405,11 @@ export default async function renderHeating(el) {
 
     // ── Banners: where things stand, and deliveries not yet paid back ──
     const since = daysBetween(last.date, today());
-    $('#status').innerHTML = `<div class="banner ok">🛢️ <strong>Last delivery ${esc(dLong(last.date))}</strong> (${esc(gal(last.gallons))} from ${esc(last.provider)}), ${since} day${since === 1 ? '' : 's'} ago.`
+    $('#status').innerHTML = `<div class="banner green">🛢️ <strong>Last delivery ${esc(dLong(last.date))}</strong> (${esc(gal(last.gallons))} from ${esc(last.provider)}), ${since} day${since === 1 ? '' : 's'} ago.`
         + (lastCheck ? ` Latest Heatable price check: <strong>${esc(money(lastCheck.price))}/gal</strong> on ${esc(dLong(lastCheck.date))}.` : '') + '</div>';
     const unpaid = deliveries.filter(d => !d.isPaidBack);
     $('#unpaid').innerHTML = unpaid.length
-        ? `<div class="banner bad unpaid-list"><strong>Not paid back yet:</strong> ${unpaid.map(d => `<span class="nowrap">${esc(dLong(d.date))} (${esc(money(d.actual))}, ${esc(d.paidBack || 'blank')}) ${markBtn(d)}</span>`).join(' ')}</div>` : '';
+        ? `<div class="banner red unpaid-list"><strong>Not paid back yet:</strong> ${unpaid.map(d => `<span class="nowrap">${esc(dLong(d.date))} (${esc(money(d.actual))}, ${esc(d.paidBack || 'blank')}) ${markBtn(d)}</span>`).join(' ')}</div>` : '';
 
     // Mark paid back: asks for the date, then writes Yes and that date; Undo sets it back to Not Yet.
     el.onclick = async e => {

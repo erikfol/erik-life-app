@@ -52,7 +52,7 @@ export async function renderGuides(el, list, v, openId = null, store = STORE) {
         body.querySelector('[data-edit]').onclick = () => editGuide(body, g);
         const setCount = n => { details.querySelector('.g-count').textContent = n ? `${n} image${n === 1 ? '' : 's'}` : ''; };
         renderGallery(body.querySelector('.g-gallery'), guideDir(v, g), { noun: 'image', onChange: setCount })
-            .catch(err => { body.querySelector('.g-gallery').innerHTML = `<div class="banner bad">Couldn't load images: ${esc(err.message)}</div>`; });
+            .catch(err => { body.querySelector('.g-gallery').innerHTML = `<div class="banner red">Couldn't load images: ${esc(err.message)}</div>`; });
     };
 
     // Opening a guide draws it (and loads its images) the first time.

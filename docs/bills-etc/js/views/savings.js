@@ -189,8 +189,8 @@ export default {
         // ── Status ──
         // Up to date = no bucket is missing a paycheck deposit. Green 0 behind, yellow 1–2, orange 3–4, red 5+.
         const most = Math.max(0, ...allDue.map(x => x.n));
-        const level = most === 0 ? 'fresh' : most <= 2 ? 'aging' : most <= 4 ? 'old' : 'stale';
-        const depositBanner = `<div class="banner updated-${level}">${most === 0
+        const level = most === 0 ? 'green' : most <= 2 ? 'yellow' : most <= 4 ? 'orange' : 'red';
+        const depositBanner = `<div class="banner ${level}">${most === 0
             ? '<strong>Deposits up to date</strong> · every bucket has its paycheck deposits'
             : `<strong>${most} deposit${most === 1 ? '' : 's'} behind</strong> · ${[...allDue].sort((a, b) => b.n - a.n).map(x => `${esc(x.b.name)} ${x.n}×`).join(', ')}`}</div>`;
         // The account activity: yellow after 20 days without an entry (or a "checked"), red after 40, like a credit card's.
@@ -198,10 +198,10 @@ export default {
         const actText = [act.lastEntry ? `last entry ${esc(dLong(act.lastEntry))}` : 'no entries yet', act.checked ? `checked ${esc(dLong(act.checked))}` : '']
             .filter(Boolean).join(', ') + (Number.isFinite(act.days) ? ` <span class="muted">(${act.days} day${act.days === 1 ? '' : 's'})</span>` : '');
         const actBanner = act.days >= STALE_DAYS
-            ? `<div class="banner updated-${act.days >= VERY_STALE_DAYS ? 'stale' : 'aging'} row"><span><strong>Account activity not updated in ${act.days >= VERY_STALE_DAYS ? VERY_STALE_DAYS : STALE_DAYS}+ days</strong> · ${actText}</span>
+            ? `<div class="banner ${act.days >= VERY_STALE_DAYS ? 'red' : 'yellow'} row"><span><strong>Account activity not updated in ${act.days >= VERY_STALE_DAYS ? VERY_STALE_DAYS : STALE_DAYS}+ days</strong> · ${actText}</span>
                 <span class="spacer"></span><button type="button" class="small" id="act-checked" title="You looked at the account and there's nothing new to add. Saves today's date; no entry is added.">✓ Checked – no new activity</button></div>`
-            : `<div class="banner ok">✓ <strong>Account activity up to date</strong> · ${actText}</div>`;
-        $('#status').innerHTML = depositBanner + actBanner + (!pending.length ? '' : `<div class="banner updated-aging row"><span>💸 <strong>Money to move out of savings: ${esc(money(toMoveTotal))}</strong>
+            : `<div class="banner green">✓ <strong>Account activity up to date</strong> · ${actText}</div>`;
+        $('#status').innerHTML = depositBanner + actBanner + (!pending.length ? '' : `<div class="banner yellow row"><span>💸 <strong>Money to move out of savings: ${esc(money(toMoveTotal))}</strong>
                 · ${toMove.map(g => `${esc(g.bucket)} ${esc(money(g.total))} (${g.rows.length} item${g.rows.length === 1 ? '' : 's'})`).join(', ')}, paid from checking</span>
                 <span class="spacer"></span><button type="button" class="small" id="move-go">See the list</button></div>`);
         if ($('#move-go')) $('#move-go').onclick = () => $('#moves').scrollIntoView({ behavior: 'smooth', block: 'start' });

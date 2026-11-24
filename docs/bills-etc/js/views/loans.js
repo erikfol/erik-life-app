@@ -269,13 +269,13 @@ export default {
         const open = all.flatMap(({ account, payments }) => payments.filter(p => !p.made && p.date).map(p => ({ account, p })));
         const late = open.filter(x => x.p.date < t0), soon = open.filter(x => x.p.date >= t0 && x.p.date - t0 <= 14 * DAY);
         const item = x => `<span class="nowrap">${esc(x.account.title)}: ${esc(money(amountDue(x.p)))}${Number.isFinite(x.p.payment) ? '' : ' minimum'} ${x.p.date < t0 ? 'was due' : 'due'} ${esc(dLong(x.p.date))}</span>`;
-        $('#due').innerHTML = (late.length ? `<div class="banner bad"><strong>Not made yet:</strong> ${late.map(item).join(' · ')}</div>` : '')
+        $('#due').innerHTML = (late.length ? `<div class="banner red"><strong>Not made yet:</strong> ${late.map(item).join(' · ')}</div>` : '')
             + (soon.length ? `<div class="banner"><strong>Coming up:</strong> ${soon.map(item).join(' · ')}</div>` : '')
-            + (!late.length && !soon.length && all.some(x => x.payments.length) ? '<div class="banner ok">✓ <strong>No payments due.</strong> Nothing is past due or due in the next two weeks.</div>' : '')
+            + (!late.length && !soon.length && all.some(x => x.payments.length) ? '<div class="banner green">✓ <strong>No payments due.</strong> Nothing is past due or due in the next two weeks.</div>' : '')
             + (tab.id === 'cards' ? staleActivityBanners(all, t0) : '');
         // ── Activity not paid back yet (like Home Heating's), each with Mark paid back ──
         const unpaid = notPaidBack(all);
-        if (unpaid.length) $('#due').insertAdjacentHTML('beforeend', `<div class="banner bad unpaid-list"><strong>Not paid back yet${unpaid.length > 1 ? ` (${esc(money(sum(unpaid.map(x => x.a.amount).filter(Number.isFinite))))})` : ''}:</strong>
+        if (unpaid.length) $('#due').insertAdjacentHTML('beforeend', `<div class="banner red unpaid-list"><strong>Not paid back yet${unpaid.length > 1 ? ` (${esc(money(sum(unpaid.map(x => x.a.amount).filter(Number.isFinite))))})` : ''}:</strong>
             ${unpaid.map(({ account, a }, k) => `<span class="nowrap">${esc(account.title)}: ${a.date ? esc(dLong(a.date)) : 'no date'} ${esc(a.description || a.type)} (${esc(money(a.amount))}${a.paidBack === 'Not yet' ? '' : `, ${esc(a.paidBack)}`})
                 <button type="button" class="small primary" data-unpaid="${k}">Mark paid back</button></span>`).join(' ')}</div>`);
         el.querySelectorAll('[data-unpaid]').forEach(b => b.onclick = async () => {
@@ -309,7 +309,7 @@ export default {
         // ── Timeshare maintenance fees not paid yet (like Home Heating's), a line per year with Mark paid ──
         const drawFeesDue = () => {
             const due = all.flatMap(x => unpaidFees(x.fees).map(g => ({ ...g, x })));
-            $('#fees-due').innerHTML = !due.length ? '' : `<div class="banner bad unpaid-list"><strong>Maintenance fees not paid yet:</strong>
+            $('#fees-due').innerHTML = !due.length ? '' : `<div class="banner red unpaid-list"><strong>Maintenance fees not paid yet:</strong>
                 ${due.map((g, k) => `<span class="nowrap">${esc(g.x.account.title)} ${esc(g.year || '(no year)')}: ${esc(money(g.total))}
                     <span class="muted">(${g.rows.map(r => esc(r.Fee || 'fee')).join(', ')})</span>
                     <button type="button" class="small primary" data-fees-paid="${k}">Mark paid</button></span>`).join(' ')}</div>`;
@@ -420,9 +420,9 @@ function staleActivityBanners(all, t0) {
             <button type="button" class="small" data-activity-checked="${esc(x.account.id)}" title="You looked at the statement and there's nothing new to add. Saves today's date on the card; no activity row is added.">✓ Checked – no new activity</button>
         </div>`;
     const banner = (list, level, head) => (list.length
-        ? `<div class="banner updated-${level}"><strong>${head}</strong>${list.map(item).join('')}</div>` : '');
-    return banner(stale.filter(x => x.days >= VERY_STALE_DAYS), 'stale', `Activity not updated in ${VERY_STALE_DAYS}+ days`)
-        + banner(stale.filter(x => x.days < VERY_STALE_DAYS), 'aging', `Activity not updated in ${STALE_DAYS}+ days`);
+        ? `<div class="banner ${level}"><strong>${head}</strong>${list.map(item).join('')}</div>` : '');
+    return banner(stale.filter(x => x.days >= VERY_STALE_DAYS), 'red', `Activity not updated in ${VERY_STALE_DAYS}+ days`)
+        + banner(stale.filter(x => x.days < VERY_STALE_DAYS), 'yellow', `Activity not updated in ${STALE_DAYS}+ days`);
 }
 
 /**

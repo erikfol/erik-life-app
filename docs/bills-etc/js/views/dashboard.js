@@ -36,7 +36,7 @@ export default {
             return;
         }
         if (!master.columns.includes('AI Category')) {
-            el.innerHTML = `<div class="banner bad">The master file has no <code>AI Category</code> column. Columns: ${esc(master.columns.join(', '))}</div>`;
+            el.innerHTML = `<div class="banner red">The master file has no <code>AI Category</code> column. Columns: ${esc(master.columns.join(', '))}</div>`;
             return;
         }
 

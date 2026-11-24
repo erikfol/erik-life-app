@@ -61,7 +61,7 @@ export async function renderPolicy(el, list, p, onListChanged) {
     });
     renderPlaces(el.querySelector('#places'), list, p, STORE);
     renderGallery(el.querySelector('#docs'), documentsDir(p), { noun: 'image' }).catch(err => {
-        el.querySelector('#docs').innerHTML = `<div class="banner bad">Couldn't load images: ${esc(err.message)}</div>`;
+        el.querySelector('#docs').innerHTML = `<div class="banner red">Couldn't load images: ${esc(err.message)}</div>`;
     });
     table = recordTable(el.querySelector('#records'), {
         columns: RECORD_COLUMNS,

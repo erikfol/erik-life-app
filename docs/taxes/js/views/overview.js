@@ -23,7 +23,7 @@ const daysText = n => (n === 0 ? 'today' : `${n} day${n === 1 ? '' : 's'}`);
 
 /** The banner for seasonStatus `s`, with how many of the year's documents are in. */
 function banner(s, docs) {
-    const cls = s.level === 'red' ? 'bad' : s.level === 'yellow' ? 'updated-aging' : s.level === 'ok' ? 'ok' : 'info';
+    const cls = { red: 'red', yellow: 'yellow', ok: 'green' }[s.level] || 'blue';
     const p = docs ? docsProgress(docs) : null;
     const docLine = p && p.needed ? ` · <a href="#documents/${esc(s.year)}">${p.received} of ${p.needed} documents in</a>` : '';
     const body = {

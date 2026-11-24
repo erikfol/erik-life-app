@@ -48,9 +48,9 @@ function renderSchedule(el, v, rows, get) {
         const states = saved.map(r => ({ r, s: status(r) }));
         const red = states.filter(x => x.s.level === 'red'), yellow = states.filter(x => x.s.level === 'yellow');
         const item = x => `<span class="nowrap"><strong>${esc(x.r.Item)}</strong> <span class="muted">(due ${esc(dueText(x.s))})</span></span>`;
-        el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner bad"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
+        el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner red"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
             + (yellow.length ? `<div class="banner"><strong>Due soon:</strong> ${yellow.map(item).join(' · ')}</div>` : '')
-            + (saved.length && !red.length && !yellow.length ? '<div class="banner ok">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
+            + (saved.length && !red.length && !yellow.length ? '<div class="banner green">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
         const meter = (v.meter || 'Mileage').toLowerCase(), unit = meter === 'engine hours' ? 'hours' : 'miles';
         el.querySelector('.sched-note').innerHTML = `Worked out from ${now ? `the latest ${esc(meter)}, <strong>${now.miles.toLocaleString('en-US')} ${unit}</strong>
             (${esc(now.date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}),` : `the ${esc(meter)} (none logged yet, so only the dates count)`}
@@ -300,7 +300,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     }
     renderPlaces(el.querySelector('#places'), list, v, STORE);
     renderGallery(el.querySelector('#photos'), photosDir(v), { noun: 'photo' }).catch(err => {
-        el.querySelector('#photos').innerHTML = `<div class="banner bad">Couldn't load photos: ${esc(err.message)}</div>`;
+        el.querySelector('#photos').innerHTML = `<div class="banner red">Couldn't load photos: ${esc(err.message)}</div>`;
     });
     table = recordTable(el.querySelector('#maint'), {
         columns: maintenanceColumns(v, (plan || []).map(r => r.Item)), // the schedule's items are offered first as Actions

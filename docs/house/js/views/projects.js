@@ -246,7 +246,7 @@ export async function renderProject(el, list, h, top, p) {
     });
 
     renderGallery(el.querySelector('#p-photos'), projectDir(h, p), { noun: 'image' }).catch(err => {
-        el.querySelector('#p-photos').innerHTML = `<div class="banner bad">Couldn't load images: ${esc(err.message)}</div>`;
+        el.querySelector('#p-photos').innerHTML = `<div class="banner red">Couldn't load images: ${esc(err.message)}</div>`;
     });
 
     const futureHref = `#${h.id}/updates/${FUTURE_UPDATES.id}`;

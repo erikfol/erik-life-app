@@ -15,7 +15,7 @@ export const forgetSchedule = () => { schedule = null; log = null; };
 
 const STATUS = { red: 'Overdue', yellow: 'Due soon', ok: 'OK' };
 const STATUS_CLASS = { Overdue: 'due-red', 'Due soon': 'due-yellow', OK: 'due-ok' };
-const BANNER = { red: 'banner bad', yellow: 'banner', ok: 'banner ok' };
+const BANNER = { red: 'banner red', yellow: 'banner', ok: 'banner green' };
 
 /** Banners [{ level, title, detail }] as HTML (red, yellow, green). */
 export const bannersHtml = list => list.map(b => `<div class="${BANNER[b.level]}"><strong>${esc(b.title)}</strong> ${esc(b.detail)}</div>`).join('');
@@ -50,9 +50,9 @@ export async function renderScheduleTab(el, h, top) {
         const where = r => { const a = pageOfItem(r); return a ? ` <a href="${esc(pageHref(h, a))}">${esc(a.label)} →</a>` : ''; };
         const item = x => `<span class="nowrap"><strong>${esc(x.r.Item)}</strong> <span class="muted">(due ${esc(dueText(x.s))})</span>${where(x.r)}</span>`;
         const red = states.filter(x => x.s.level === 'red'), yellow = states.filter(x => x.s.level === 'yellow');
-        el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner bad"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
+        el.querySelector('.sched-banner').innerHTML = (red.length ? `<div class="banner red"><strong>Overdue:</strong> ${red.map(item).join(' · ')}</div>` : '')
             + (yellow.length ? `<div class="banner"><strong>Due soon:</strong> ${yellow.map(item).join(' · ')}</div>` : '')
-            + (rows.length && !red.length && !yellow.length ? '<div class="banner ok">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
+            + (rows.length && !red.length && !yellow.length ? '<div class="banner green">✓ <strong>Nothing due.</strong> Everything on the schedule is up to date.</div>' : '');
         if (schedule?.hasUnsavedEdits()) return; // don't throw away edits in progress
         const status = r => scheduleStatus(h, r, entries);
         const cols = scheduleColumns([...new Set(entries.map(e => String(e.row.Action || '').trim()).filter(Boolean))]);

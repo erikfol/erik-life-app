@@ -40,7 +40,7 @@ async function folderStatus() {
 }
 
 /** Banner for files not added because an older month is still open (importFiles' `blocked`). */
-const blockedHtml = blocked => !blocked.length ? '' : `<div class="banner bad"><strong>Didn't add ${blocked.map(b => esc(b.name)).join(', ')}</strong>:
+const blockedHtml = blocked => !blocked.length ? '' : `<div class="banner red"><strong>Didn't add ${blocked.map(b => esc(b.name)).join(', ')}</strong>:
     ${esc(monthLabel(blocked[0].open))} is still open. When you've finished fixing its categories, close it with <strong>Close month</strong> below, then add ${blocked.length === 1 ? 'this file' : 'these files'} again.</div>`;
 
 /** Whether the current-month file has changes This Month doesn't show yet (Refresh loads them). */
@@ -67,7 +67,7 @@ function statusHtml(st) {
         </div>
         ${ch ? `<div class="banner">${ch.processed ? `<code>${esc(ch.file)}</code> has changed since it was last loaded (${[ch.added && `${ch.added} new row${ch.added === 1 ? '' : 's'}`, ch.gone && `${ch.gone} row${ch.gone === 1 ? '' : 's'} no longer in it, e.g. pending charges that have posted`].filter(Boolean).join(', ')}), so This Month doesn't show it yet.` : `<code>${esc(ch.file)}</code> hasn't been loaded yet.`} Click <strong>Refresh</strong> to load it; your edits are kept.</div>` : ''}
         ${cur && cur.months.length && cur.months.at(-1) < thisYm ? `<div class="banner">The current-month file is for ${esc(rangeLabel(cur.months))}, which has ended. When you've finished fixing its categories, ${st.processed ? 'close it with <strong>Close month</strong> below' : 'click Refresh, then close it with <strong>Close month</strong>'}.</div>` : ''}
-        ${st.current.length > 1 ? `<div class="banner bad">There are ${st.current.length} files in <code>${PATHS.currentMonth}/</code>; keep only one.</div>` : ''}
+        ${st.current.length > 1 ? `<div class="banner red">There are ${st.current.length} files in <code>${PATHS.currentMonth}/</code>; keep only one.</div>` : ''}
         ${st.processed ? `<div class="row" style="margin:0 0 12px"><button id="close-month"${cur && cur.months.length && cur.months.at(-1) < thisYm ? ' class="primary"' : ''}>Close month…</button>
             <span class="muted" style="font-size:0.85em">Adds the finished month to your history, archives its files and clears <code>${PATHS.currentMonth}/</code>.</span></div>
             <div id="close-plan"></div>` : ''}
@@ -150,7 +150,7 @@ const home = {
                     <span id="folder-name" class="muted"></span>
                     <button class="small" id="dropbox-out" ${cloud ? '' : 'hidden'}>Sign out of Dropbox</button>
                 </div>
-                <div class="banner bad" id="folder-moved" style="margin-bottom:14px" hidden></div>
+                <div class="banner red" id="folder-moved" style="margin-bottom:14px" hidden></div>
                 <div id="folder-tools" hidden>
                     <div class="row">
                         <button class="primary" id="add-files">Add bank files…</button>
@@ -231,7 +231,7 @@ const home = {
                     empty: 'No bank files yet',
                 });
             } catch (e) {
-                el.querySelector('#folder-status').innerHTML = `<div class="banner bad">Couldn't read the folder: ${esc(e.message)}</div>`;
+                el.querySelector('#folder-status').innerHTML = `<div class="banner red">Couldn't read the folder: ${esc(e.message)}</div>`;
             }
         };
 
@@ -248,7 +248,7 @@ const home = {
                     const st = await pingOllama();
                     if (!(st.ok && st.hasModel)) {
                         log(st.ok ? `Model ${ollamaSettings.model} isn't installed in Ollama.` : `Ollama ${st.error}.`, 'err');
-                        result(`<div class="banner bad"><strong>Didn't load: AI isn't available</strong> (${st.ok ? `model <code>${esc(ollamaSettings.model)}</code> isn't installed` : esc(st.error)}). See Local AI below.
+                        result(`<div class="banner red"><strong>Didn't load: AI isn't available</strong> (${st.ok ? `model <code>${esc(ollamaSettings.model)}</code> isn't installed` : esc(st.error)}). See Local AI below.
                             You can also load without AI: merchants you've categorized before use your history, and new ones get keyword rules.
                             <div class="row" style="margin-top:10px"><button class="primary" id="no-ai">Load without AI</button></div></div>`);
                         el.querySelector('#no-ai').onclick = () => load({ current, skipped, blocked }, false);
@@ -258,17 +258,17 @@ const home = {
                 const t = await backfill({ useAI, log, signal });
                 let html = '';
                 if (t.added) {
-                    html += `<div class="banner ok"><strong>Loaded ${t.added} new transaction${t.added === 1 ? '' : 's'}</strong> from ${t.files.map(esc).join(', ')}.
+                    html += `<div class="banner green"><strong>Loaded ${t.added} new transaction${t.added === 1 ? '' : 's'}</strong> from ${t.files.map(esc).join(', ')}.
                         ${t.history} matched merchants from your history${t.merchant ? `; ${t.merchant} matched your merchant rules` : ''}${t.ai ? `; ${t.ai} new merchant${t.ai === 1 ? ' was' : 's were'} categorized by the AI` : ''}${t.rules ? `; <strong>${t.rules} new merchant${t.rules === 1 ? ' was' : 's were'}</strong> categorized by keyword rules (mostly “Miscellaneous”). Check them in <a href="#edit">Finance Table</a> → Master history, filtering Category to Miscellaneous` : ''}.</div>`;
                 }
                 if (current) {
                     const p = await processCurrentMonth({ useAI, log, signal });
-                    if (p) html += `<div class="banner ok"><strong>Current month updated.</strong> See <a href="#month">This Month</a>.</div>`;
-                    else html += `<div class="banner bad">Couldn't process the current month; see Details below.</div>`;
+                    if (p) html += `<div class="banner green"><strong>Current month updated.</strong> See <a href="#month">This Month</a>.</div>`;
+                    else html += `<div class="banner red">Couldn't process the current month; see Details below.</div>`;
                 }
-                if (skipped.length) html += `<div class="banner bad">Skipped ${skipped.map(esc).join(', ')}: not a bank export (needs Date, Description and Amount columns).</div>`;
+                if (skipped.length) html += `<div class="banner red">Skipped ${skipped.map(esc).join(', ')}: not a bank export (needs Date, Description and Amount columns).</div>`;
                 html += blockedHtml(blocked);
-                result(html ||'<div class="banner ok">Everything is already loaded. Nothing new found.</div>');
+                result(html ||'<div class="banner green">Everything is already loaded. Nothing new found.</div>');
             } catch (e) {
                 if (e.name === 'AbortError') {
                     log('Cancelled. Finished rows were saved.', 'err');
@@ -277,7 +277,7 @@ const home = {
                 }
                 console.error(e);
                 log(`Error: ${e.message}`, 'err');
-                result(`<div class="banner bad">${e.name === 'NotAllowedError' ? 'Lost access to your folder. Click Reconnect above.' : `Something went wrong: ${esc(e.message)}`}</div>`);
+                result(`<div class="banner red">${e.name === 'NotAllowedError' ? 'Lost access to your folder. Click Reconnect above.' : `Something went wrong: ${esc(e.message)}`}</div>`);
             } finally {
                 busy = false;
                 running = null;
@@ -292,7 +292,7 @@ const home = {
         const reviewClose = async () => {
             const box = el.querySelector('#close-plan');
             const plan = await planClose();
-            if (plan.error) { box.innerHTML = `<div class="banner bad">${esc(plan.error)}</div>`; return; }
+            if (plan.error) { box.innerHTML = `<div class="banner red">${esc(plan.error)}</div>`; return; }
             box.innerHTML = `
                 <div class="banner" style="margin-bottom:12px">
                     <strong>Close ${esc(plan.label)}?</strong>
@@ -320,12 +320,12 @@ const home = {
                 logEl.textContent = '';
                 try {
                     await closeMonth(plan, log);
-                    result(`<div class="banner ok"><strong>${esc(plan.label)} closed.</strong> Add next month's bank export when it's ready.</div>`);
+                    result(`<div class="banner green"><strong>${esc(plan.label)} closed.</strong> Add next month's bank export when it's ready.</div>`);
                     toast(`${plan.label} closed`, 'ok');
                 } catch (e) {
                     console.error(e);
                     log(`Error: ${e.message}`, 'err');
-                    result(`<div class="banner bad">Couldn't close ${esc(plan.label)}: ${esc(e.message)}. See Details below.</div>`);
+                    result(`<div class="banner red">Couldn't close ${esc(plan.label)}: ${esc(e.message)}. See Details below.</div>`);
                 }
                 showFolder();
             };
@@ -348,13 +348,13 @@ const home = {
             try {
                 const r = await importFiles(files, log);
                 if (!r.past.length && !r.current) {
-                    result(r.blocked.length && !r.skipped.length ? blockedHtml(r.blocked) : '<div class="banner bad">No files were added; see Details below.</div>');
+                    result(r.blocked.length && !r.skipped.length ? blockedHtml(r.blocked) : '<div class="banner red">No files were added; see Details below.</div>');
                     if (!r.blocked.length || r.skipped.length) el.querySelector('#log-wrap').open = true;
                     return;
                 }
                 await load({ current: !!r.current, skipped: r.skipped, blocked: r.blocked });
             } catch (e) {
-                result(`<div class="banner bad">${esc(e.message)}</div>`);
+                result(`<div class="banner red">${esc(e.message)}</div>`);
             }
         };
 
@@ -398,9 +398,9 @@ const home = {
             box.innerHTML = '<p class="muted">Checking…</p>';
             const st = await pingOllama();
             el.querySelector('#o-models').innerHTML = (st.models || []).map(m => `<option value="${esc(m)}">`).join('');
-            if (!st.ok) box.innerHTML = `<div class="banner bad">Ollama ${esc(st.error)}.</div>`;
+            if (!st.ok) box.innerHTML = `<div class="banner red">Ollama ${esc(st.error)}.</div>`;
             else if (!st.hasModel) box.innerHTML = `<div class="banner">Ollama is running, but model <code>${esc(ollamaSettings.model)}</code> isn't pulled. Installed: ${esc(st.models.join(', ') || 'none')}. Run <code>ollama pull ${esc(ollamaSettings.model)}</code>.</div>`;
-            else box.innerHTML = `<div class="banner ok">Connected — using <code>${esc(ollamaSettings.model)}</code>.</div>`;
+            else box.innerHTML = `<div class="banner green">Connected — using <code>${esc(ollamaSettings.model)}</code>.</div>`;
         };
         el.querySelector('#ai-on').onchange = e => {
             setAiEnabled(e.target.checked);

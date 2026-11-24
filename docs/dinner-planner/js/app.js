@@ -1066,7 +1066,7 @@ async function start() {
         ]);
     } catch (e) {
         console.error(e);
-        viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
+        viewEl.innerHTML = `<div class="banner red"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
         return;
     }
     state.ai.enabled = !!state.ai.settings.key;

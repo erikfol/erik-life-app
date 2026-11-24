@@ -25,7 +25,7 @@ export default async function renderPropane(el) {
         return;
     }
     if (data.missing.length) {
-        el.innerHTML = `<div class="banner bad"><code>${esc(PROPANE_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects date, quantity and propane cost.</div>`;
+        el.innerHTML = `<div class="banner red"><code>${esc(PROPANE_PATH)}</code> is missing columns this page needs (${esc(data.missing.join(', '))}). It expects date, quantity and propane cost.</div>`;
         return;
     }
     const { fills } = data;
@@ -213,7 +213,7 @@ export default async function renderPropane(el) {
     const since = daysBetween(last.date, today());
     const gaps = fills.map(f => f.days).filter(d => d > 0);
     const avgGap = gaps.length ? sum(gaps) / gaps.length : NaN;
-    $('#status').innerHTML = `<div class="banner ok">🔥 <strong>Last fill-up ${esc(dLong(last.date))}</strong> (${esc(gal(last.gallons))}, ${esc(money(last.total))}), ${esc(months(since))} ago.`
+    $('#status').innerHTML = `<div class="banner green">🔥 <strong>Last fill-up ${esc(dLong(last.date))}</strong> (${esc(gal(last.gallons))}, ${esc(money(last.total))}), ${esc(months(since))} ago.`
         + (Number.isFinite(avgGap) ? ` You've filled up about every ${esc(months(avgGap))} on average.` : '') + '</div>';
 
     // About a month before the next fill-up is expected (last one + the average time between fill-ups), it's time to
@@ -224,7 +224,7 @@ export default async function renderPropane(el) {
         const text = `Around ${esc(dLong(detailsOn))} you should be able to get the details of the next fill-up.</strong> It's expected around ${esc(dLong(nextFill))}, about ${esc(months(Math.round(avgGap)))} after the last one.`;
         $('#details-soon').innerHTML = today() >= detailsOn
             ? `<div class="banner">🔎 <strong>${text}</div>`
-            : `<div class="banner ok">🗓️ <strong>${text}</div>`;
+            : `<div class="banner green">🗓️ <strong>${text}</div>`;
     }
 
     // ── Add a fill-up ──
