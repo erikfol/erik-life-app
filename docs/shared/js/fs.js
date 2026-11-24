@@ -134,8 +134,24 @@ function split(path) {
     return i < 0 ? ['', path] : [path.slice(0, i), path.slice(i + 1)];
 }
 
+// While shareReads() runs (the Home page counting every section's red and yellow items), a file that several sections
+// read is read once: on a tablet each read is a Dropbox download. Writing or removing a file drops its shared copy.
+let sharing = null; // path → the promise of its text
+/** Run `fn`, reading each file at most once meanwhile. */
+export async function shareReads(fn) {
+    if (sharing) return fn();
+    sharing = new Map();
+    try { return await fn(); } finally { sharing = null; }
+}
+
 /** File text, or null if it doesn't exist. */
-export async function readText(path) {
+export function readText(path) {
+    if (!sharing) return readNow(path);
+    if (!sharing.has(path)) sharing.set(path, readNow(path));
+    return sharing.get(path);
+}
+
+async function readNow(path) {
     if (isCloud()) { const f = await dbx.download(path); return f && await f.blob.text(); }
     const [d, name] = split(path);
     try {
@@ -185,6 +201,7 @@ export async function modifiedAt(path) {
 }
 
 export async function writeText(path, text) {
+    sharing?.delete(path);
     if (isCloud()) await dbx.upload(path, text);
     else {
         if (root && await isGone(root)) throw movedError(); // never write into a moved folder's old place
@@ -211,6 +228,7 @@ export async function exists(path) {
 }
 
 export async function removeFile(path) {
+    sharing?.delete(path);
     if (isCloud()) { await dbx.remove(path); return; }
     const [d, name] = split(path);
     try { await (await dir(d)).removeEntry(name); } catch (e) { await checkFolder(e); throw e; }

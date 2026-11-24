@@ -27,6 +27,8 @@ p.lead { color: var(--muted); margin-bottom: 22px; }
 .count.red { background: #d63a2c; color: #fff; }
 .count.yellow { background: #f5c518; color: #4a3b00; }
 .count.error { background: #e3e6ec; color: #667; }
+/* The last counts in this tab, shown faded while they're counted again (shared/js/home.js) */
+.alerts.old { opacity: 0.45; }
 .alerts-note { margin: -8px 0 18px; color: var(--muted); font-size: 0.9em; }
 /* Manual backup to a folder on the PC (shared/js/backup.js) */
 .backup {

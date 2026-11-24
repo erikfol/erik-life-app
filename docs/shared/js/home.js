@@ -22,7 +22,25 @@ const ALERTS = {
 };
 
 const slot = id => document.querySelector(`.app[href="${id}/"] .alerts`);
-const clearCounts = () => Object.keys(ALERTS).forEach(id => { slot(id).innerHTML = ''; });
+// The counts from the last time in this tab are shown at once (faded) while they're counted again, which on a tablet
+// takes a while: every file is a Dropbox download.
+const SAVED = 'home-counts';
+const saveCounts = () => {
+    try { sessionStorage.setItem(SAVED, JSON.stringify(Object.fromEntries(Object.keys(ALERTS).map(id => [id, slot(id).innerHTML])))); } catch { /* not kept; fine */ }
+};
+const showSaved = () => {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(SAVED)); } catch { /* none */ }
+    for (const [id, html] of Object.entries(saved || {})) {
+        if (!ALERTS[id] || slot(id).innerHTML) continue;
+        slot(id).innerHTML = html;
+        slot(id).classList.add('old');
+    }
+};
+const clearCounts = () => {
+    Object.keys(ALERTS).forEach(id => { slot(id).innerHTML = ''; slot(id).classList.remove('old'); });
+    try { sessionStorage.removeItem(SAVED); } catch { /* fine */ }
+};
 
 /** '2 red:\n• …\n• …' */
 const listText = (n, colour, items) => `${n} ${colour}:\n${items.map(x => `• ${x.text}`).join('\n')}`;
@@ -30,7 +48,8 @@ const count = (colour, items) => (items.length
     ? `<span class="count ${colour}" title="${esc(listText(items.length, colour, items))}" aria-label="${esc(listText(items.length, colour, items))}">${items.length}</span>` : '');
 
 async function countAll() {
-    await Promise.all(Object.entries(ALERTS).map(async ([id, load]) => {
+    showSaved();
+    await fs.shareReads(() => Promise.all(Object.entries(ALERTS).map(async ([id, load]) => {
         const el = slot(id);
         try {
             const items = await (await load()).default();
@@ -39,7 +58,9 @@ async function countAll() {
             console.error(id, e);
             el.innerHTML = `<span class="count error" title="${esc(`Couldn't check: ${e.message}`)}">?</span>`;
         }
-    }));
+        el.classList.remove('old');
+    })));
+    saveCounts();
 }
 
 // ── The folder (this computer) or Dropbox (a tablet or phone) the counts and the backup line are read from ──
@@ -50,9 +71,9 @@ const connected = () => { backup.refresh(); assistant.refresh(); return countAll
 
 async function connect() {
     note.hidden = true;
+    if (fs.folder()) return connected(); // signed in to Dropbox on this device
     backup.refresh();
     assistant.refresh();
-    if (fs.folder()) return connected(); // signed in to Dropbox on this device
     if (!fs.isSupported()) return; // a tablet or phone: sign in with Dropbox below first
     const rem = await fs.rememberedFolder().catch(() => null);
     if (fs.folder()) return connected();
