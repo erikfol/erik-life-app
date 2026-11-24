@@ -40,7 +40,9 @@ the Home page counts and the menus are coloured by), `js/views/` (its pages) and
 - `css/app.css` (the look every section shares), `records.css`, `sections.css`
 
 Before committing changes to `docs/`, run `python tools/stamp_version.py` (so browsers fetch the new files at once
-rather than up to 10 minutes later) and `node --test` (the tests in `tests/`).
+rather than up to 10 minutes later) and `node --test` (the tests in `tests/`). For a change that should leave the
+pages as they were, `node tools/check/run.mjs` compares every page before and after on a copy of your data
+(see `tools/check/README.md`).
 
 To run it locally: `python -m http.server 8000 -d docs` and open http://localhost:8000.
 
