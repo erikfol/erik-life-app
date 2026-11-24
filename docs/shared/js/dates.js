@@ -53,6 +53,16 @@ export const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n,
 export const today = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
 export const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 export const dateOf = v => { const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], m[2] - 1, +m[3]) : null; };
+/** Today as YYYY-MM-DD (this device's date). */
+export const todayIso = () => isoDate(new Date());
+/**
+ * Whole calendar days from `a` to `b` (negative when b is earlier). The time of day doesn't count, and neither do
+ * daylight-saving changes: Mar 1 → Mar 21 is 20 days, where (b - a) / 864e5 rounded down gives 19.
+ */
+export const daysBetween = (a, b) => Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate())
+    - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / 864e5);
+/** 0 → 'today', 1 → 'tomorrow', 5 → 'in 5 days'. */
+export const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
 
 /** Normalize a date cell to DD-Mmm-YY, or '' if it can't be parsed (pandas NaT). */
 export function normalizeDateCell(value) {

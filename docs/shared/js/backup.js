@@ -4,12 +4,12 @@
 // A tablet or phone can't make one (no folders there), but shows how long ago the last one was.
 import * as fs from './fs.js';
 import { esc } from './util.js';
+import { daysBetween } from './dates.js';
 
 /** What a backup copies, from the top of your folder. Anything else there (like Dropbox's desktop.ini) is left out. */
 const DATA = ['config.json', 'inputs', 'output_master_data', 'reports', 'backups.json'];
 const LOG_PATH = 'backups.json';
 const DEST_KEY = 'backup'; // the backup folder, remembered in this browser
-const DAY = 864e5;
 /** The Backup line turns yellow after this many days without a backup, and red after this many (or with none yet). */
 export const BACKUP_YELLOW_DAYS = 15, BACKUP_RED_DAYS = 30;
 
@@ -114,7 +114,7 @@ export function backupPanel(el) {
         const last = backups.at(-1);
         if (!last) return { level: 'red', html: '<strong>No manual backup yet.</strong>' };
         const [y, m, d] = last.date.slice(0, 10).split('-').map(Number);
-        const t = new Date(), days = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / DAY);
+        const days = daysBetween(new Date(y, m - 1, d), new Date());
         const path = last.path || pathOf(location, last.to);
         const when = `<span class="muted">(${esc(longDay(new Date(y, m - 1, d)))}${path ? `, to ${esc(path)}` : last.to ? `, to “${esc(last.to)}”` : ''})</span>`;
         return {

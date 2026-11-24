@@ -6,9 +6,9 @@ import { esc, toast, money } from './util.js';
 import { dataTable, closeFilterMenu } from './datatable.js';
 import { moveButtons } from './infobox.js';
 import { openLightbox } from './lightbox.js';
+import { MON } from './dates.js';
 
 const NEW_CHOICE = '__new__'; // a choice can't be named this, so it can't clash
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const ONGOING = 'ongoing';
 let tableCount = 0; // gives each table's suggestion lists their own ids (a page can have more than one table)
 

@@ -8,6 +8,7 @@ import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recor
 import { infoBox } from '../../../shared/js/infobox.js';
 import { infoLinks, cleanUrl } from '../../../shared/js/infolinks.js';
 import { appointmentStatus } from '../../../shared/js/appointments.js';
+import { inDays, todayIso } from '../../../shared/js/dates.js';
 import { staleAccounts, STALE_DAYS, VERY_STALE_DAYS } from '../alerts.js';
 import {
     HEALTH_DIR, INFO_PATH, loadRecords, saveRecords, loadLocations, saveLocations, loadAccounts, saveAccounts, newAccount,
@@ -19,7 +20,6 @@ let checks = []; // one "has unsaved edits?" per table and account box on the pa
 export const hasUnsavedEdits = () => checks.some(f => f());
 export const forget = () => { checks = []; closeFilterMenu(); };
 
-const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
 
 /** Red while Records have an I Owe amount not marked Paid: the total and each one. */
 const owedBanner = rows => {
@@ -135,8 +135,6 @@ export async function renderSection(el, section) {
     }
 }
 
-const pad = n => String(n).padStart(2, '0');
-const isoToday = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 /** The yellow / red "Activity not updated" banners (staleAccounts, shared with the Home page); entries: { account id: rows }. */
 function staleBanners(list, entries) {
@@ -180,7 +178,7 @@ async function renderAccounts(el, section) {
         const account = list.find(a => a.id === b.dataset.activityChecked);
         b.disabled = true;
         try {
-            await ctx.save(list.map(a => (a.id === account.id ? { ...a, activityChecked: isoToday() } : a)));
+            await ctx.save(list.map(a => (a.id === account.id ? { ...a, activityChecked: todayIso() } : a)));
             toast(`${account.title}: marked checked today`, 'ok');
         } catch (err) {
             b.disabled = false;

@@ -106,7 +106,7 @@ export function christmas(year, today = new Date()) {
 export const comingChristmas = (today = new Date()) => String(today.getFullYear() + (christmas(today.getFullYear(), today).days < 0 ? 1 : 0));
 
 export const showDay = date => date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-export const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+export { inDays } from '../../shared/js/dates.js';
 
 // ── Gifts ──────────────────────────────────────────────────────────────
 

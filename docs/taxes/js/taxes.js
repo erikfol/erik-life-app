@@ -5,6 +5,7 @@
 import * as fs from '../../shared/js/fs.js';
 import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
+import { MON, todayIso } from '../../shared/js/dates.js';
 
 export const T_DIR = 'inputs/taxes';
 export const DATA_PATH = `${T_DIR}/taxes.json`;
@@ -16,9 +17,6 @@ export const notesPath = y => `${T_DIR}/${y}-notes.csv`;
 export const notesDir = y => `${T_DIR}/notes/${y}`;
 
 const DAY = 864e5;
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const todayIso = () => iso(new Date());
 const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 export const dateOf = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v ?? '').trim()); return m ? new Date(+m[1], m[2] - 1, +m[3]) : null; };
 export const longDate = d => `${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;

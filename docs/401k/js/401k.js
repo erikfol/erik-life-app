@@ -5,6 +5,7 @@
 import * as fs from '../../shared/js/fs.js';
 import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
+import { isoDate, todayIso } from '../../shared/js/dates.js';
 
 export const K_DIR = 'inputs/401k';
 export const PLAN_PATH = `${K_DIR}/401k.json`;
@@ -33,7 +34,6 @@ export async function savePlan(plan) {
     await writeTracked(PLAN_PATH, JSON.stringify(plan, null, 2) + '\n');
 }
 
-const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
 // The period a statement's numbers cover (its "Show these returns"): the years before its date.
 export const RETURN_PERIODS = ['1-year', '3-year', '5-year', '10-year'];
@@ -115,7 +115,7 @@ export function ledger(rows) {
         const balance = Number.isFinite(typed) ? typed : [start, net, returns].every(Number.isFinite) ? start + net + returns : NaN;
         const date = /^\d{4}-\d{2}-\d{2}$/.test(row.Date) ? row.Date : null, years = periodYears(row['Show These Returns']);
         // The same day `years` years before (Feb 29 → Feb 28).
-        const from = date && years ? (d => (d.getDate() === +date.slice(8) ? isoOf(d) : isoOf(new Date(d.getFullYear(), d.getMonth(), 0))))(
+        const from = date && years ? (d => (d.getDate() === +date.slice(8) ? isoDate(d) : isoDate(new Date(d.getFullYear(), d.getMonth(), 0))))(
             new Date(+date.slice(0, 4) - years, +date.slice(5, 7) - 1, +date.slice(8))) : null;
         return { row, i, date, period: years ? row['Show These Returns'] : '', from, start, net: net || 0, returns: returns || 0, balance };
     })
@@ -127,7 +127,6 @@ export function ledger(rows) {
 export const notAddingUp = pts => pts.filter(p => Number.isFinite(p.start) && Number.isFinite(amountOf(p.row['Current Balance']))
     && Math.abs(p.start + p.net + p.returns - p.balance) > 0.5);
 
-const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /**
  * Every balance the entries give, oldest first: [{ date, balance, kind: 'current' | 'start', entry }] — each entry's

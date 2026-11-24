@@ -3,6 +3,7 @@ import { esc, toast } from '../../../shared/js/util.js';
 import { recordTable, closeFilterMenu, showDate } from '../../../shared/js/recordtable.js';
 import { infoBox } from '../../../shared/js/infobox.js';
 import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
+import { inDays } from '../../../shared/js/dates.js';
 import { PETS_PATH, ageText, savePets, newPet, recordsPath, photosDir, RECORD_COLUMNS, loadRecords, saveRecords,
     appointmentsPath, APPOINTMENT_COLUMNS, loadAppointments, saveAppointments, appointmentStatus, invoicesDir } from '../pets.js';
 
@@ -21,7 +22,6 @@ const ageItem = f => {
         : '<span class="muted">Can’t read the birthday — type it like 3/5/2018, Mar 5 2018 or March 2018</span>'}</dd></div>`;
 };
 
-const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
 
 /** Red: no future appointment; yellow: the next one is within 2 weeks; green: one is booked further out. */
 const appointmentBanner = (name, rows) => {

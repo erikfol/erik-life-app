@@ -2,9 +2,9 @@
 // with dates like 22/Jul/2026 and Excel accounting amounts like ' $25.15 ' / ' $(1,003.21)'.
 import * as fs from '../../shared/js/fs.js';
 import { parseRecords } from '../../shared/js/csv.js';
+import { MON } from '../../shared/js/dates.js';
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** '22/Jul/2026' (also 22-Jul-2026, 2026-07-22, Nov 19 2025, and US 12/07/2022 = Dec 7) → Date, or null. */
 export function parseBillDate(s) {

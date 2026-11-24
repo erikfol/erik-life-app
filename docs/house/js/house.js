@@ -4,6 +4,7 @@
 import * as fs from '../../shared/js/fs.js';
 import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
+import { isoDate } from '../../shared/js/dates.js';
 
 export const HOUSE_DIR = 'inputs/house';
 export const HOUSE_PATH = `${HOUSE_DIR}/house.json`;
@@ -190,7 +191,6 @@ const nextQuarter = k => (k.q === 4 ? { y: k.y + 1, q: 1 } : { y: k.y, q: k.q + 
 /** When a quarter's RECs are minted, and the day their payment is due by. */
 export const recMinted = k => new Date(k.y, k.q * 3 + 3, 15);
 export const recPaidBy = k => new Date(k.y, k.q * 3 + 4, 15);
-const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /** The latest quarter minted by `today`: what a new REC payments row starts with. */
 const lastMinted = (today = new Date()) => {
     let k = { y: today.getFullYear() - 2, q: 1 };
@@ -200,7 +200,7 @@ const lastMinted = (today = new Date()) => {
 
 const REC_PAYMENT_COLUMNS = [
     { name: 'Quarter', kind: 'choice', default: () => quarterValue(lastMinted()) }, // the quarter of production
-    { name: 'Paid By', kind: 'date', calc: r => { const k = quarterOf(r.Quarter); return k ? isoOf(recPaidBy(k)) : ''; } },
+    { name: 'Paid By', kind: 'date', calc: r => { const k = quarterOf(r.Quarter); return k ? isoDate(recPaidBy(k)) : ''; } },
     { name: 'RECs', kind: 'number' }, // minted (0 when it was under 1,000 kWh: it rolls over)
     { name: 'Price per REC', kind: 'money', total: false },
     { name: 'Amount', kind: 'money' },

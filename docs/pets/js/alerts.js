@@ -1,8 +1,8 @@
 // Pets' red and yellow banners, for the Home page's counts and the menu colours: a pet with no future appointment
 // (red) or one in the next two weeks (yellow), as the appointment banner on its page (appointmentStatus).
 import { loadPets, loadAppointments, appointmentStatus } from './pets.js';
+import { inDays } from '../../shared/js/dates.js';
 
-const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
 
 /** [{ level: 'red' | 'yellow', text, href }] (href: the pet's page) */
 export default async function alerts() {

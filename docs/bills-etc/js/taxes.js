@@ -2,10 +2,10 @@
 // NH bills twice a year: the 1st half is an estimate at roughly half the rate; the 2nd half uses the year's full rate
 // and makes up the rest, so the year's tax is the two halves added together.
 import { readSheet, insertRow, parseBillDate, parseMoney, num, sheetMoney } from './sheet.js';
+import { MON } from '../../shared/js/dates.js';
 
 export const TAX_PATH = 'inputs/taxes_property_enfield/master_taxes_property.csv';
 
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const round2 = n => Math.round((n + Math.sign(n) * 1e-9) * 100) / 100;
 /** 'Nov 19 2025', the sheet's date format. */
 export const taxDate = d => `${MON[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;

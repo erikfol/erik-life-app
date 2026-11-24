@@ -3,7 +3,7 @@
 // names live only in those files (inputs/ is kept out of git), not in this code.
 import * as fs from '../../shared/js/fs.js';
 import { parseCSV, toCSV } from '../../shared/js/csv.js';
-import { parseDate } from '../../shared/js/dates.js';
+import { parseDate, isoDate } from '../../shared/js/dates.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const DIR = 'inputs/kid-lunches';
@@ -36,8 +36,7 @@ let db = null; // { version, kids: [names], items: { kid: { compartment: [names]
 
 export const data = () => db;
 
-const pad = n => String(n).padStart(2, '0');
-export const localDate = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const localDate = (d = new Date()) => isoDate(d);
 
 const clean = (v, max = 60) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 export const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();

@@ -6,16 +6,13 @@
 import { SECTIONS, loadRecords, loadAccounts, appointmentsSection, accountSection, owedRecords } from './records.js';
 import { money } from '../../shared/js/util.js';
 import { appointmentStatus } from '../../shared/js/appointments.js';
+import { inDays, daysBetween, dateOf } from '../../shared/js/dates.js';
 
 // Like Bills Etc → Loan/CC → Credit Cards: an account whose newest entry, or the last time it was marked checked, is
 // STALE_DAYS or more ago gets a yellow banner (red from VERY_STALE_DAYS), so you know to look at its activity.
 export const STALE_DAYS = 20, VERY_STALE_DAYS = 40;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-const daysSince = iso => {
-    const [y, m, d] = iso.split('-').map(Number);
-    const t = new Date();
-    return Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / 86400000);
-};
+const daysSince = iso => daysBetween(dateOf(iso), new Date());
 
 /** Accounts to look at, longest first: [{ a, lastEntry, checked, days }]; entries: { account id: rows }. */
 export function staleAccounts(list, entries) {
@@ -27,7 +24,6 @@ export function staleAccounts(list, entries) {
     }).filter(x => x.days >= STALE_DAYS).sort((x, y) => y.days - x.days);
 }
 
-const inDays = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
 
 /** [{ level: 'red' | 'yellow', text, href }] (href: the section's page) */
 export default async function alerts() {

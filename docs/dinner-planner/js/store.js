@@ -3,6 +3,7 @@
 // by-hand and before-restore copies of db.json. inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
+import { isoDate } from '../../shared/js/dates.js';
 import { STATUS, OUT, nameOf, limitsOf, limitsProblem, leftoverKeys, outLabel } from './leftovers.js';
 
 export const DIR = 'inputs/dinner-planner';
@@ -18,7 +19,7 @@ let db = null; // the whole data file, as loaded
 export const data = () => db;
 
 const pad = n => String(n).padStart(2, '0');
-export const localDate = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const localDate = (d = new Date()) => isoDate(d);
 const stamp = (d = new Date()) => `${localDate(d)}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 
 // ---------- validation ----------

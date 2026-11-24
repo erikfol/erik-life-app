@@ -3,10 +3,10 @@
 // and lays them out as a resume you can adjust (every part has a checkbox), print / save as PDF, copy as text, and save
 // with the posting it was made for. No AI and nothing sent anywhere: see js/match.js for how matching works.
 import { esc, toast } from '../../../shared/js/util.js';
+import { MON } from '../../../shared/js/dates.js';
 import { loadAll, loadResumes, saveResumes, RESUMES_PATH } from '../career.js';
 import { readPosting, score, mentions, words, stem, stemsIn } from '../match.js';
 
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const BULLETS_PER_JOB = 5; // the most matching bullets picked for each position
 const LEVELS = ['expert', 'advanced', 'intermediate', 'beginner'];
 

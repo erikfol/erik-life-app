@@ -14,6 +14,7 @@ import { loadAccounts, loadPayments, loadActivity, ledger, owesBack, isCard, has
 import { parseBillDate } from './sheet.js';
 import { esc, money, sum } from '../../shared/js/util.js';
 import { dLong, addMonths, today } from './views/utilcommon.js';
+import { daysBetween, dateOf } from '../../shared/js/dates.js';
 import { portalLink as waterPortal } from './views/water.js';
 import { portalLink as taxPortal, taxDetailsOn } from './views/taxes.js';
 
@@ -27,7 +28,7 @@ export const LEVELS = ['stale', 'old', 'aging'];
 /** Savings: paid every other week. */
 export const PAYCHECK_EVERY = 14;
 /** Savings: deposits a bucket is behind, one for every two weeks since its last update. */
-export const depositsDue = b => (b.group === 'active' && b.perCheck > 0 && b.updated ? Math.max(0, Math.floor((today() - b.updated) / DAY / PAYCHECK_EVERY)) : 0);
+export const depositsDue = b => (b.group === 'active' && b.perCheck > 0 && b.updated ? Math.max(0, Math.floor(daysBetween(b.updated, today()) / PAYCHECK_EVERY)) : 0);
 /**
  * Savings: how long since the account activity was last brought up to date — the newest of its last entry, the day
  * it was marked checked (settings.activityChecked) and the starting balance's date: { lastEntry, checked, days }.
@@ -38,8 +39,7 @@ export function savingsActivityAge(rows, settings, t0) {
     const lastEntry = rows.map(r => iso(r.Date)).filter(Boolean).sort().at(-1) || null;
     const checked = iso(settings?.activityChecked), opened = iso(settings?.opening?.date);
     const last = [lastEntry, checked, opened].filter(Boolean).sort().at(-1);
-    const day = x => { const [y, m, d] = x.split('-').map(Number); return new Date(y, m - 1, d); };
-    return { lastEntry: lastEntry && day(lastEntry), checked: checked && day(checked), days: last ? Math.floor((t0 - day(last)) / DAY) : Infinity };
+    return { lastEntry: lastEntry && dateOf(lastEntry), checked: checked && dateOf(checked), days: last ? daysBetween(dateOf(last), t0) : Infinity };
 }
 
 // The electric company's customer portal, where statements are downloaded.
@@ -68,7 +68,7 @@ export function staleCards(all, t0) {
         const lastEntry = dates.length ? new Date(Math.max(...dates)) : null;
         const checked = parseBillDate(account.activityChecked);
         const last = [lastEntry, checked].filter(Boolean).sort((a, b) => b - a)[0] || parseBillDate(account.openingDate);
-        return { account, lastEntry, checked, days: last ? Math.floor((t0 - last) / DAY) : Infinity };
+        return { account, lastEntry, checked, days: last ? daysBetween(last, t0) : Infinity };
     }).filter(x => x.days >= STALE_DAYS).sort((a, b) => b.days - a.days);
 }
 /** Loan/CC: activity still to pay back, as {account, a}. */

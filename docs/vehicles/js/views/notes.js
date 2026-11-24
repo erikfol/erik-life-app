@@ -3,6 +3,7 @@
 // are the files in inputs/vehicles/notes/<vehicle id>/<note id>/.
 import { esc, toast } from '../../../shared/js/util.js';
 import { showDate } from '../../../shared/js/recordtable.js';
+import { todayIso } from '../../../shared/js/dates.js';
 import { STORE } from '../vehicles.js';
 import { renderGallery, releaseGalleries } from '../../../shared/js/gallery.js';
 
@@ -11,8 +12,6 @@ let draft = null; // { start, read } while a note is being edited
 export const notesUnsaved = () => !!draft && draft.read() !== draft.start;
 export const forgetNotes = () => { draft = null; };
 
-const pad = n => String(n).padStart(2, '0');
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const newestFirst = (a, b) => (b.date || '').localeCompare(a.date || '') || b.id.localeCompare(a.id);
 
 const newId = (notes, date, title) => {
@@ -78,7 +77,7 @@ export function renderNotes(el, list, v, store = STORE) {
         container.innerHTML = `
             <div class="note-form">
                 <div class="note-form-row">
-                    <label class="field">Date<input type="date" data-f="date" value="${esc(n ? n.date : today())}"></label>
+                    <label class="field">Date<input type="date" data-f="date" value="${esc(n ? n.date : todayIso())}"></label>
                     <label class="field note-form-title">Title<input type="text" data-f="title" value="${esc(n?.title || '')}" placeholder="e.g. Leak at the stern"></label>
                 </div>
                 <label class="field">Note<textarea data-f="text" rows="8">${esc(n?.text || '')}</textarea></label>

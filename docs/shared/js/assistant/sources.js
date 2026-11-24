@@ -3,6 +3,7 @@
 // them. Every value goes through the privacy filter (scrub.js) here, so nothing later can see the originals.
 import * as fs from '../fs.js';
 import { parseRecords } from '../csv.js';
+import { isoDate } from '../dates.js';
 import { parseBillDate } from '../../../bills-etc/js/sheet.js';
 import { loadConfig } from '../../../bills-etc/js/data.js';
 import { allTransactions, parseBills } from '../../../bills-etc/js/bills.js';
@@ -24,7 +25,7 @@ const FOLDERS = [
 // Read through the app's own code below instead, or an internal copy of what's in another source.
 const SKIP = /^inputs\/(electric\/master_electric\.csv|heat_home\/master_heat_home\.csv|dinner-planner\/db\.json)$/;
 
-const iso = d => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '');
+const iso = d => (d ? isoDate(d) : '');
 const dollars = n => (Number.isFinite(n) ? `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'unknown');
 
 /** A date in any of the sheets' formats → YYYY-MM-DD, so dates can be compared and grouped; anything else unchanged. */
