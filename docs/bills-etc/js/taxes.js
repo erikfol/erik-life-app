@@ -4,6 +4,12 @@
 import { readSheet, insertRow, parseBillDate, parseMoney, num, sheetMoney } from './sheet.js';
 import { MON } from '../../shared/js/dates.js';
 
+// The town's online bill kiosk (same one as the water bills).
+const TOWN_PORTAL = 'https://nhtaxkiosk.com/?KIOSKID=ENFIELD';
+export const portalLink = `<a class="ext-link" href="${TOWN_PORTAL}" target="_blank" rel="noopener">Enfield tax bills ↗</a>`;
+/** When the next half's details can be viewed on the kiosk: 1st half around May 25, 2nd half around Nov 25. */
+export const taxDetailsOn = last => (last.half === 1 ? new Date(last.year, 10, 25) : new Date(last.year + 1, 4, 25));
+
 export const TAX_PATH = 'inputs/taxes_property_enfield/master_taxes_property.csv';
 
 const round2 = n => Math.round((n + Math.sign(n) * 1e-9) * 100) / 100;

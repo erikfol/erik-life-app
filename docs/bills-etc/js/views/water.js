@@ -1,6 +1,6 @@
 // Utilities → Water: quarterly bills from inputs/water/master_water.csv.
 import {
-    loadWater, addWaterBill, setWaterPaid, calcWater, nextQuarter, quarterDates, recalcWaterRow, waterDupKey, WATER_CALCULATED, WATER_PATH,
+    loadWater, addWaterBill, setWaterPaid, calcWater, nextQuarter, quarterDates, recalcWaterRow, waterDupKey, WATER_CALCULATED, WATER_PATH, portalLink,
 } from '../water.js';
 import { drawBars } from '../../../shared/js/charts.js';
 import { esc, money, sum, toast } from '../../../shared/js/util.js';
@@ -21,9 +21,6 @@ const qLong = b => `Q${b.q} ${b.year}`;
 const gal = n => Number.isFinite(n) ? `${Math.round(n).toLocaleString('en-US')} gal` : '–';
 /** $4.40, or $4.125 when the rate has a third decimal. */
 const rateText = r => { if (!Number.isFinite(r)) return '–'; const t = r.toFixed(3); return '$' + (t.endsWith('0') ? r.toFixed(2) : t); };
-// The town's online bill payment kiosk for water.
-const WATER_PORTAL = 'https://nhtaxkiosk.com/?KIOSKID=ENFIELD';
-export const portalLink = `<a class="ext-link" href="${WATER_PORTAL}" target="_blank" rel="noopener">Enfield water bills ↗</a>`;
 /** Button that marks a quarter paid (or, with paid = false, not paid). */
 const markBtn = (b, paid, text, cls = '') => `<button type="button" class="small ${cls}" data-mark-paid="${paid ? 1 : 0}" data-q="${b.q}" data-year="${b.year}">${text}</button>`;
 // The four parts of a bill's calculated amount, in the order the chart shows them.

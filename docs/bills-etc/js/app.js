@@ -4,19 +4,21 @@ import { esc } from '../../shared/js/util.js';
 import { syncCategories } from './categories.js';
 import alerts from './alerts.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
-import home from './views/home.js';
-import month from './views/month.js';
-import dashboard from './views/dashboard.js';
-import edit from './views/edit.js';
-import config from './views/config.js';
-import subs from './views/subs.js';
-import utilities from './views/utilities.js';
-import loans from './views/loans.js';
-import savings from './views/savings.js';
-import bills from './views/bills.js';
-import income from './views/income.js';
 
-const VIEWS = { home, month, income, bills, dashboard, utilities, loans, savings, edit, subs, config };
+// Each page's code is loaded the first time it's opened, so starting Bills Etc doesn't load all eleven.
+const VIEWS = {
+    home: () => import('./views/home.js'),
+    month: () => import('./views/month.js'),
+    income: () => import('./views/income.js'),
+    bills: () => import('./views/bills.js'),
+    dashboard: () => import('./views/dashboard.js'),
+    utilities: () => import('./views/utilities.js'),
+    loans: () => import('./views/loans.js'),
+    savings: () => import('./views/savings.js'),
+    edit: () => import('./views/edit.js'),
+    subs: () => import('./views/subs.js'),
+    config: () => import('./views/config.js'),
+};
 const viewEl = document.getElementById('view');
 let current = null;
 let currentName = null;
@@ -90,7 +92,14 @@ async function route(force = false) {
         viewEl.innerHTML = `<div class="banner"><strong>This page needs the latest version of the app.</strong> Your browser is still using an older copy. Press <strong>Ctrl+F5</strong> to reload it.</div>`;
         return;
     }
-    const view = VIEWS[name] || VIEWS.home;
+    let view;
+    try {
+        view = (await (VIEWS[name] || VIEWS.home)()).default;
+    } catch (e) { // e.g. no connection while the page's code is fetched
+        console.error(e);
+        viewEl.innerHTML = `<div class="banner bad"><strong>Couldn't load this page:</strong> ${esc(e.message)} Check the connection and reload (F5).</div>`;
+        return;
+    }
     current?.destroy?.();
     current = view;
     currentName = VIEWS[name] ? name : 'home';

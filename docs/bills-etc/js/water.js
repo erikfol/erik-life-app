@@ -3,6 +3,9 @@ import * as fs from '../../shared/js/fs.js';
 import { readSheet, insertRow, addColumn, parseBillDate, parseMoney, num, sheetDate, sheetMoney } from './sheet.js';
 
 export const WATER_PATH = 'inputs/water/master_water.csv';
+// The town's online bill payment kiosk for water.
+const WATER_PORTAL = 'https://nhtaxkiosk.com/?KIOSKID=ENFIELD';
+export const portalLink = `<a class="ext-link" href="${WATER_PORTAL}" target="_blank" rel="noopener">Enfield water bills ↗</a>`;
 
 const round2 = n => Math.round(n * 100) / 100;
 

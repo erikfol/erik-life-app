@@ -1,5 +1,5 @@
 // Utilities → Property Taxes: half-year bills from inputs/taxes_property_enfield/master_taxes_property.csv.
-import { loadTaxes, addTaxBill, recalcTaxRow, taxDupKey, TAX_CALCULATED, TAX_PATH } from '../taxes.js';
+import { loadTaxes, addTaxBill, recalcTaxRow, taxDupKey, TAX_CALCULATED, TAX_PATH, portalLink, taxDetailsOn } from '../taxes.js';
 import { drawBars } from '../../../shared/js/charts.js';
 import { esc, money, sum, toast } from '../../../shared/js/util.js';
 import { dataTable } from '../../../shared/js/datatable.js';
@@ -12,11 +12,6 @@ import {
 let rememberedBill = null; // 'year-half' while you move between pages
 let chartYears = null; // years shown in the charts (null = all)
 
-// The town's online bill kiosk (same one as the water bills).
-const TOWN_PORTAL = 'https://nhtaxkiosk.com/?KIOSKID=ENFIELD';
-export const portalLink = `<a class="ext-link" href="${TOWN_PORTAL}" target="_blank" rel="noopener">Enfield tax bills ↗</a>`;
-/** When the next half's details can be viewed on the kiosk: 1st half around May 25, 2nd half around Nov 25. */
-export const taxDetailsOn = last => (last.half === 1 ? new Date(last.year, 10, 25) : new Date(last.year + 1, 4, 25));
 
 const RATE_PARTS = [
     { id: 'school', label: 'School', color: '#4a90d9' },

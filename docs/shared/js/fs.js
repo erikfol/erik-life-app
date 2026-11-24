@@ -199,7 +199,15 @@ export async function writeText(path, text) {
 
 export async function exists(path) {
     if (isCloud()) return (await dbx.metadata(path))?.['.tag'] === 'file';
-    return (await readText(path)) !== null;
+    const [d, name] = split(path);
+    try {
+        await (await dir(d)).getFileHandle(name); // without reading the file
+        return true;
+    } catch (e) {
+        await checkFolder(e);
+        if (e.name === 'NotFoundError' || e.name === 'TypeMismatchError') return false;
+        throw e;
+    }
 }
 
 export async function removeFile(path) {
