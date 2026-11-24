@@ -1,8 +1,13 @@
-"""Stamp each app's index.html (docs/bills-etc/, docs/health/, docs/vehicles/, docs/house/, docs/pets/, docs/insurance/, docs/dinner-planner/, docs/kid-lunches/, docs/career/, docs/gifts/, docs/401k/) and the Home page (docs/index.html) with a new version and the list of its files.
+"""Stamp each section's index.html (every docs/<section>/ with a js/app.js) and the Home page (docs/index.html) with a
+new version and the list of its files.
 
 GitHub Pages lets browsers cache files for up to 10 minutes, so right after an update a browser can get the new
 index.html but old JavaScript. index.html compares this version with the one the browser last ran; when it changed,
 it re-downloads every file listed here (bypassing the cache) before starting the app.
+
+The list is worked out, not kept by hand: every module the page's script imports (directly or not, including
+import('…') with a fixed path) and every stylesheet its index.html links. A new section, or a file moved to
+docs/shared/, needs no change here.
 
 Run before committing changes to docs/:  python tools/stamp_version.py
 """
@@ -13,39 +18,12 @@ import posixpath
 import re
 
 DOCS = Path(__file__).resolve().parent.parent / 'docs'
-# app folder → (localStorage key, files from other apps it imports, relative to docs/)
-SHARED = ['bills-etc/css/app.css', 'bills-etc/js/csv.js', 'bills-etc/js/datatable.js', 'bills-etc/js/dates.js',
-          'bills-etc/js/filtermenu.js', 'bills-etc/js/fs.js', 'bills-etc/js/util.js', 'shared/css/records.css',
-          'shared/js/dropbox.js', 'shared/js/fileguard.js', 'shared/js/folder.js', 'shared/js/infobox.js',
-          'shared/js/recordtable.js', 'shared/js/navcolors.js', 'shared/js/lightbox.js', 'shared/js/infolinks.js']
-# The Home sections' table and information box.
-BASIC = SHARED + ['vehicles/css/vehicles.css']
-APPS = {
-    'bills-etc': ('billsetc-version', ['shared/css/records.css', 'shared/js/dropbox.js', 'shared/js/fileguard.js',
-                                       'shared/js/infobox.js', 'shared/js/recordtable.js', 'shared/js/navcolors.js',
-                                       'shared/js/lightbox.js']),  # Forgettable Subs uses the Home sections' table; fs.js uses Dropbox
-    'health': ('health-version', SHARED + ['vehicles/css/vehicles.css', 'pets/js/pets.js']),  # the General information box's styles; Pets' appointment status
-    'vehicles': ('vehicles-version', SHARED),
-    'house': ('house-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/vehicles.js', 'vehicles/js/views/gallery.js',
-                                         'vehicles/js/views/places.js', 'vehicles/js/views/guides.js']),  # Vehicles' views (+ guide text formatting)
-    'insurance': ('insurance-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/vehicles.js', 'vehicles/js/views/gallery.js',
-                                                 'vehicles/js/views/places.js']),  # Vehicles' views
-    'pets': ('pets-version', SHARED + ['vehicles/css/vehicles.css', 'vehicles/js/views/gallery.js']),  # borrows Vehicles' info box + photos
-    'dinner-planner': ('dinner-planner-version', SHARED),  # catalog.json/seed.json are fetched no-cache
-    'kid-lunches': ('kid-lunches-version', SHARED + ['dinner-planner/css/dinner.css']),  # the Dinner Planner's calendar look
-    'career': ('career-version', BASIC),
-    'gifts': ('gifts-version', BASIC),
-    'taxes': ('taxes-version', BASIC + ['bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
-    '401k': ('401k-version', SHARED + ['vehicles/css/vehicles.css', 'bills-etc/js/charts.js', 'bills-etc/js/views/utilcommon.js']),  # Bills Etc's charts and cards
-}
-
-
-def own_files(app_dir):
-    return sorted(p.relative_to(app_dir).as_posix() for p in list(app_dir.glob('js/**/*.js')) + list(app_dir.glob('css/*.css')))
-
+# The browser remembers the version it last ran under '<section>-version' (Bills Etc kept its older name).
+KEYS = {'bills-etc': 'billsetc-version'}
 
 # `import … from './x.js'`, `import './x.js'`, `export … from './x.js'` and `import('./x.js')`
 IMPORT = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(?\s*)['"](\.{1,2}/[^'"]+\.js)['"]""")
+STYLESHEET = re.compile(r'<link rel="stylesheet" href="([^"?]+)"')
 
 
 def module_graph(entry):
@@ -58,7 +36,16 @@ def module_graph(entry):
         seen.add(f)
         for m in IMPORT.finditer((DOCS / f).read_text(encoding='utf-8')):
             todo.append(posixpath.normpath(posixpath.join(posixpath.dirname(f), m.group(1))))
-    return sorted(seen)
+    return seen
+
+
+def page_files(page_dir, entry):
+    """What the page in docs/<page_dir>/ loads: its modules from `entry` and its stylesheets, relative to the page.
+    The page's own files first, then the shared ones, each sorted."""
+    html = (DOCS / page_dir / 'index.html').read_text(encoding='utf-8')
+    styles = {posixpath.normpath(posixpath.join(page_dir, h)) for h in STYLESHEET.findall(html)}
+    files = [posixpath.relpath(f, page_dir or '.') for f in module_graph(entry) | styles]
+    return sorted(files, key=lambda f: (f.startswith('../'), f))
 
 
 def version_block(key, files, entry):
@@ -91,13 +78,13 @@ def stamp(index, block):
 
 
 version = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
-for app, (key, shared) in APPS.items():
-    app_dir = DOCS / app
-    files = own_files(app_dir) + ['../' + f for f in shared]
-    stamp(app_dir / 'index.html', version_block(key, files, './js/app.js'))
+for app_dir in sorted(p.parent.parent for p in DOCS.glob('*/js/app.js')):
+    app = app_dir.name
+    files = page_files(app, f'{app}/js/app.js')
+    stamp(app_dir / 'index.html', version_block(KEYS.get(app, f'{app}-version'), files, './js/app.js'))
     print(f'{app}: version {version}, {len(files)} files')
 
 # The Home page: its script and every module it brings in (each section's alerts.js and what those use).
-home_files = module_graph('shared/js/home.js')
+home_files = page_files('', 'shared/js/home.js')
 stamp(DOCS / 'index.html', version_block('home-version', home_files, './shared/js/home.js'))
 print(f'home: version {version}, {len(home_files)} files')
