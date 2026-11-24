@@ -68,7 +68,7 @@ export async function renderMerchants(el, rerender) {
 
     el.innerHTML = `
         <p class="lead">Each <strong>rule</strong> says: when the bank's text contains these letters, use this merchant name and/or category.
-            Rules run on every new transaction (before the AI, in the app and the Python scripts). Merchants without a rule keep whatever name history or the AI gave them.</p>
+            Rules run on every new transaction, before the AI. Merchants without a rule keep whatever name history or the AI gave them.</p>
         <div class="row" style="margin-bottom:10px">
             <span id="views">${Object.entries(VIEWS).map(([k, v]) => `<button class="chip${k === view ? ' active' : ''}" data-view="${k}">${v} <span class="muted">${counts[k]}</span></button>`).join(' ')}</span>
             <span class="spacer"></span>

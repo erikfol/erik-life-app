@@ -1,5 +1,4 @@
 // History-first categorization: reuse the category you've already given a merchant.
-// Keep merchantKey() identical to merchant_key() in history_lookup.py.
 
 /** "TST* JOES PIZZA 1234 HANOVER NH" → "TST JOES PIZZA": letters only, first 3 words. */
 export function merchantKey(description) {

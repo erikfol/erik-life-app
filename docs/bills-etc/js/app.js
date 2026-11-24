@@ -52,7 +52,7 @@ export function requireFolder(el) {
             <h2>No folder connected</h2>
             <div class="banner bad" id="moved-here" style="margin-bottom:12px" hidden></div>
             <p>Connect your <code>erik-life-app</code> folder on the <a href="#home">Setup</a> page first.
-            The app reads and writes the same files as the Python scripts; nothing is uploaded.</p>
+            Nothing is uploaded.</p>
             <div class="row" style="margin-top:12px"><button class="primary" id="reconnect-here" hidden></button></div>
         </section>`;
     // After a page refresh Chrome needs one click to re-allow the folder; offer it right here.

@@ -1,4 +1,4 @@
-// The workflow steps (load, categorize, close the month), ported from the Python scripts; run from the Setup page. Each takes a `log(text, kind)` callback.
+// The workflow steps (load, categorize, close the month), run from the Setup page. Each takes a `log(text, kind)` callback.
 import * as fs from '../../shared/js/fs.js';
 import { PATHS, MASTER_COLS, CACHE_COLS, readTable, writeTable, readBankCsv, keyOf, loadConfig, parseConfig } from './data.js';
 import { aiCategorize } from './ollama.js';

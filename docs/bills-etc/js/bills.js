@@ -206,7 +206,7 @@ export function suggestBills(rows, bills, ignored = []) {
     return result.sort((a, b) => a.day - b.day);
 }
 
-/** Monthly equivalent of the active bills, for config.json `fixed_expenses` (the Python scripts read it). */
+/** Monthly equivalent of the active bills, for config.json `fixed_expenses` (parseConfig reads it). */
 const fixedFrom = bills => Object.fromEntries(bills.filter(b => b.active).map(b => [b.name, round2(b.amount / b.every)]));
 
 /** Save the bills (and keep `fixed_expenses` in step). The first save keeps a copy of the old fixed expenses. */
@@ -233,7 +233,7 @@ export async function saveBills(bills, extra = {}) {
 }
 
 /** Save the income sources ([{ name, perPay, every }]) as config.json's `income_sources`, and each one's amount a month as
- * `monthly_income_<name>`, which script 3, This Month, the Bills page and the Home chat read. */
+ * `monthly_income_<name>`, which This Month, the Bills page and the Home chat read. */
 export async function saveIncome(list) {
     const cfg = (await loadConfig()) || structuredClone(DEFAULT_CONFIG);
     const out = withIncomes(cfg, list.map(s => [s.name, round2(perMonth(s))]),

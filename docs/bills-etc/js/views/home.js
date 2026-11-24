@@ -142,8 +142,7 @@ const home = {
                 <h2>Your data folder</h2>
                 ${cloud ? `<p>On this device your files are read from and saved to your Dropbox (<code>${esc(FOLDER_LABEL)}</code>):
                 the same files your PC uses, kept in sync by Dropbox.</p>` : `
-                <p>Choose your <code>erik-life-app</code> folder, the one that contains <code>inputs/</code> and <code>config.json</code>.
-                The app reads and writes the same files as the Python scripts, so you can switch between them.</p>`}
+                <p>Choose your <code>erik-life-app</code> folder, the one that contains <code>inputs/</code> and <code>config.json</code>.</p>`}
                 <div class="row" style="margin:14px 0">
                     <button id="pick" ${supported && !cloud ? '' : 'hidden'}>Choose folder…</button>
                     <button class="primary" id="reconnect" hidden></button>

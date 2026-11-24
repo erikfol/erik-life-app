@@ -1,4 +1,4 @@
-// Paths and file formats shared with the Python scripts.
+// Bills Etc's files: where they are and how they're read.
 import * as fs from '../../shared/js/fs.js';
 import { parseCSV, toCSV } from '../../shared/js/csv.js';
 import { normalizeDateCell, parseDate } from '../../shared/js/dates.js';
@@ -59,7 +59,7 @@ export async function loadConfig() {
     return JSON.parse(text);
 }
 
-/** Same rules as script 3's load_config: keys starting with _ are ignored. */
+/** Income, fixed expenses and variable categories from config.json; keys starting with _ are notes and are ignored. */
 export function parseConfig(cfg) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const income = Object.entries(cfg)
@@ -116,7 +116,7 @@ export const perMonth = s => s.perPay * PAY_EVERY[s.every].month;
 export const perYear = s => s.perPay * PAY_EVERY[s.every].year;
 
 export const DEFAULT_CONFIG = {
-    _readme: 'BillsEtc config — copy this file to config.json and fill in your expected monthly values. Keys starting with _ are ignored by the scripts.',
+    _readme: 'Bills Etc settings, changed on its Config, Income and Bills pages. Keys starting with _ are notes and are ignored.',
     _income_note: 'Your typical monthly take-home pay (after taxes). Do not count bonuses or tax refunds here.',
     monthly_income_tt: 0,
     fixed_expenses: {

@@ -1,4 +1,4 @@
-// Canvas charts, ported from the HTML report that script 2 generates.
+// Canvas charts (bars and lines) for Bills Etc, Taxes and the 401(k).
 import { esc } from './util.js';
 
 export const axisMoney = v => (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 });

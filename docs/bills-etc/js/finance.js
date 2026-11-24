@@ -1,4 +1,4 @@
-// Report and projection math — ports of scripts 2 and 3.
+// Report and projection math: Checking History's report and This Month's projection.
 import { parseDate, yearMonth, monthLabel } from '../../shared/js/dates.js';
 import { normalizeCategory, renamed } from './rules.js';
 import { amountOf, money, round2 } from '../../shared/js/util.js';
@@ -32,7 +32,7 @@ function sumBy(rows, keyFn) {
 }
 
 /**
- * Script 2's numbers. Returns
+ * Checking History's numbers. Returns
  * { months, monthly: [{ym, income, expenses, net}], categories, trends: {ym: {cat: signedSum}}, totals: {cat: abs} }
  */
 export function buildReport(rows) {
@@ -73,7 +73,7 @@ export function reportSummaryText(report) {
     return s;
 }
 
-/** Script 3's historical averages: completed months only (current month excluded). `exclude` drops rows (scheduled bills). */
+/** Historical averages for This Month: completed months only (current month excluded). `exclude` drops rows (scheduled bills). */
 export function historicalAverages(masterRows, variableCats, today, exclude = null) {
     const currentYm = yearMonth(today);
     const exp = withParsed(masterRows).filter(r => r._ym && r._ym !== currentYm && r['AI Category'] !== 'Income' && !exclude?.(r));
@@ -89,7 +89,7 @@ export function historicalAverages(masterRows, variableCats, today, exclude = nu
 }
 
 /**
- * Script 3's projection for the current month. With scheduled bills, pass `exclude` (row is a bill payment)
+ * This Month's projection for the current month. With scheduled bills, pass `exclude` (row is a bill payment)
  * and `fixedTotal` (bills paid + still due): bill payments are then left out of the day-scaled spending.
  */
 export function computeProjection({ config, rows, masterRows, today = new Date(), exclude = null, fixedTotal = null }) {
