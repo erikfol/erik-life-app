@@ -5,6 +5,18 @@
 
 export const STATUS = { fridge: 'In the fridge', eaten: 'All eaten', tossed: 'Thrown out' };
 
+// A day you ate out (plan[date].ateOut = { place }) can have leftovers too: their mealId is OUT.
+export const OUT = '@out';
+
+/** What a day's leftovers can be of: its meals and eating out, or (with neither) its note. */
+export function leftoverKeys({ mealIds = [], note = '', ateOut = null }) {
+    const keys = [...mealIds, ...(ateOut ? [OUT] : [])];
+    return keys.length ? keys : note ? [''] : [];
+}
+
+/** How eating out shows: the place, or 'Ate out' ('Eating out' on a day still to come) without one. */
+export const outLabel = (ateOut, future = false) => ateOut?.place || (future ? 'Eating out' : 'Ate out');
+
 // Leftovers turn yellow, then red, once they've been in the fridge MORE than this many days. Changed on the Settings
 // tab and saved in db.json as settings.leftovers { yellowAfter, redAfter }.
 export const DEFAULT_LIMITS = { yellow: 5, red: 8 };

@@ -7,7 +7,7 @@ import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
 import { colourMenus } from '../../shared/js/navcolors.js';
 import * as store from './store.js';
 import { aiSettings, suggestMeals } from './ai.js';
-import { STATUS, fridgeItems, daysIn, levelOf, daysText, nameOf, limitsOf, limitsProblem, DEFAULT_LIMITS } from './leftovers.js';
+import { STATUS, OUT, fridgeItems, daysIn, levelOf, daysText, nameOf, limitsOf, limitsProblem, DEFAULT_LIMITS, leftoverKeys, outLabel } from './leftovers.js';
 import alerts from './alerts.js';
 
 const menus = colourMenus(alerts); // the Calendar tab turns yellow / red with old leftovers in the fridge
@@ -253,16 +253,15 @@ function renderCalendar() {
         const label = state.view === 'week' ? `${fmt(d, { weekday: 'short' })} ${d.getDate()}` : d.getDate();
         const badge = key === today ? '<span class="badge">Today</span>' : '';
 
-        let body;
-        if (meals.length) {
-            body = meals.map(meal => `<span class="meal-name ${meal.special ? 'special' : ''} ${e.skipped ? 'skipped' : ''}">${meal.favorite ? '★ ' : ''}${esc(meal.name)}</span>`
-                + (meal.prepMinutes && state.view === 'week' ? `<span class="meta">⏱ ${meal.prepMinutes} min</span>` : '')).join('');
-            if (e.note) body += `<span class="meal-note">${esc(e.note)}</span>`;
-        } else if (e?.note) {
-            body = `<span class="meal-note ${e.skipped ? 'skipped' : ''}">${esc(e.note)}</span>`;
-        } else {
-            body = state.view === 'week' ? `<span class="empty">${key < today ? 'Nothing logged' : '+ Plan dinner'}</span>` : '';
+        let body = meals.map(meal => `<span class="meal-name ${meal.special ? 'special' : ''} ${e.skipped ? 'skipped' : ''}">${meal.favorite ? '★ ' : ''}${esc(meal.name)}</span>`
+            + (meal.prepMinutes && state.view === 'week' ? `<span class="meta">⏱ ${meal.prepMinutes} min</span>` : '')).join('');
+        if (e?.ateOut) {
+            const where = outLabel(e.ateOut, key > today);
+            const tip = e.ateOut.place ? `${key > today ? 'Eating out at' : 'Ate out at'} ${e.ateOut.place}` : where;
+            body += `<span class="meal-name out ${e.skipped ? 'skipped' : ''}" title="${esc(tip)}">🍴 ${esc(where)}</span>`;
         }
+        if (e?.note) body += `<span class="meal-note ${!body && e.skipped ? 'skipped' : ''}">${esc(e.note)}</span>`;
+        if (!body && state.view === 'week') body = `<span class="empty">${key < today ? 'Nothing logged' : '+ Plan dinner'}</span>`;
         if (e && !e.skipped && key <= today) body += (e.leftovers || []).map(l => leftoverMark(key, l, e, today)).join('');
         // Quick actions: 🥡 leftovers in the fridge, on today's and yesterday's dinner until it has some; and for
         // upcoming planned days, rejecting a suggestion in one click (↻ only with one meal) or clearing the day.
@@ -284,7 +283,7 @@ const shortDate = key => fmt(parseKey(key), { weekday: 'short', month: 'short', 
 /** A day's leftovers on the calendar: in the fridge with its days (yellow / red when old), or how they went. */
 function leftoverMark(date, l, e, today) {
     const name = nameOf(l, state.meals);
-    const who = e.mealIds.length > 1 ? `${name}: ` : ''; // which meal, on a day with several
+    const who = leftoverKeys(e).length > 1 ? `${name}: ` : ''; // which one, on a day with several meals or eating out
     const week = state.view === 'week';
     if (l.status === 'fridge') {
         const days = daysIn(date, l, today);
@@ -299,18 +298,22 @@ function leftoverMark(date, l, e, today) {
 function canQuickLeftovers(date, e) {
     const today = todayKey();
     return (date === today || date === dateKey(addDays(parseKey(today), -1)))
-        && !e.skipped && !e.leftovers?.length && (e.mealIds.some(mealById) || !!e.note);
+        && !e.skipped && !e.leftovers?.length && leftoverKeys({ ...e, mealIds: e.mealIds.filter(mealById) }).length > 0;
 }
 
-/** 🥡 on a day: with one meal (or just a note) its leftovers go in the fridge; with several, the day opens to choose. */
+/**
+ * 🥡 on a day: with one meal, or only eating out, or just a note, its leftovers go in the fridge; with more than one of
+ * those, the day opens to choose.
+ */
 async function quickLeftovers(date) {
     const e = state.plan[date];
     const ids = e.mealIds.filter(mealById);
-    if (ids.length > 1) return openDay(date, null, { leftovers: true });
-    const mealId = ids[0] || '';
+    const keys = leftoverKeys({ ...e, mealIds: ids });
+    if (keys.length > 1) return openDay(date, null, { leftovers: true });
+    const [mealId] = keys;
     await store.setDay(date, { mealIds: ids, note: e.note, skipped: e.skipped, leftovers: [{ mealId, status: 'fridge' }] });
     reload();
-    toast(`🥡 ${mealById(mealId)?.name || e.note} leftovers are in the fridge`, 'ok');
+    toast(`🥡 ${mealId === OUT ? outLabel(e.ateOut) : mealById(mealId)?.name || e.note} leftovers are in the fridge`, 'ok');
 }
 
 /** The "In the fridge" box above the calendar: what's in it, oldest first, with its days and Eaten / Thrown out. */
@@ -322,7 +325,7 @@ function renderFridge() {
     box.innerHTML = items.length ? `<h2>🥡 In the fridge</h2>` + items.map(x => `
         <div class="fridge-row ${x.level || 'fresh'}">
             <span class="fridge-days">${esc(daysText(x.days))}</span>
-            <span class="fridge-what"><button type="button" class="link" data-left-open="${x.date}" title="Open this day">${esc(x.name)}</button>
+            <span class="fridge-what"><button type="button" class="link" data-left-open="${x.date}" title="Open this day">${x.mealId === OUT ? '🍴 ' : ''}${esc(x.name)}</button>
                 <span class="from">from ${esc(shortDate(x.date))}</span>${x.level ? ` <span class="why">over ${x.level === 'red' ? red : yellow} days</span>` : ''}</span>
             <span class="fridge-acts">
                 <button type="button" class="btn small" data-left="eaten" data-date="${x.date}" data-meal="${esc(x.mealId)}">✓ Eaten</button>
@@ -367,7 +370,7 @@ async function fillWeek() {
     toast(count ? `Planned ${count} day${count > 1 ? 's' : ''}` : 'No empty upcoming days this week');
 }
 
-const dayMealNames = e => (e?.mealIds || []).map(id => mealById(id)?.name).filter(Boolean).join(' + ');
+const dayMealNames = e => [...(e?.mealIds || []).map(id => mealById(id)?.name), e?.ateOut && outLabel(e.ateOut)].filter(Boolean).join(' + ');
 
 async function quickClearDay(date) {
     const name = dayMealNames(state.plan[date]) || state.plan[date]?.note;
@@ -473,7 +476,17 @@ function openDay(date, presetMealId, { leftovers = false } = {}) {
     (ids.length ? ids : ['']).forEach(id => addDayMealRow(id));
     form.note.value = e.note || '';
     form.skipped.checked = !!e.skipped;
+    form.ateOut.checked = !!e.ateOut;
+    form.place.value = e.ateOut?.place || '';
     form.dataset.date = date;
+    // places you've eaten out before, newest first, to pick from
+    const places = new Map();
+    for (const [, d] of Object.entries(state.plan).sort(([a], [b]) => b.localeCompare(a))) {
+        const p = d.ateOut?.place;
+        if (p && !places.has(p.toLowerCase())) places.set(p.toLowerCase(), p);
+    }
+    $('#out-places').innerHTML = [...places.values()].map(p => `<option value="${esc(p)}"></option>`).join('');
+    updateOutRow();
     updateDayDialog();
     $('#day-dialog').showModal();
     if (leftovers) {
@@ -482,20 +495,36 @@ function openDay(date, presetMealId, { leftovers = false } = {}) {
     }
 }
 
+/** The day's eating out as the dialog has it: { place } or null. */
+const dialogAteOut = () => ($('#day-form').ateOut.checked ? { place: $('#day-form').place.value.trim() } : null);
+
+// A note-only day's leftovers and eating out's are the same food: ticking or unticking "We ate out" moves them across.
+const swapped = id => (id === OUT ? '' : id === '' ? OUT : null);
+
+/** The saved leftovers for a row. */
+const savedFor = id => savedLeftovers.find(l => l.mealId === id) || savedLeftovers.find(l => l.mealId === swapped(id));
+
+/** The "We ate out" tick shows the Where? box, and reads "We're eating out" on a day still to come. */
+function updateOutRow() {
+    const form = $('#day-form');
+    form.place.hidden = !form.ateOut.checked;
+    $('#out-label').textContent = form.dataset.date > todayKey() ? "🍴 We're eating out" : '🍴 We ate out';
+}
+
 /**
- * The day dialog's 🥡 Had leftovers? rows: one per meal chosen (or the note, with no meal), today or earlier, not
- * skipped. A row keeps what's ticked while the meals change; a new one starts as saved.
+ * The day dialog's 🥡 Had leftovers? rows: one per meal chosen and one for eating out (or the note, with neither),
+ * today or earlier, not skipped. A row keeps what's ticked while the meals change; a new one starts as saved.
  */
 function renderLeftoverRows() {
     const form = $('#day-form');
     const box = $('#day-leftovers');
     const now = new Map($$('.leftover-row', box).map(r => [r.dataset.meal, { on: r.querySelector('input').checked, status: r.querySelector('select').value }]));
-    const ids = dayMealIds();
-    const keys = ids.length ? ids : form.note.value.trim() ? [''] : [];
+    const ateOut = dialogAteOut();
+    const keys = leftoverKeys({ mealIds: dayMealIds(), note: form.note.value.trim(), ateOut });
     $('#day-leftover-rows').innerHTML = keys.map(id => {
-        const saved = savedLeftovers.find(l => l.mealId === id);
-        const { on, status } = now.get(id) || { on: !!saved, status: saved?.status || 'fridge' };
-        const name = id ? mealById(id)?.name : form.note.value.trim();
+        const saved = savedFor(id);
+        const { on, status } = now.get(id) || now.get(swapped(id)) || { on: !!saved, status: saved?.status || 'fridge' };
+        const name = id === OUT ? `🍴 ${outLabel(ateOut)}` : id ? mealById(id)?.name : form.note.value.trim();
         return `<div class="leftover-row" data-meal="${esc(id)}">
             <label class="check"><input type="checkbox" ${on ? 'checked' : ''}> ${esc(name || 'Leftovers')}</label>
             <select aria-label="Where they are now" ${on ? '' : 'disabled'}>${Object.entries(STATUS).map(([v, label]) => `<option value="${v}" ${v === status ? 'selected' : ''}>${label}</option>`).join('')}</select>
@@ -513,7 +542,7 @@ function updateLeftoverRow(row) {
     select.disabled = !on;
     const date = $('#day-form').dataset.date;
     const today = todayKey();
-    const saved = savedLeftovers.find(l => l.mealId === row.dataset.meal);
+    const saved = savedFor(row.dataset.meal);
     // Eaten or thrown out just now counts as today, as saving it will.
     const doneOn = select.value === 'fridge' ? '' : saved?.status === select.value && saved.doneOn ? saved.doneOn : today;
     const days = daysIn(date, { status: select.value, doneOn }, today);
@@ -555,7 +584,7 @@ async function saveDay(ev) {
     const date = form.dataset.date;
     const skipped = form.skipped.checked && date < todayKey();
     const leftovers = $('#day-leftovers').hidden ? [] : dayLeftovers();
-    await store.setDay(date, { mealIds: dayMealIds(), note: form.note.value, skipped, leftovers });
+    await store.setDay(date, { mealIds: dayMealIds(), note: form.note.value, skipped, ateOut: dialogAteOut(), leftovers });
     $('#day-dialog').close();
     reload();
 }
@@ -957,7 +986,13 @@ function wire() {
     };
     $('#add-day-meal').onclick = () => addDayMealRow().querySelector('select').focus();
     $('#day-form').skipped.onchange = showLeftovers;
-    $('#day-form').note.oninput = () => { if (!dayMealIds().length) renderLeftoverRows(); }; // a note-only day's leftovers
+    $('#day-form').note.oninput = renderLeftoverRows; // a note-only day's leftovers
+    $('#day-form').ateOut.onchange = () => {
+        updateOutRow();
+        renderLeftoverRows();
+        if ($('#day-form').ateOut.checked) $('#day-form').place.focus();
+    };
+    $('#day-form').place.oninput = renderLeftoverRows; // eating out's leftovers are named by the place
     $('#day-leftover-rows').onchange = ev => updateLeftoverRow(ev.target.closest('.leftover-row'));
 
     $('#add-meal').onclick = () => openMealEditor(null);

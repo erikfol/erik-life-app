@@ -3,7 +3,7 @@
 // by-hand and before-restore copies of db.json. inputs/ is kept out of git.
 import * as fs from '../../bills-etc/js/fs.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
-import { STATUS, nameOf, limitsOf, limitsProblem } from './leftovers.js';
+import { STATUS, OUT, nameOf, limitsOf, limitsProblem, leftoverKeys, outLabel } from './leftovers.js';
 
 export const DIR = 'inputs/dinner-planner';
 export const DB_PATH = `${DIR}/db.json`;
@@ -48,27 +48,32 @@ export function normalizeMeal(input, existing = {}) {
 }
 
 /**
- * A day's leftovers, cleaned: one per meal on the day (mealId '' = the day's note, when it has no meals), each
- * { mealId, name, status: 'fridge' | 'eaten' | 'tossed', doneOn }. name is kept so a deleted meal's leftovers still
- * have one; doneOn is the day they were eaten or thrown out (today, unless `old` already had it gone that way).
+ * A day's leftovers, cleaned: one per meal on the day, one for eating out (mealId OUT, named by the place), or one
+ * for the day's note when it has neither (mealId ''), each { mealId, name, status: 'fridge' | 'eaten' | 'tossed',
+ * doneOn }. name is kept so a deleted meal's leftovers still have one; doneOn is the day they were eaten or thrown out
+ * (today, unless `old` already had it gone that way).
  */
-function normalizeLeftovers(list, { mealIds, note, skipped }, { old = [], meals = db.meals } = {}) {
-    if (skipped || !Array.isArray(list)) return [];
+function normalizeLeftovers(list, day, { old = [], meals = db.meals } = {}) {
+    if (day.skipped || !Array.isArray(list)) return [];
     const today = localDate();
-    const keys = mealIds.length ? mealIds : note ? [''] : [];
+    const keys = leftoverKeys(day);
     const out = [];
     for (const l of list) {
         if (!l || typeof l !== 'object') continue;
         const mealId = typeof l.mealId === 'string' ? l.mealId : '';
         if (!keys.includes(mealId) || out.some(x => x.mealId === mealId) || !Object.hasOwn(STATUS, l.status)) continue;
-        const was = old.find(x => x.mealId === mealId);
+        // a note-only day's leftovers and eating out's are the same food when the day is changed between them
+        const was = old.find(x => x.mealId === mealId) || old.find(x => x.mealId === (mealId === OUT ? '' : mealId === '' ? OUT : null));
         const doneOn = l.status === 'fridge' ? ''
             : DATE_RE.test(l.doneOn) ? l.doneOn : was?.status === l.status && DATE_RE.test(was.doneOn) ? was.doneOn : today;
-        const name = cleanStr(meals.find(m => m.id === mealId)?.name || (mealId ? l.name : note), 120);
+        const name = cleanStr(mealId === OUT ? outLabel(day.ateOut) : meals.find(m => m.id === mealId)?.name || (mealId ? l.name : day.note), 120);
         out.push({ mealId, name, status: l.status, doneOn });
     }
     return out;
 }
+
+/** Eating out: { place } (the place may be blank), or null. */
+const cleanAteOut = v => (v && typeof v === 'object' ? { place: cleanStr(v.place, 80) } : null);
 
 /** Check a whole data file (from a backup) before it replaces the current one. */
 function sanitizeDb(input) {
@@ -82,8 +87,9 @@ function sanitizeDb(input) {
         if (!DATE_RE.test(date) || !e || typeof e !== 'object') continue;
         const mealIds = [...new Set(mealsOf(e))].filter(id => ids.has(id));
         const note = cleanStr(e.note, 200);
-        if (!mealIds.length && !note) continue;
-        plan[date] = { mealIds, note, skipped: !!e.skipped };
+        const ateOut = cleanAteOut(e.ateOut);
+        if (!mealIds.length && !note && !ateOut) continue;
+        plan[date] = { mealIds, note, skipped: !!e.skipped, ...(ateOut && { ateOut }) };
         const leftovers = normalizeLeftovers(e.leftovers, plan[date], { meals });
         if (leftovers.length) plan[date].leftovers = leftovers;
     }
@@ -247,14 +253,15 @@ export function mealsCsv() {
 export function historyCsv() {
     const today = localDate();
     const names = new Map(db.meals.map(m => [m.id, m.name]));
-    const rows = [['Date', 'Day', 'Meal', 'Notes', 'Status', 'Leftovers']];
+    const rows = [['Date', 'Day', 'Meal', 'Ate out', 'Notes', 'Status', 'Leftovers']];
     for (const [date, e] of Object.entries(db.plan).sort(([a], [b]) => a.localeCompare(b))) {
         const [y, mo, d] = date.split('-').map(Number);
         const weekday = new Date(y, mo - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
         const status = e.skipped ? 'Skipped' : date < today ? 'Eaten' : date === today ? 'Today' : 'Planned';
         // e.g. "Chili: In the fridge; Tacos: All eaten 2026-11-26"
         const leftovers = (e.leftovers || []).map(l => `${nameOf(l, db.meals)}: ${STATUS[l.status]}${l.doneOn ? ` ${l.doneOn}` : ''}`).join('; ');
-        rows.push([date, weekday, mealsOf(e).map(id => names.get(id)).filter(Boolean).join(' + '), e.note || '', status, leftovers]);
+        const out = e.ateOut ? e.ateOut.place || 'Yes' : '';
+        rows.push([date, weekday, mealsOf(e).map(id => names.get(id)).filter(Boolean).join(' + '), out, e.note || '', status, leftovers]);
     }
     return toCsv(rows);
 }
@@ -300,25 +307,27 @@ export async function deleteMeal(id) {
             entry.mealIds = entry.mealIds.filter(x => x !== id);
             entry.note = entry.note || removed.name;
             // Its leftovers keep their saved name; on a day left with no meals they become the note's.
-            if (!entry.mealIds.length) for (const l of entry.leftovers || []) if (l.mealId === id) l.mealId = '';
+            if (!entry.mealIds.length && !entry.ateOut) for (const l of entry.leftovers || []) if (l.mealId === id) l.mealId = '';
         }
     }
     await save();
 }
 
 /**
- * A day on the calendar: { mealIds, note, skipped, leftovers }; no meals and no note clears it. leftovers:
- * [{ mealId, status }] for today or a past day; left out, the day keeps the ones it has for meals it still has.
+ * A day on the calendar: { mealIds, note, skipped, ateOut, leftovers }; no meals, no note and not eating out clears it.
+ * ateOut: { place } when you ate out (or will), null when not; left out, the day keeps what it had. leftovers:
+ * [{ mealId, status }] for today or a past day; left out, the day keeps the ones it has for what it still has.
  */
-export async function setDay(date, { mealIds = [], note, skipped, leftovers } = {}) {
+export async function setDay(date, { mealIds = [], note, skipped, ateOut, leftovers } = {}) {
     if (!DATE_RE.test(date)) throw new Error('Bad date');
     mealIds = [...new Set(mealIds)].filter(id => db.meals.some(m => m.id === id));
     note = cleanStr(note, 200);
+    ateOut = ateOut === undefined ? db.plan[date]?.ateOut || null : cleanAteOut(ateOut);
     const old = db.plan[date]?.leftovers || [];
     // skipped: the plan didn't happen, so it shouldn't count as history.
-    if (!mealIds.length && !note) delete db.plan[date];
+    if (!mealIds.length && !note && !ateOut) delete db.plan[date];
     else {
-        const day = { mealIds, note, skipped: !!skipped };
+        const day = { mealIds, note, skipped: !!skipped, ...(ateOut && { ateOut }) };
         const kept = date > localDate() ? [] : normalizeLeftovers(leftovers ?? old, day, { old });
         db.plan[date] = kept.length ? { ...day, leftovers: kept } : day;
     }

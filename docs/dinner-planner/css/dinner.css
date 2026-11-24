@@ -311,6 +311,12 @@
     .dp .row > label.narrow { flex: 1; }
 }
 
+/* ---------- eating out ---------- */
+.dp .out-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.dp .out-row label.check { flex: 0 0 auto; }
+.dp .out-row input[name=place] { flex: 1 1 220px; width: auto; }
+.dp .out-row input[name=place][hidden] { display: none; }
+
 /* ---------- settings ---------- */
 .dp .settings-form { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
 .dp .settings-form label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 500; }
