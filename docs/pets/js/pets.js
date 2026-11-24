@@ -12,15 +12,12 @@ export const FIELDS = ['Species', 'Breed', 'Sex', 'Birthday', 'Color', 'Weight',
 
 const blankInfo = () => FIELDS.map(label => ({ label, value: '' }));
 
-// Used until pets.json is first saved.
-const STARTING_PETS = ['Jackie', 'Castle', 'Kona', 'Cosmo', 'Peaches'].map(name => ({ id: name.toLowerCase(), name, info: blankInfo() }));
-
-/** track: false for read-only use, so the save guard keeps the version this page is editing. */
+/** track: false for read-only use, so the save guard keeps the version this page is editing. No pets.json yet: none (the page opens "Add a pet"). */
 export async function loadPets(track = true) {
     const text = track ? await readTracked(PETS_PATH) : await fs.readText(PETS_PATH);
-    if (text === null) return structuredClone(STARTING_PETS);
+    if (text === null) return [];
     const list = JSON.parse(text).pets;
-    return Array.isArray(list) ? list : structuredClone(STARTING_PETS);
+    return Array.isArray(list) ? list : [];
 }
 
 export async function savePets(list) {
