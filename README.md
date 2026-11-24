@@ -1,20 +1,56 @@
-# Bills Etc
+# Erik's Life App
 
-Personal spending tracker. Exports Come Citizens Bank transaction CSV, categorizes each line with a local Ollama LLM (100% offline), keeps a master history, and generates HTML budget reports.
+A personal app that runs in the browser: bills and budgeting, the 401(k), taxes, health, vehicles, the house, pets,
+insurance, dinners, the kids' lunches, gifts and career. It's static HTML and JavaScript with no build step, served by
+GitHub Pages from `docs/` at **https://erikfol.github.io/erik-life-app/**. The data is never put on GitHub: it lives in
+a folder on the PC (and in Dropbox, for the tablet), and the pages read and write it there.
 
-## Requirements
+The Python scripts at the top of the repo are the original Bills Etc command-line workflow (see **Workflow** below).
 
-- Python 3 with `pandas`
-- [Ollama](https://ollama.com) running locally with a pulled model matching `MODEL_NAME` in the scripts (currently `qwen2.5:3b`; run `ollama pull qwen2.5:3b` once)
+## Sections
 
-## GUI (GitHub Pages)
+| Section | Code | Saves to |
+|---|---|---|
+| Home page (red / yellow counts, Backup, assistant) | `docs/index.html`, `docs/shared/js/home.js` | `backups.json`, `inputs/assistant/` |
+| Bills Etc | `docs/bills-etc/` | `inputs/…` (bank CSVs, savings, loans_cc, electric, water, …), `output_master_data/`, `config.json` |
+| 401(k) | `docs/401k/` | `inputs/401k/` |
+| Taxes | `docs/taxes/` | `inputs/taxes/` |
+| Health | `docs/health/` | `inputs/health/` |
+| Vehicles | `docs/vehicles/` | `inputs/vehicles/` |
+| House | `docs/house/` | `inputs/house/` |
+| Pets | `docs/pets/` | `inputs/pets/` |
+| Insurance | `docs/insurance/` | `inputs/insurance/` |
+| Dinner Planner | `docs/dinner-planner/` | `inputs/dinner-planner/` |
+| Kid Lunches | `docs/kid-lunches/` | `inputs/kid-lunches/` |
+| Gifts, Bday, Anniversary | `docs/gifts/` | `inputs/gifts/` |
+| Working Career | `docs/career/` | `inputs/career/` |
 
-`docs/` is served by GitHub Pages at **https://erikfol.github.io/erik-life-app/**: the Erik's Life App home page (`docs/index.html`) that links to each app.
-`docs/bills-etc/` holds a browser version of the whole bills workflow, at
-**https://erikfol.github.io/erik-life-app/bills-etc/**.
-`docs/health/` is the Health app (General Health, Dental, Eye, Health Savings Account (HSA) tables), which saves to `inputs/health/` in the same folder.
-`docs/vehicles/` is the Vehicles app (one page per vehicle: information + maintenance table), which saves to `inputs/vehicles/`.
-`docs/shared/` holds the editable record table and folder prompt that Health and Vehicles share. It's static HTML and JavaScript with no build step. Your data is never put on GitHub:
+## How the code is laid out
+
+Each section's folder has `index.html`, `js/app.js` (the start; most sections use `shared/js/section.js` for the
+parts they all share), a data module that reads and writes its files, `js/alerts.js` (its red and yellow rules, which
+the Home page counts and the menus are coloured by), `js/views/` (its pages) and sometimes `css/`.
+
+`docs/shared/` holds what every section uses, and a section never imports from another section's folder:
+
+- `js/fs.js` (the data folder, or Dropbox on a tablet), `fileguard.js` (won't save over a file changed elsewhere),
+  `folder.js`, `section.js`, `navcolors.js`
+- `js/util.js`, `dates.js`, `csv.js`, `charts.js`
+- `js/datatable.js` + `filtermenu.js` (sortable, filterable tables), `recordtable.js` (editable record tables),
+  `infobox.js`, `infolinks.js`, `gallery.js`, `places.js`, `guidetext.js`, `appointments.js`, `lightbox.js`
+- `js/backup.js`, `js/assistant/` (the Home page)
+- `css/app.css` (the look every section shares), `records.css`, `sections.css`
+
+Before committing changes to `docs/`, run `python tools/stamp_version.py` (so browsers fetch the new files at once
+rather than up to 10 minutes later) and `node --test` (the tests in `tests/`).
+
+To run it locally: `python -m http.server 8000 -d docs` and open http://localhost:8000.
+
+## Bills Etc
+
+The browser version of the whole bills workflow, at **https://erikfol.github.io/erik-life-app/bills-etc/**. It reads
+Citizens Bank transaction CSVs, categorizes each line (history first, then optionally a local Ollama model, 100%
+offline), keeps a master history, and shows the month, savings, bills, utilities and loans.
 
 - In **Chrome or Edge** you connect the data folder on the Setup page. The app then reads and writes the same files as the scripts (`inputs/`, `output_master_data/`, `config.json`), so you can mix the GUI and the scripts.
 - The data lives in the Dropbox app folder `Dropbox\Apps\ErikLifeApp\`, so a **tablet or phone** can use it too: there the app signs in with Dropbox (`docs/shared/js/dropbox.js`, Dropbox app "ErikLifeApp", app-folder access only) and reads and writes the same files through Dropbox. On the PC, `inputs/`, `output_master_data/` and `reports/` in this repo are links (junctions) into that folder and `config.json` is found next to them, so the scripts work as before.
@@ -22,11 +58,14 @@ Personal spending tracker. Exports Come Citizens Bank transaction CSV, categoriz
   `setx OLLAMA_ORIGINS "https://erikfol.github.io"`
 - Pages: **Setup** (add bank CSVs, optional AI for new merchants, close the month), **This Month** (projection), **Income** (expected monthly take-home, and every paycheck from the bank data charted, with your notes on why it changed in `inputs/income/pay_notes.csv`), **Bills** (scheduled bills in `config.json` `scheduled_bills`: paid / due / late each month, 12-month grid, suggestions from history; transactions matching a bill's merchant count as scheduled, everything else as unscheduled), **Dashboard** (history report and AI analysis), **Finance Table** (fix the processed month or the master), **Config** (tabs: Categories, with the variable categories This Month projects on top; Merchants — one table of merchant rules and the names that still need one).
 
-To run it locally instead: `python -m http.server 8000 -d docs` and open http://localhost:8000. Ollama allows localhost by default.
+Run locally (above), Ollama needs no setup: it allows localhost by default.
 
 Merchant names and forced categories come only from `merchant_rules` in `config.json` (edit them on Config → Merchants); the GUI and the scripts apply them the same way. The rules that used to be hardcoded were moved there by `tools/migrate_rules.py`.
 
-## Workflow
+## Workflow (the Python scripts)
+
+Requirements: Python 3 with `pandas`, and [Ollama](https://ollama.com) running locally with a pulled model matching
+`MODEL_NAME` in the scripts (currently `qwen2.5:3b`; run `ollama pull qwen2.5:3b` once).
 
 ### End of month — add a full month of history
 
@@ -84,7 +123,7 @@ Keys starting with `_` are ignored. See the notes in the file itself.
 
 Categorization order: manual edits in the processed file → **your history** → cache → AI (with `--ai`) → override/keyword rules.
 
-**History-first:** a transaction whose merchant (first three words of the description, letters only, so store numbers are ignored) already appears in the master gets that merchant's most common category, as long as that category is a strict majority. That covers roughly 80% of transactions, so the AI only sees new merchants. Fixing a category in the master teaches the lookup. The logic is in `history_lookup.py` and `docs/js/history.js`; keep them in sync. Known merchants that the AI gets wrong are pinned in each script's `CATEGORY_OVERRIDES` / `MERCHANT_CATEGORY_OVERRIDES` lists — add entries there for anything else it keeps miscategorizing.
+**History-first:** a transaction whose merchant (first three words of the description, letters only, so store numbers are ignored) already appears in the master gets that merchant's most common category, as long as that category is a strict majority. That covers roughly 80% of transactions, so the AI only sees new merchants. Fixing a category in the master teaches the lookup. The logic is in `history_lookup.py` and `docs/bills-etc/js/history.js`; keep them in sync. For a merchant the AI keeps getting wrong, add a merchant rule with a category (Config → Merchants).
 
 ## Notes
 

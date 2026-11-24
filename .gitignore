@@ -9,6 +9,8 @@ config.json
 /reports
 # Copies made by the Home page's 💾 Back up now
 /backup
+# The original Node.js Dinner Planner, still at the top of the project folder: its data/ holds real meals and history
+/dinner-planner/
 # Personal documents kept in the project folder
 /Home_Equity_Loan_Proposal.md
 

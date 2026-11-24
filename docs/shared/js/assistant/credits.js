@@ -12,10 +12,14 @@ const PRICES = {
     'claude-sonnet-5': [2, 2.5, 0.20, 10],
     'claude-opus-5-5': [4, 5, 0.20, 20],
     'claude-opus-5': [5, 6.25, 0.50, 25],
+    'claude-fable-5-2': [8, 10, 0.20, 40],
     'claude-fable-5-1': [10, 12.5, 0.25, 50],
 };
 const HAIKU_LONG = [0.50, 0.625, 0.05, 2.50]; // Haiku 5.5, a request whose whole prompt is over 100,000 tokens
-const IF_UNKNOWN = PRICES['claude-opus-5-5']; // a model not listed here: better to count too much than nothing
+const IF_UNKNOWN = PRICES['claude-fable-5-1']; // a model not listed here: the dearest price, so it counts too much rather than too little
+
+/** Whether `model` has a known price. */
+export const isPriced = model => model in PRICES;
 
 /** What one reply cost in dollars, from its `usage`. */
 export function costOf(model, usage) {

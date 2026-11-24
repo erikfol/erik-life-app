@@ -3,7 +3,7 @@
 // summary and what the lookups in tools.js return, all of it already through the privacy filter.
 import * as fs from '../fs.js';
 import { TOOLS, runTool, describeTool } from './tools.js';
-import { costOf } from './credits.js';
+import { costOf, isPriced } from './credits.js';
 
 export const ENV_PATH = 'inputs/assistant/.env';
 const DEFAULT_MODEL = 'claude-haiku-5-5';
@@ -11,7 +11,7 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const MAX_ROUNDS = 8;       // lookups-and-replies for one question, so a confused answer can't run up a bill
 const MAX_TURNS_KEPT = 6;   // earlier questions and answers sent along, for follow-ups
 // Models that take fallbacks: "default" (a declined request is re-run on another model instead of failing).
-const FALLBACK_MODELS = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'];
+const FALLBACK_MODELS = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-2', 'claude-fable-5-1', 'claude-sonnet-5-5'];
 
 /** The pages an answer can link to, written [[code]]: code → [address, name]. Nothing else becomes a link. */
 export const PAGES = {
@@ -131,7 +131,8 @@ export async function ask({ settings, ctx, history, question, onStatus, onSpend 
             const reply = await callClaude(settings, {
                 max_tokens: 8000, system, tools: TOOLS, messages, cache_control: { type: 'ephemeral' }, output_config: { effort: 'medium' },
             });
-            cost += costOf(settings.model, reply.usage);
+            // A fallback can answer on another model: price the reply by the one that did.
+            cost += costOf(isPriced(reply.model) ? reply.model : settings.model, reply.usage);
             const text = (reply.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
             if (reply.stop_reason === 'refusal') throw new Error('Claude declined to answer that. Try asking another way.');
             if (reply.stop_reason === 'max_tokens') return `${text || 'That answer was too long to finish.'}\n\n(Cut off: try asking for less at once.)`;

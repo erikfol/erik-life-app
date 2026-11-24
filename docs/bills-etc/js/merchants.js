@@ -68,12 +68,6 @@ export function rulesOnly(description) {
     return r.merchant && r.category ? r : null;
 }
 
-/** Rules that would apply to this transaction (for showing why it got its name/category). */
-export function rulesFor(description) {
-    const d = compactText(description), dKey = merchantNameKey(description);
-    return rules.filter(r => r.match.includes(dKey) || r.bank.some(b => d.includes(b)));
-}
-
 const DATA_FILES = [PATHS.master, PATHS.processed, PATHS.cache];
 
 /** Every merchant spelling with its transaction count, categories and bank texts (compacted) (master + current month). */
