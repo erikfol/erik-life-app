@@ -74,13 +74,25 @@ async function checkFolder(e) {
     if (e.name === 'NotFoundError' && root && await isGone(root)) throw movedError();
 }
 
+// Chrome has been seen to never answer about the saved folder (Nov 2026, still after a restart), which left every page
+// waiting with no button. After a few seconds it counts as not remembered, so pages offer "Choose folder…" instead,
+// which saves a fresh one. Once stuck, the rest of this page load doesn't wait again.
+let stuck = false;
+/** True if Chrome didn't answer about the saved folder on this page load. */
+export const folderStuck = () => stuck;
+const within = (promise, ms) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(new Error('No answer')), ms))]);
+
 /** Returns {handle, granted, moved} for the remembered folder, or null. A moved folder is not connected. */
 export async function rememberedFolder() {
-    if (isCloud()) return null; // using Dropbox, not a folder on this computer
+    if (isCloud() || stuck) return null; // using Dropbox, not a folder on this computer / Chrome isn't answering
     let handle;
     try { handle = await idbOp('readonly', s => s.get('root')); } catch { return null; }
     if (!handle) return null;
-    const granted = (await handle.queryPermission({ mode: 'readwrite' })) === 'granted';
+    let granted;
+    try { granted = (await within(handle.queryPermission({ mode: 'readwrite' }), 4000)) === 'granted'; } catch {
+        stuck = true;
+        return null;
+    }
     const moved = granted && await isGone(handle);
     if (granted && !moved) root = handle;
     return { handle, granted, moved };

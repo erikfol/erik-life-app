@@ -58,7 +58,9 @@ async function connect() {
     // After Chrome restarts it asks once before the folder can be read again (needs a click).
     note.innerHTML = rem && !rem.moved
         ? `To show the red and yellow counts, allow your folder again: <button type="button" class="primary">Reconnect “${esc(rem.handle.name)}”</button>`
-        : `${rem?.moved ? `${esc(fs.movedMessage(rem.handle))} ` : ''}To show the red and yellow counts, choose your <code>erik-life-app</code> folder: <button type="button" class="primary">Choose folder…</button>`;
+        : fs.folderStuck()
+            ? `Chrome didn’t answer about your saved folder. Choose it again (<code>Dropbox\\Apps\\ErikLifeApp</code>): <button type="button" class="primary">Choose folder…</button>`
+            : `${rem?.moved ? `${esc(fs.movedMessage(rem.handle))} ` : ''}To show the red and yellow counts, choose your <code>erik-life-app</code> folder: <button type="button" class="primary">Choose folder…</button>`;
     note.hidden = false;
     note.querySelector('button').onclick = async () => {
         if (rem && !rem.moved) { if (!(await fs.reconnect(rem.handle))) return connect(); } // says so if it was moved
