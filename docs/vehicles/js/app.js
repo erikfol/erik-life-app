@@ -1,68 +1,31 @@
 // Vehicles: one page per vehicle (#<id>, its Guides and Notes tabs #<id>/guides, #<id>/notes) plus "＋ Add vehicle" (#new); the menu is
 // built from vehicles.json.
 // Uses the same folder as Bills Etc (the browser remembers it for the whole site); the data lives in inputs/vehicles/.
-import * as fs from '../../shared/js/fs.js';
 import { esc } from '../../shared/js/util.js';
-import { refreshStatus, askForFolder } from '../../shared/js/folder.js';
+import { startSection } from '../../shared/js/section.js';
 import { loadVehicles } from './vehicles.js';
 import alerts from './alerts.js';
-import { colourMenus } from '../../shared/js/navcolors.js';
 import { renderVehicle, renderNewVehicle, hasUnsavedEdits, forget } from './views/vehicle.js';
 
 const viewEl = document.getElementById('view');
 const navEl = document.getElementById('nav');
-let currentHash = null;
-// Menu links (and tabs / pills) turn red or yellow while that page has a red or yellow banner.
-const menus = colourMenus(alerts);
 
 function drawNav(list, active) {
-    navEl.innerHTML = list.map(v => `<a href="#${esc(v.id)}"${v.id === active ? ' class="active"' : ''}>${esc(v.name)}</a>`).join('')
+    navEl.innerHTML = list.map(x => `<a href="#${esc(x.id)}"${x.id === active ? ' class="active"' : ''}>${esc(x.name)}</a>`).join('')
         + `<a href="#new"${active === 'new' ? ' class="active"' : ''}>＋ Add vehicle</a>`;
 }
 
-/** After a vehicle is added, renamed or removed: re-read the list and open #goTo. */
-function listChanged(goTo) {
-    if (location.hash === '#' + goTo) route(true);
-    else { currentHash = '#' + goTo; location.hash = goTo; } // hashchange routes; nothing unsaved to ask about
-}
-
-async function route(force = false) {
-    const hash = location.hash;
-    if (!force && hash !== currentHash && hasUnsavedEdits()) {
-        if (!confirm('You have unsaved edits. Leave without saving?')) {
-            history.replaceState(null, '', currentHash);
-            return;
-        }
-    }
-    forget();
-    if (!fs.folder()) {
-        navEl.innerHTML = '';
-        return askForFolder(viewEl, { what: 'Vehicle records', where: 'inputs/vehicles/', onConnected: () => route(true) });
-    }
-    menus.ready();
-    try {
+startSection({
+    what: 'Vehicle records', where: 'inputs/vehicles/', alerts, hasUnsavedEdits, forget,
+    noFolder: () => { navEl.innerHTML = ''; },
+    async draw(hash, page) {
         const list = await loadVehicles();
         const [want, part] = hash.slice(1).split('/');
         const v = list.find(x => x.id === want) || (want === 'new' ? null : list[0]);
         const sub = v && v.id === want && ['guides', 'notes'].includes(part) ? part : '';
-        currentHash = '#' + (v ? v.id : 'new') + (sub ? '/' + sub : '');
-        if (location.hash !== currentHash) history.replaceState(null, '', currentHash);
+        page.show('#' + (v ? v.id : 'new') + (sub ? '/' + sub : ''));
         drawNav(list, v ? v.id : 'new');
-        if (v) await renderVehicle(viewEl, list, v, listChanged, sub);
-        else renderNewVehicle(viewEl, list, listChanged);
-    } catch (e) {
-        console.error(e);
-        viewEl.innerHTML = `<div class="banner bad"><strong>Something went wrong:</strong> ${esc(e.message)}</div>`;
-    }
-}
-
-window.addEventListener('hashchange', () => route());
-window.addEventListener('beforeunload', e => {
-    if (hasUnsavedEdits()) { e.preventDefault(); e.returnValue = ''; }
+        if (v) await renderVehicle(viewEl, list, v, page.go, sub); // page.go: after a vehicle is added, renamed or removed
+        else renderNewVehicle(viewEl, list, page.go);
+    },
 });
-
-(async () => {
-    if (fs.isSupported()) await fs.rememberedFolder().catch(() => null);
-    refreshStatus();
-    route();
-})();
