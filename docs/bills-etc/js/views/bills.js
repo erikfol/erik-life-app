@@ -1,7 +1,7 @@
 // Bills page: scheduled bills (config.json `scheduled_bills`) weighed against your monthly income (set on the Income
 // page), a 12-month payment grid and suggestions from your history. This month's bill status is on the This Month page.
 import { loadConfig, incomeSources } from '../data.js';
-import { parseBills, hasBills, billMonth, paymentsByMonth, firstPaid, suggestBills, saveBills, allTransactions, addMonths, STATUS, EVERY } from '../bills.js';
+import { parseBills, billMonth, paymentsByMonth, firstPaid, suggestBills, saveBills, allTransactions, addMonths, STATUS, EVERY } from '../bills.js';
 import { merchantNameKey } from '../merchants.js';
 import { longMonthLabel, monthLabel, yearMonth, MONTH_NAMES } from '../../../shared/js/dates.js';
 import { esc, money, toast } from '../../../shared/js/util.js';
@@ -41,7 +41,6 @@ export default {
             catOf.set(b.name, [...counts].sort((a, c) => c[1] - a[1])[0]?.[0] || '');
         }
         const merchants = [...new Set(rows.filter(r => r._amt < 0).map(r => String(r['Cleaned Merchant'] ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-        const legacy = Object.entries(cfg.fixed_expenses || {}).filter(([k, v]) => !k.startsWith('_') && typeof v === 'number');
 
         el.innerHTML = `
             <div class="row dash-head">
@@ -55,9 +54,7 @@ export default {
             </div>
             <p class="lead">Scheduled bills leave on about the same day every month (or every few months). Everything else is unscheduled. This month's bills (paid, still due, late) are on <a href="#month">This Month</a>.
                 ${dataThrough ? `Bank data is loaded through <strong>${esc(dataThrough.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))}</strong>.` : ''}</p>
-            ${bills.length ? '' : `<div class="banner"><strong>No scheduled bills yet.</strong> Add them from <strong>Suggested from your history</strong> below, or with <strong>+ Add a bill</strong>.
-                ${!hasBills(cfg) && legacy.length ? `Until you add one, This Month keeps using the ${legacy.length} fixed expenses in config.json:
-                ${legacy.map(([k, v]) => `${esc(k.replace(/_/g, ' '))} ${esc(money(v))}`).join(' · ')}. Once you add a bill, your bills replace that list (a copy is kept in config.json).` : ''}</div>`}
+            ${bills.length ? '' : `<div class="banner"><strong>No scheduled bills yet.</strong> Add them from <strong>Suggested from your history</strong> below, or with <strong>+ Add a bill</strong>.</div>`}
 
             <section>
                 <h2>Your bills <span class="sub">${bills.length} bill${bills.length === 1 ? '' : 's'}</span><span class="spacer"></span><button class="small" id="add">+ Add a bill</button></h2>

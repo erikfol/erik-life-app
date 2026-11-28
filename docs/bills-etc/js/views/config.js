@@ -41,7 +41,7 @@ export default {
             <h2>Variable Categories <span class="sub">day-scaled to project the full month · saved as you tick</span></h2>
             ${cfg ? '' : '<div class="banner">No <code>config.json</code> yet. Tick your variable categories and it is created.</div>'}
             <div class="check-grid">${choices.map(c => `<label class="check"><input type="checkbox" value="${esc(c)}"${vars.has(c) ? ' checked' : ''}> ${esc(c)}</label>`).join('')}</div>
-            <p class="note">This Month projects these to the end of the month from your pace so far and your average. ${hasBills(base) ? 'Scheduled bills are left out of this and added on top.' : 'Fixed expenses are added on top.'}</p>`;
+            <p class="note">This Month projects these to the end of the month from your pace so far and your average.${hasBills(base) ? ' Scheduled bills are left out of this and added on top.' : ''}</p>`;
         box.querySelector('.check-grid').addEventListener('change', async () => {
             const picked = [...box.querySelectorAll('.check-grid input:checked')].map(i => i.value);
             try {

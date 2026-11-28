@@ -220,10 +220,9 @@ export default {
             </section>
 
             <section>
-                ${p.bills ? `<h2>Scheduled Bills <span class="sub">${billsSummary(p)}</span><span class="spacer"></span><a href="#bills" style="font-size:0.85em;text-transform:none;letter-spacing:0">Manage bills →</a></h2>`
-                    : `<h2>Fixed Expenses <span class="sub">(from config)</span></h2>`}
-                <div id="t-fixed"></div>
-                ${p.bills ? '' : '<p class="note">Set up your scheduled bills on the <a href="#bills">Bills</a> page to see which are paid and which are still due.</p>'}
+                ${p.bills ? `<h2>Scheduled Bills <span class="sub">${billsSummary(p)}</span><span class="spacer"></span><a href="#bills" style="font-size:0.85em;text-transform:none;letter-spacing:0">Manage bills →</a></h2>
+                <div id="t-fixed"></div>`
+                    : '<h2>Scheduled Bills</h2><p class="note">Set up your scheduled bills on the <a href="#bills">Bills</a> page to see which are paid and which are still due.</p>'}
             </section>
             <section>
                 <h2>${p.bills ? 'Unscheduled Spending' : 'Variable Spending'}</h2>
@@ -256,15 +255,6 @@ export default {
                 <td class="amt"><strong>${money(sumOf(rows, x => (x.due ? x.expected : 0)))}</strong></td><td></td><td></td>
                 <td class="amt"><strong>${money(sumOf(rows, x => x.paid))}</strong></td><td class="amt"><strong>${money(sumOf(rows, x => x.counted))}</strong></td><td></td></tr>`,
             empty: 'No scheduled bills this month',
-        });
-        else dataTable(el.querySelector('#t-fixed'), {
-            columns: [
-                { id: 'item', label: 'Item', value: r => r.item },
-                moneyColumn('amt', 'Monthly', r => r.amount),
-            ],
-            rows: Object.entries(p.fixed).map(([k, v]) => ({ item: k.replace(/_/g, ' '), amount: v })),
-            footer: (rows, filtered) => `<tr class="total-row"><td><strong>Total Fixed${filtered ? ' (filtered)' : ''}</strong></td><td class="amt"><strong>${money(sumOf(rows, r => r.amount))}</strong></td></tr>`,
-            empty: 'No fixed expenses in config',
         });
 
         const STATUS_ORDER = { 'On track': 0, 'Watch': 1, 'Over': 2, 'No history': 3 };

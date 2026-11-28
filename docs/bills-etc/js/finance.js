@@ -90,10 +90,10 @@ export function historicalAverages(masterRows, variableCats, today, exclude = nu
 
 /**
  * This Month's projection for the current month. With scheduled bills, pass `exclude` (row is a bill payment)
- * and `fixedTotal` (bills paid + still due): bill payments are then left out of the day-scaled spending.
+ * and `fixedTotal` (bills paid + still due): bill payments are then left out of the day-scaled spending and added on top.
  */
 export function computeProjection({ config, rows, masterRows, today = new Date(), exclude = null, fixedTotal = null }) {
-    const { income, fixed, variableCats } = config;
+    const { income, variableCats } = config;
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     const daysElapsed = today.getDate();
 
@@ -112,11 +112,11 @@ export function computeProjection({ config, rows, masterRows, today = new Date()
         projected[cat] = round2(spent[cat] + rate * daysLeft);
     }
 
-    const totalFixed = fixedTotal ?? Object.values(fixed).reduce((a, b) => a + b, 0);
+    const totalFixed = fixedTotal ?? 0;
     const totalVariable = Object.values(projected).reduce((a, b) => a + b, 0);
     const totalProjected = totalFixed + totalVariable;
     return {
-        income, fixed, variableCats, spent, projected, hist,
+        income, variableCats, spent, projected, hist,
         today, daysInMonth, daysElapsed, pctMonth: Math.round(daysElapsed / daysInMonth * 100),
         totalFixed, totalVariable, totalProjected, surplus: income - totalProjected,
         rows: parsed,

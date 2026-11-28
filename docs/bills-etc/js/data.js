@@ -59,16 +59,14 @@ export async function loadConfig() {
     return JSON.parse(text);
 }
 
-/** Income, fixed expenses and variable categories from config.json; keys starting with _ are notes and are ignored. */
+/** Income and variable categories from config.json; keys starting with _ are notes and are ignored. */
 export function parseConfig(cfg) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const income = Object.entries(cfg)
         .filter(([k, v]) => k.startsWith('monthly_income') && isNum(v))
         .reduce((a, [, v]) => a + v, 0);
-    const fixed = Object.fromEntries(Object.entries(cfg.fixed_expenses || {})
-        .filter(([k, v]) => !k.startsWith('_') && isNum(v)));
     const variableCats = (cfg.variable_categories || []).filter(c => typeof c === 'string' && !c.startsWith('_'));
-    return { income, fixed, variableCats };
+    return { income, variableCats };
 }
 
 /** Monthly income sources ([name, amount a month]) from the `monthly_income_<name>` keys (kept in step by the Income page). */
@@ -119,12 +117,9 @@ export const DEFAULT_CONFIG = {
     _readme: 'Bills Etc settings, changed on its Config, Income and Bills pages. Keys starting with _ are notes and are ignored.',
     _income_note: 'Your typical monthly take-home pay (after taxes). Do not count bonuses or tax refunds here.',
     monthly_income_tt: 0,
-    fixed_expenses: {
-        _note: 'Bills that hit every month for the same (or nearly the same) amount.',
-    },
     variable_categories: [
         '_note: These categories are day-scaled from your partial month data to project the full month.',
         'Groceries', 'Dining Out', 'Entertainment', 'Shopping', 'Transport', 'Gas', 'Miscellaneous', 'Utilities',
     ],
-    _projection_note: 'Projection formula (GUI): projected_variable = spent_so_far + days_left * (w * spent_so_far / days_elapsed + (1 - w) * historical_avg / days_in_month), w = days_elapsed / days_in_month (no history: pace alone). Fixed expenses are added on top regardless of partial data.',
+    _projection_note: 'Projection formula (GUI): projected_variable = spent_so_far + days_left * (w * spent_so_far / days_elapsed + (1 - w) * historical_avg / days_in_month), w = days_elapsed / days_in_month (no history: pace alone). Scheduled bills are added on top regardless of partial data.',
 };

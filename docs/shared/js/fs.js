@@ -25,9 +25,6 @@ const FILE_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gi
     heic: 'image/heic', bmp: 'image/bmp', pdf: 'application/pdf' };
 const typeOf = name => FILE_TYPES[name.split('.').pop().toLowerCase()] || '';
 
-/** Use an already-obtained directory handle (e.g. the browser-private OPFS root for testing). */
-export const useFolder = handle => { root = handle; };
-
 function idb() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open('billsetc', 1);

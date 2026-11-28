@@ -206,15 +206,9 @@ export function suggestBills(rows, bills, ignored = []) {
     return result.sort((a, b) => a.day - b.day);
 }
 
-/** Monthly equivalent of the active bills, for config.json `fixed_expenses` (parseConfig reads it). */
-const fixedFrom = bills => Object.fromEntries(bills.filter(b => b.active).map(b => [b.name, round2(b.amount / b.every)]));
-
-/** Save the bills (and keep `fixed_expenses` in step). The first save keeps a copy of the old fixed expenses. */
+/** Save the bills as config.json's `scheduled_bills`. */
 export async function saveBills(bills, extra = {}) {
     const cfg = (await loadConfig()) || structuredClone(DEFAULT_CONFIG);
-    if (!hasBills(cfg) && cfg.fixed_expenses && !cfg._fixed_expenses_before_bills) {
-        cfg._fixed_expenses_before_bills = cfg.fixed_expenses;
-    }
     cfg.scheduled_bills = bills.map(b => {
         const o = { name: b.name, merchants: b.merchants, day: b.day, amount: round2(b.amount), varies: !!b.varies, every: b.every };
         if (b.start) o.start = b.start;
@@ -222,11 +216,6 @@ export async function saveBills(bills, extra = {}) {
         if (b.notes) o.notes = b.notes;
         return o;
     });
-    const notes = Object.fromEntries(Object.entries(cfg.fixed_expenses || {}).filter(([k]) => k.startsWith('_') && k !== '_note'));
-    cfg.fixed_expenses = {
-        _note: 'Kept in step with the Bills page (monthly equivalent of each active bill). Edit your bills there.',
-        ...notes, ...fixedFrom(parseBills(cfg)),
-    };
     Object.assign(cfg, extra);
     await fs.writeText(PATHS.config, JSON.stringify(cfg, null, 2) + '\n');
     return cfg;
