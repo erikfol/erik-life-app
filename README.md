@@ -56,7 +56,7 @@ a master history, and shows the month, savings, bills, utilities and loans.
   `output_master_data/` and `config.json` there.
 - The data lives in the Dropbox app folder `Dropbox\Apps\ErikLifeApp\`, so a **tablet or phone** can use it too: there
   the app signs in with Dropbox (`docs/shared/js/dropbox.js`, Dropbox app "ErikLifeApp", app-folder access only) and
-  reads and writes the same files through Dropbox. On the PC, `inputs/`, `output_master_data/` and `reports/` in this
+  reads and writes the same files through Dropbox. On the PC, `inputs/` and `output_master_data/` in this
   repo are links (junctions) into that folder.
 - AI calls go straight from the browser to your local Ollama (model `qwen2.5:3b`; `ollama pull qwen2.5:3b` once). For the
   GitHub Pages address, allow its origin once, then restart Ollama: `setx OLLAMA_ORIGINS "https://erikfol.github.io"`.
@@ -94,7 +94,6 @@ Keys starting with `_` are notes and are ignored.
 | `output_master_data/all_time_finances.csv` | Master history of all transactions |
 | `output_master_data/processed_current_month.csv` | Current month's categorized rows (fix them on Finance Table) |
 | `output_master_data/categorized_cache.csv` | AI categorization cache for the current month |
-| `reports/` | HTML reports from the retired Python scripts (kept, and backed up, as history) |
 
 ### Categories
 

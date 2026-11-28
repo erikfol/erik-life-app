@@ -16,7 +16,7 @@ found).
 
 ## What it does
 
-1. Copies your data (`config.json`, `inputs/`, `output_master_data/`, `reports/`, `backups.json`) from the data
+1. Copies your data (`config.json`, `inputs/`, `output_master_data/`, `backups.json`) from the data
    folder (where this repo's `inputs/` link points, or `--data <folder>`) into a temporary folder.
 2. Checks out the `--base` commit into a temporary folder too.
 3. For each of the two: starts a small local web server, opens a headless browser with an empty profile, puts the data

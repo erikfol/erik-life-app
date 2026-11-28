@@ -1,4 +1,4 @@
-// Manual backup from the Home page (on the PC): copies your data — config.json, inputs/, output_master_data/, reports/ —
+// Manual backup from the Home page (on the PC): copies your data — config.json, inputs/, output_master_data/ —
 // from your folder (the Dropbox folder on this PC) into a new dated folder inside a backup folder you choose on this PC,
 // and logs each backup in backups.json in your folder, so the Home page can say how many days it's been since the last.
 // A tablet or phone can't make one (no folders there), but shows how long ago the last one was.
@@ -7,7 +7,7 @@ import { esc } from './util.js';
 import { daysBetween } from './dates.js';
 
 /** What a backup copies, from the top of your folder. Anything else there (like Dropbox's desktop.ini) is left out. */
-const DATA = ['config.json', 'inputs', 'output_master_data', 'reports', 'backups.json'];
+const DATA = ['config.json', 'inputs', 'output_master_data', 'backups.json'];
 const LOG_PATH = 'backups.json';
 const DEST_KEY = 'backup'; // the backup folder, remembered in this browser
 /** The Backup line turns yellow after this many days without a backup, and red after this many (or with none yet). */

@@ -13,7 +13,7 @@ import { SECTIONS, seed, crawl, editPrompts } from './crawl.mjs';
 import { diff } from './png.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const DATA_ITEMS = ['config.json', 'inputs', 'output_master_data', 'reports', 'backups.json'];
+const DATA_ITEMS = ['config.json', 'inputs', 'output_master_data', 'backups.json'];
 const say = text => process.stderr.write(text + '\n');
 
 const args = process.argv.slice(2);
