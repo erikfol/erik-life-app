@@ -69,6 +69,7 @@ export async function renderDocuments(el, data, year, onChanged) {
     const reload = async () => { const y = scrollY; await renderDocuments(el, data, year, onChanged); scrollTo(0, y); };
     const docsTable = recordTable(el.querySelector('#docs'), {
         columns: DOCUMENT_COLUMNS,
+        columnsId: 'taxes/documents', sharedBy: "every tax year's Documents",
         choices: DOCUMENT_CHOICES,
         rows: docs,
         filesDir: documentsDir(year),
@@ -89,6 +90,7 @@ export async function renderDocuments(el, data, year, onChanged) {
     });
     const notesTable = recordTable(el.querySelector('#notes'), {
         columns: NOTE_COLUMNS,
+        columnsId: 'taxes/notes', sharedBy: "every tax year's Things to remember",
         rows: notes,
         filesDir: notesDir(year),
         save: r => saveNotes(year, r),

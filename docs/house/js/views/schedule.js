@@ -57,6 +57,7 @@ export async function renderScheduleTab(el, h, top) {
         const status = r => scheduleStatus(h, r, entries);
         const cols = scheduleColumns([...new Set(entries.map(e => String(e.row.Action || '').trim()).filter(Boolean))]);
         schedule = recordTable(el.querySelector('.sched'), {
+            columnsId: 'house/schedule',
             columns: [cols[0], cols[1],
                 { name: 'Status', kind: 'text', calc: r => STATUS[status(r).level] || '—', badge: x => STATUS_CLASS[x] || '' },
                 { name: 'Next due', kind: 'text', calc: r => dueText(status(r)) || 'Fill in Every or Due by' },
@@ -71,6 +72,7 @@ export async function renderScheduleTab(el, h, top) {
         if (log?.hasUnsavedEdits()) return;
         log = recordTable(el.querySelector('.house-log'), {
             columns: maintenanceColumns(h, rows.filter(r => !pageOfItem(r)).map(r => r.Item)),
+            columnsId: 'house/maintenance-log',
             rows: logRows,
             filesDir: invoicesDir(h, 'maintenance'),
             save: async next => {

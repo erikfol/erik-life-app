@@ -108,6 +108,7 @@ export async function renderOverview(el) {
     } });
     changes = recordTable(el.querySelector('#changes'), {
         columns: CHANGE_COLUMNS,
+        columnsId: '401k/changes',
         choices: CHANGE_CHOICES,
         rows: changeRows,
         save: r => saveChanges(r),
@@ -137,6 +138,7 @@ export async function renderOverview(el) {
     }, { title: 'Balance history <span class="sub">one entry per statement: the numbers from its summary for the period shown</span>', example: 'NetBenefits' });
     table = recordTable(el.querySelector('#balances'), {
         columns: BALANCE_COLUMNS,
+        columnsId: '401k/balances',
         choices: BALANCE_CHOICES,
         rows,
         save: async r => { await saveBalances(r); redraw(); },

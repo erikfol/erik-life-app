@@ -1,12 +1,14 @@
 // Editable record table shared by the Home-page sections (Health, Vehicles): read-only with Excel-style sort and
 // filter on every column until Edit is pressed; then every cell is an input, rows can be added, removed and moved up
-// and down, and Save hands the rows back to be written. The rows keep the order they're saved in.
+// and down, and Save hands the rows back to be written. The rows keep the order they're saved in. ⚙ Columns moves,
+// renames, adds and takes off columns (kept per table in inputs/table_columns.json: shared/js/columns.js).
 import * as fs from './fs.js';
 import { esc, toast, money } from './util.js';
 import { dataTable, closeFilterMenu } from './datatable.js';
 import { moveButtons } from './infobox.js';
 import { openLightbox } from './lightbox.js';
 import { MON } from './dates.js';
+import { loadLayouts, saveLayout, arrange, ADDED_KINDS, KIND_NAMES, COLUMNS_PATH } from './columns.js';
 
 const NEW_CHOICE = '__new__'; // a choice can't be named this, so it can't clash
 const ONGOING = 'ongoing';
@@ -62,6 +64,10 @@ const numberOf = v => {
  *   filesDir: the folder for 'files' columns without their own dir
  *   rowActions: [{ label, title, run: async row => void, show?: row => bool }] — a button for each entry in the read-only
  *            view (e.g. move an appointment to the records); run gets the entry as saved; show leaves it off entries it's false for
+ *   columnsId: the table's id for its ⚙ Columns (e.g. 'pets/records'; one id for a table repeated on several pages);
+ *            without it there's no ⚙ Columns. sharedBy: where else those columns show (e.g. "every pet's Records").
+ *            Rows passed in and handed to save keep every column, even ones the page doesn't know (added with
+ *            ⚙ Columns, or by hand), so the page's load and save must keep them too (shared/js/csv.js tableRows/tableCSV).
  * Every table looks like Health → Dental → Records: it scrolls inside a box about a screen tall (column names on top,
  * Total at the bottom and the first column on the left stay in view), and each text is cut to a few lines until it's
  * clicked. Rows are shown in the order they're saved in. Editing starts in the order the read-only view shows (so a
@@ -69,11 +75,17 @@ const numberOf = v => {
  * without).
  * Returns { hasUnsavedEdits() }.
  */
-export function recordTable(container, { columns: cols, rows: initial, save, choices = {}, filesDir = '', rowActions = [] }) {
+export function recordTable(container, { columns: base, rows: initial, save, choices = {}, filesDir = '', rowActions = [], columnsId = '', sharedBy = '' }) {
     const tableNo = ++tableCount;
-    const editCols = cols.filter(c => !c.calc); // the columns that are typed in and saved
+    // cols: every column, in the table's saved order, the ones taken off marked hidden; editCols: the typed-in ones (all
+    // saved, taken off or not); onTable: the ones on the table. title: the name a column shows.
+    let cols, editCols, onTable;
+    const setColumns = layout => { cols = arrange(base, layout); editCols = cols.filter(c => !c.calc); onTable = cols.filter(c => !c.hidden); };
+    setColumns(null);
+    const title = c => c.label || c.name;
     const valueOf = (c, r) => (c.calc ? c.calc(r) : r[c.name]);
-    const state = { rows: initial, draft: null, original: null, shown: null }; // shown: the rows in the read-only view's order
+    // shown: the rows in the read-only view's order; colDraft: the columns while ⚙ Columns is open
+    const state = { rows: initial, draft: null, original: null, shown: null, colDraft: null, colOriginal: null };
     const dlId = c => `dl-${tableNo}-${cols.indexOf(c)}`;
     const dirOf = c => c.dir || filesDir;
     const nounOf = c => c.noun || 'file';
@@ -82,6 +94,7 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         <div class="row table-tools" data-tools></div>
         <div class="record-table" data-read></div>
         <div class="table-wrap" data-edit-wrap hidden><table class="record-table editing"></table></div>
+        <div data-cols-edit hidden></div>
         <div class="row" data-actions style="margin-top:14px" hidden>
             <button type="button" data-add>＋ Add entry</button>
             <span class="spacer"></span>
@@ -94,48 +107,50 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     const editWrap = container.querySelector('[data-edit-wrap]');
     const tools = container.querySelector('[data-tools]');
     const actions = container.querySelector('[data-actions]');
-    const hasUnsavedEdits = () => !!state.draft && (JSON.stringify(state.draft) !== state.original || state.draft.some(pending));
+    const colsEl = container.querySelector('[data-cols-edit]');
+    const hasUnsavedEdits = () => (!!state.draft && (JSON.stringify(state.draft) !== state.original || state.draft.some(pending)))
+        || (!!state.colDraft && JSON.stringify(state.colDraft) !== state.colOriginal);
     const picker = container.querySelector('[data-file-picker]');
     let pickFor = null; // { i, k }: the entry and column the picked files are for
 
     // Read-only view: Excel-style sort and filter on every column (the Finance Table's menu).
     const column = c => {
         const get = r => valueOf(c, r) ?? '';
-        const base = { id: c.name, label: c.name };
+        const head = { id: c.name, label: title(c) };
         if (c.kind === 'date') return {
-            ...base, value: get, text: showDate, tdClass: () => 'date',
+            ...head, value: get, text: showDate, tdClass: () => 'date',
             sortLabels: ['Oldest → Newest', 'Newest → Oldest'],
         };
         if (c.kind === 'end') return { // blank = ongoing: its own filter value, sorted after every end date
-            ...base, value: r => get(r) || ONGOING,
+            ...head, value: r => get(r) || ONGOING,
             text: v => (v === ONGOING ? 'ongoing' : showDate(v)),
             cell: r => (get(r) ? esc(showDate(get(r))) : '<span class="ongoing">ongoing</span>'),
             sortKey: v => (v === ONGOING ? '9999' : v), tdClass: () => 'date',
             sortLabels: ['Oldest → Newest (ongoing last)', 'Ongoing, then Newest → Oldest'],
         };
         if (c.kind === 'number') return { // a value that isn't a number (typed into the file by hand) shows as it is
-            ...base, num: true,
+            ...head, num: true,
             value: r => { const n = numberOf(get(r)); return Number.isNaN(n) ? get(r) : n; },
             text: v => (typeof v === 'number' ? v.toLocaleString('en-US') : String(v)),
         };
         if (c.kind === 'money') return {
-            ...base, num: true,
+            ...head, num: true,
             value: r => { const n = numberOf(get(r)); return Number.isNaN(n) ? get(r) : n; },
             text: v => (typeof v === 'number' ? money(v) : String(v)),
         };
         if (c.kind === 'choice') return {
-            ...base, value: get,
+            ...head, value: get,
             cell: r => {
                 const v = get(r), href = v && c.href?.(v), cls = `cat-badge${v && c.badge ? ` ${esc(c.badge(v))}` : ''}`; // c.badge: its colour
                 return !v ? '' : href ? `<a class="${cls}" href="${esc(href)}">${esc(v)}</a>` : `<span class="${cls}">${esc(v)}</span>`;
             },
         };
         if (c.kind === 'link') return {
-            ...base, value: get, text: v => (isLink(v) ? linkText(v) : String(v)),
+            ...head, value: get, text: v => (isLink(v) ? linkText(v) : String(v)),
             cell: r => { const v = get(r); return isLink(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener" title="${esc(v)}">${esc(linkText(v))} ↗</a>` : esc(v); },
         };
         if (c.kind === 'files') return { // 📎 2: click to see them large
-            ...base, value: r => fileNames(get(r)).length || '',
+            ...head, value: r => fileNames(get(r)).length || '',
             text: v => (v ? `${v} ${nounOf(c)}${v === 1 ? '' : 's'}` : ''),
             cell: r => {
                 const names = fileNames(get(r));
@@ -144,16 +159,16 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             },
         };
         if (c.badge) return {
-            ...base, value: get,
+            ...head, value: get,
             cell: r => { const v = get(r); return v ? `<span class="cat-badge ${esc(c.badge(v))}">${esc(v)}</span>` : ''; },
         };
         const wide = c.wide ?? /notes$/i.test(c.name); // notes get more room
         return { // cut to a few lines (…); a click shows it all
-            ...base, value: get, tdClass: () => (wide ? 'text wide' : 'text'),
+            ...head, value: get, tdClass: () => (wide ? 'text wide' : 'text'),
             cell: r => { const v = get(r); return v ? `<div class="clip" title="Click to show it all">${esc(v)}</div>` : ''; },
         };
     };
-    const firstDate = cols.find(c => c.kind === 'date' && !c.calc); // the first typed-in date (not a worked-out one, like REC payments' Paid By)
+    const firstDate = base.find(c => c.kind === 'date' && !c.calc); // the page's first typed-in date (not a worked-out one, like REC payments' Paid By)
 
     // An entry's button (rowActions).
     readEl.addEventListener('click', async e => {
@@ -190,30 +205,36 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
 
     const showRead = () => {
         state.draft = null;
+        state.colDraft = null;
         actions.hidden = true;
         editWrap.hidden = true;
+        colsEl.hidden = true;
+        colsEl.innerHTML = '';
         tbl.innerHTML = '';
         readEl.hidden = false;
         tools.innerHTML = `<button type="button" class="small" data-edit>✎ Edit</button>
+            ${columnsId ? '<button type="button" class="small" data-columns title="Move, rename, add or remove columns">⚙ Columns</button>' : ''}
             <span class="muted edit-hint">Click a column name to sort, or ▾ to sort and filter. Turn on editing to add,
-                change, remove or reorder entries — it starts in the order shown, and Save keeps that order.</span>`;
+                change, remove or reorder entries — it starts in the order shown, and Save keeps that order.${columnsId
+                ? ' ⚙ Columns moves, renames, adds or removes columns.' : ''}</span>`;
         tools.querySelector('[data-edit]').onclick = startEdit;
+        if (columnsId) tools.querySelector('[data-columns]').onclick = startColumns;
         // a last column with each entry's buttons (rowActions)
         const actionCol = rowActions.length ? [{ id: '_actions', label: '', plain: true, value: () => '', tdClass: () => 'row-actions',
             cell: r => rowActions.map((a, k) => (a.show && !a.show(r) ? '' : `<button type="button" class="small" data-row-action="${k}" data-row="${state.rows.indexOf(r)}"
                 title="${esc(a.title || '')}">${esc(a.label)}</button>`)).join(' ') }] : [];
         dataTable(readEl, {
-            columns: [...cols.map(column), ...actionCol],
+            columns: [...onTable.map(column), ...actionCol],
             rows: state.rows,
             empty: state.rows.length ? 'No entries match the filters' : 'No entries yet. Press Edit to add one.',
-            footer: cols.some(c => c.kind === 'money' && c.total !== false) ? totalRow : undefined,
+            footer: onTable.some(c => c.kind === 'money' && c.total !== false) ? totalRow : undefined,
             onChange: visible => { state.shown = visible; },
         });
     };
 
     // Under a table with money columns: their totals over the rows currently shown (so filtering by Action or a year
     // gives what that cost).
-    const totalRow = visible => !visible.length ? '' : `<tr class="total-row">${cols.map((c, i) => {
+    const totalRow = visible => !visible.length ? '' : `<tr class="total-row">${onTable.map((c, i) => {
         if (c.kind !== 'money' || c.total === false) return `<td>${i === 0 ? `<strong>Total</strong> <span class="muted">(${visible.length} shown)</span>` : ''}</td>`;
         const total = visible.reduce((t, r) => { const n = numberOf(valueOf(c, r)); return t + (typeof n === 'number' && !Number.isNaN(n) ? n : 0); }, 0);
         return `<td class="amt"><strong>${esc(money(total))}</strong></td>`;
@@ -236,8 +257,10 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     };
 
     const drawEdit = () => {
+        const typed = onTable.filter(c => !c.calc);
         const input = (c, i, v) => {
-            const attrs = `data-i="${i}" data-k="${esc(c.name)}" aria-label="${esc(c.name)}"`;
+            v ??= '';
+            const attrs = `data-i="${i}" data-k="${esc(c.name)}" aria-label="${esc(title(c))}"`;
             if (c.kind === 'date' || c.kind === 'end') return `<input type="date" ${attrs} value="${esc(v)}">`;
             if (c.kind === 'number' || c.kind === 'money') return `<input type="text" inputmode="decimal" class="num-input" ${attrs} value="${esc(v)}">`;
             if (c.kind === 'choice') return `<select ${attrs}>${choiceOptions(c, v)}</select>`;
@@ -253,12 +276,12 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             }
             return `<textarea ${attrs} rows="1">${esc(v)}</textarea>`;
         };
-        const lists = editCols.filter(c => c.kind === 'suggest').map(c =>
+        const lists = typed.filter(c => c.kind === 'suggest').map(c =>
             `<datalist id="${dlId(c)}">${suggestions(c).map(v => `<option value="${esc(v)}">`).join('')}</datalist>`).join('');
-        tbl.innerHTML = `<thead><tr><th></th>${editCols.map(c => `<th>${esc(c.name)}${c.kind === 'end' ? ' <span class="muted">(blank = ongoing)</span>' : ''}</th>`).join('')}<th>${lists}</th></tr></thead>
-            <tbody>${state.draft.map((r, i) => `<tr><td class="move">${moveButtons()}</td>${editCols.map(c => `<td>${input(c, i, r[c.name])}</td>`).join('')}
+        tbl.innerHTML = `<thead><tr><th></th>${typed.map(c => `<th>${esc(title(c))}${c.kind === 'end' ? ' <span class="muted">(blank = ongoing)</span>' : ''}</th>`).join('')}<th>${lists}</th></tr></thead>
+            <tbody>${state.draft.map((r, i) => `<tr><td class="move">${moveButtons()}</td>${typed.map(c => `<td>${input(c, i, r[c.name])}</td>`).join('')}
                 <td class="remove"><button type="button" class="danger" data-remove="${i}" title="Remove this entry" aria-label="Remove this entry">✕</button></td></tr>`).join('')
-                || `<tr><td colspan="${editCols.length + 2}" class="muted">No entries. Press ＋ Add entry.</td></tr>`}</tbody>`;
+                || `<tr><td colspan="${typed.length + 2}" class="muted">No entries. Press ＋ Add entry.</td></tr>`}</tbody>`;
         markChanged();
     };
 
@@ -266,7 +289,7 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     const markChanged = () => {
         tbl.querySelectorAll('[data-k]').forEach(inp => {
             const r = state.draft[+inp.dataset.i];
-            const was = r._from == null ? '' : state.rows[r._from][inp.dataset.k];
+            const was = r._from == null ? '' : state.rows[r._from][inp.dataset.k] ?? '';
             inp.classList.toggle('changed', r._from == null ? inp.value !== '' : inp.value !== was);
         });
         tbl.querySelectorAll('[data-files-i]').forEach(box => {
@@ -279,7 +302,8 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
     function startEdit() {
         // Start as the read-only view showed it (sorted by a column, say), entries filtered out last.
         const order = state.shown ? [...state.shown, ...state.rows.filter(r => !state.shown.includes(r))] : state.rows;
-        state.draft = order.map(r => ({ ...r, _from: state.rows.indexOf(r) }));
+        const blankRow = Object.fromEntries(editCols.map(c => [c.name, ''])); // a column added since has no value yet
+        state.draft = order.map(r => ({ ...blankRow, ...r, _from: state.rows.indexOf(r) }));
         state.original = JSON.stringify(state.draft);
         closeFilterMenu();
         readEl.hidden = true;
@@ -392,15 +416,16 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
             btn.disabled = false;
         }
         // An entry left as it started (blank, or just its starting values) isn't saved.
-        const blank = r => editCols.every(c => !String(r[c.name]).trim() || (c.default != null && r[c.name] === startValue(c)));
-        const rows = state.draft.filter(r => !blank(r)).map(r => Object.fromEntries(editCols.map(c => [c.name, String(r[c.name]).trim()])));
+        const blank = r => editCols.every(c => !String(r[c.name] ?? '').trim() || (c.default != null && r[c.name] === startValue(c)));
+        const rows = state.draft.filter(r => !blank(r)).map(r => Object.fromEntries(Object.entries(r)
+            .filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, String(v ?? '').trim()])));
         const label = r => `“${r.Description || r.Action || r.Gift || 'An entry'}”`;
-        const start = firstDate?.name, end = cols.find(c => c.kind === 'end')?.name;
+        const start = firstDate?.name, end = base.find(c => c.kind === 'end')?.name;
         const backwards = end && rows.find(r => r[start] && r[end] && r[end] < r[start]);
         if (backwards) return toast(`${label(backwards)} ends before it starts — fix the dates, then Save.`, 'bad');
-        for (const c of editCols.filter(c => c.kind === 'number' || c.kind === 'money')) {
+        for (const c of editCols.filter(c => !c.hidden && (c.kind === 'number' || c.kind === 'money'))) {
             const bad = rows.find(r => Number.isNaN(numberOf(r[c.name])));
-            if (bad) return toast(`${label(bad)}: ${c.name} “${bad[c.name]}” isn't a number — fix it, then Save.`, 'bad');
+            if (bad) return toast(`${label(bad)}: ${title(c)} “${bad[c.name]}” isn't a number — fix it, then Save.`, 'bad');
             for (const r of rows) r[c.name] = String(numberOf(r[c.name])); // '52,340' is stored as 52340, '$1,250' as 1250
         }
         const btn = container.querySelector('[data-save]');
@@ -417,7 +442,125 @@ export function recordTable(container, { columns: cols, rows: initial, save, cho
         }
     };
 
-    showRead();
+    // ⚙ Columns: the table's columns in order, each with ↑ ↓, its name (typed over to rename it) and ✕ to take it off
+    // the table; the ones taken off below, each with ＋ Put back; ＋ Add column. Nothing changes until Save columns.
+    function startColumns() {
+        closeFilterMenu();
+        state.colDraft = cols.map(c => ({ name: c.name, label: title(c), kind: c.kind, calc: !!c.calc, added: !!c.added, hidden: !!c.hidden }));
+        state.colOriginal = JSON.stringify(state.colDraft);
+        readEl.hidden = true;
+        readEl.innerHTML = '';
+        colsEl.hidden = false;
+        tools.innerHTML = `<span class="muted edit-hint">Changing the columns${sharedBy ? ` of ${esc(sharedBy)}` : ''}. ↑ ↓ move a column
+            (the top one is the table's first). Type over a name to rename it. ✕ takes a column off the table: what's typed in it
+            stays in the file, so ＋ Put back brings it all back. Nothing changes until you press Save columns.</span>`;
+        drawColumns();
+    }
+
+    const kindText = c => (c.calc ? 'Worked out from the others' : KIND_NAMES[c.kind] || 'Text');
+    function drawColumns() {
+        const on = state.colDraft.filter(c => !c.hidden), off = state.colDraft.filter(c => c.hidden);
+        colsEl.innerHTML = `
+            <div class="table-wrap"><table class="record-table editing columns-edit">
+                <thead><tr><th></th><th>Column</th><th>Kind</th><th></th></tr></thead>
+                <tbody>${on.map(c => `<tr data-col="${state.colDraft.indexOf(c)}">
+                    <td class="move">${moveButtons()}</td>
+                    <td><input type="text" data-col-name value="${esc(c.label)}" aria-label="Column name" placeholder="Name of the column"></td>
+                    <td>${c.added ? `<select data-col-kind aria-label="Kind of column">${Object.entries(ADDED_KINDS).map(([k, text]) =>
+                        `<option value="${k}"${k === c.kind ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select>`
+                        : `<span class="muted">${esc(kindText(c))}</span>`}</td>
+                    <td class="remove"><button type="button" class="danger" data-col-remove title="Take it off the table (what's typed in it stays in the file)" aria-label="Remove ${esc(c.label)}">✕</button></td>
+                </tr>`).join('')}</tbody>
+            </table></div>
+            ${off.length ? `<div class="cols-off"><span class="muted">Taken off the table:</span> ${off.map(c => `<span class="file-chip">${esc(c.label)}
+                <button type="button" data-col-back="${state.colDraft.indexOf(c)}" title="Put it back on the table">＋ Put back</button></span>`).join(' ')}</div>` : ''}
+            <div class="row" style="margin-top:14px">
+                <button type="button" data-col-add>＋ Add column</button>
+                <span class="spacer"></span>
+                <button type="button" data-col-cancel>Cancel</button>
+                <button type="button" class="primary" data-col-save>Save columns</button>
+            </div>`;
+    }
+
+    colsEl.addEventListener('input', e => {
+        const i = +e.target.closest('[data-col]')?.dataset.col;
+        if (Number.isNaN(i)) return;
+        if (e.target.matches('[data-col-name]')) state.colDraft[i].label = e.target.value;
+        if (e.target.matches('[data-col-kind]')) state.colDraft[i].kind = e.target.value;
+    });
+    colsEl.addEventListener('click', async e => {
+        const d = state.colDraft;
+        if (!d) return;
+        const row = e.target.closest('[data-col]'), i = row ? +row.dataset.col : -1;
+        const m = e.target.closest('[data-move]');
+        if (m && row) { // swap with the column above or below on the table (ones taken off stay where they were)
+            const on = d.map((c, k) => (c.hidden ? -1 : k)).filter(k => k >= 0), to = on[on.indexOf(i) + Number(m.dataset.move)];
+            if (to == null) return;
+            [d[i], d[to]] = [d[to], d[i]];
+            drawColumns();
+            colsEl.querySelector(`[data-col="${to}"] [data-move="${m.dataset.move}"]`)?.focus();
+            return;
+        }
+        if (e.target.closest('[data-col-remove]') && row) {
+            if (d[i].fresh) d.splice(i, 1); else d[i].hidden = true; // one just added goes; one saved is taken off
+            return drawColumns();
+        }
+        const back = e.target.closest('[data-col-back]');
+        if (back) { d[+back.dataset.colBack].hidden = false; return drawColumns(); }
+        if (e.target.closest('[data-col-add]')) {
+            d.push({ name: '', label: '', kind: 'text', calc: false, added: true, hidden: false, fresh: true });
+            drawColumns();
+            colsEl.querySelector(`[data-col="${d.length - 1}"] [data-col-name]`)?.focus();
+            return;
+        }
+        if (e.target.closest('[data-col-cancel]')) {
+            if (hasUnsavedEdits() && !confirm('Discard your changes to the columns?')) return;
+            return showRead();
+        }
+        if (e.target.closest('[data-col-save]')) await saveColumns(e.target.closest('[data-col-save]'));
+    });
+
+    async function saveColumns(btn) {
+        const d = state.colDraft.map(c => ({ ...c, label: c.label.trim() }));
+        const on = d.filter(c => !c.hidden), lower = s => s.toLowerCase();
+        if (!on.length) return toast('Keep at least one column on the table.', 'bad');
+        if (on.some(c => !c.label)) return toast('Give every column a name (or ✕ to remove it).', 'bad');
+        const twice = on.find((c, k) => on.findIndex(x => lower(x.label) === lower(c.label)) !== k);
+        if (twice) return toast(`Two columns are named “${twice.label}” — rename one.`, 'bad');
+        for (const c of d.filter(x => x.fresh)) { // a new column's name is also its name in the file
+            if (c.label.startsWith('_')) return toast(`A column's name can't start with _ (“${c.label}”).`, 'bad');
+            const off = d.find(x => x.hidden && lower(x.label) === lower(c.label));
+            if (off) return toast(`“${c.label}” was taken off the table: use its ＋ Put back to bring it back with what's in it.`, 'bad');
+            const used = d.find(x => x !== c && lower(x.name) === lower(c.label));
+            if (used) return toast(`“${c.label}” is already the file's name for the column shown as “${used.label}” — pick another name.`, 'bad');
+            c.name = c.label;
+        }
+        const layout = { columns: d.map(c => ({
+            name: c.name,
+            ...(c.label !== c.name ? { label: c.label } : {}),
+            ...(c.hidden ? { hidden: true } : {}),
+            ...(c.added ? { added: true, kind: c.kind } : {}),
+        })) };
+        btn.disabled = true;
+        try {
+            await saveLayout(columnsId, layout);
+        } catch (err) {
+            btn.disabled = false;
+            return toast(`Couldn't save the columns: ${err.message}`, 'bad');
+        }
+        setColumns(layout);
+        toast('Columns saved', 'ok');
+        showRead();
+    }
+
+    // The table's own columns (saved with ⚙ Columns) are read before it's first drawn.
+    if (!columnsId) showRead();
+    else {
+        readEl.innerHTML = '<p class="muted">Loading…</p>';
+        loadLayouts()
+            .then(all => setColumns(all[columnsId]), err => toast(`Couldn't read the column settings in ${COLUMNS_PATH}: ${err.message}`, 'bad'))
+            .finally(() => { if (!state.draft && !state.colDraft) showRead(); });
+    }
     return { hasUnsavedEdits };
 }
 

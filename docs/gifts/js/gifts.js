@@ -2,7 +2,7 @@
 // inputs/gifts/gifts.json; one gifts CSV per person and one per Christmas year next to it. inputs/ is kept out of git,
 // so names and dates are only ever in your folder.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const GIFTS_DIR = 'inputs/gifts';
@@ -172,11 +172,11 @@ export const christmasPath = year => `${GIFTS_DIR}/christmas-${year}.csv`;
 async function readRows(path, names, track) {
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text === null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, names);
 }
 
 async function writeRows(path, names, rows) {
-    await writeTracked(path, toCSV(names, rows));
+    await writeTracked(path, tableCSV(names, rows));
 }
 
 export const loadGifts = (p, track = true) => readRows(giftsPath(p), GIFT_NAMES, track);

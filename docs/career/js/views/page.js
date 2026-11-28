@@ -24,6 +24,7 @@ export async function renderPage(el, page) {
     tables.forEach(([id], i) => {
         const table = recordTable(el.querySelector(`[data-table="${id}"]`), {
             columns: TABLES[id].columns,
+            columnsId: `career/${id}`,
             rows: rows[i],
             save: r => saveTable(id, r),
         });

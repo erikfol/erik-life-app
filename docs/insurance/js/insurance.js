@@ -1,7 +1,7 @@
 // Insurance: the list of policies (each with its information and contacts) in inputs/insurance/insurance.json, and
 // one records CSV per policy next to it. inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const INSURANCE_DIR = 'inputs/insurance';
@@ -63,10 +63,9 @@ export const invoicesDir = p => `${INSURANCE_DIR}/invoices/${p.id}`;
 export async function loadRecords(p, track = true) {
     const text = track ? await readTracked(recordsPath(p)) : await fs.readText(recordsPath(p));
     if (text === null) return [];
-    const names = RECORD_COLUMNS.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, RECORD_COLUMNS.map(c => c.name));
 }
 
 export async function saveRecords(p, rows) {
-    await writeTracked(recordsPath(p), toCSV(RECORD_COLUMNS.map(c => c.name), rows));
+    await writeTracked(recordsPath(p), tableCSV(RECORD_COLUMNS.map(c => c.name), rows));
 }

@@ -9,7 +9,7 @@
 // The account's deposits and withdrawals are kept in activity.csv; "Available In Account" is the running balance from
 // a starting balance (savings_settings.json), written into the sheet whenever the activity changes.
 import * as fs from '../../shared/js/fs.js';
-import { parseRecords, parseCSV, toCSV } from '../../shared/js/csv.js';
+import { parseRecords, parseCSV, toCSV, tableRows, tableCSV } from '../../shared/js/csv.js';
 import { parseBillDate, parseMoney } from './sheet.js';
 
 export const SAVINGS_PATH = 'inputs/savings/master_savings.csv';
@@ -166,9 +166,9 @@ export const ACTIVITY_COLUMNS = [
 export async function loadActivity() {
     const text = await fs.readText(ACTIVITY_PATH);
     if (text == null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(ACTIVITY_COLUMNS.map(c => [c.name, String(r[c.name] ?? '').trim()])));
+    return tableRows(text, ACTIVITY_COLUMNS.map(c => c.name), { trim: true });
 }
-export const saveActivity = rows => fs.writeText(ACTIVITY_PATH, toCSV(ACTIVITY_COLUMNS.map(c => c.name), rows));
+export const saveActivity = rows => fs.writeText(ACTIVITY_PATH, tableCSV(ACTIVITY_COLUMNS.map(c => c.name), rows));
 
 /** How an entry moves the balance: a Withdrawal takes its Amount out, anything else puts it in. */
 export const signedAmount = r => {

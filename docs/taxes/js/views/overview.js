@@ -110,6 +110,7 @@ export async function renderOverview(el) {
     });
     const table = recordTable(el.querySelector('#returns'), {
         columns: RETURN_COLUMNS,
+        columnsId: 'taxes/returns',
         rows: returns,
         filesDir: RETURNS_DIR,
         save: async r => {

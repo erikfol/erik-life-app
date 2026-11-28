@@ -1,6 +1,6 @@
 // Health records: one CSV per section in inputs/health/ of the connected folder (kept out of git like all of inputs/).
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const HEALTH_DIR = 'inputs/health';
@@ -113,11 +113,11 @@ function accountBalance(rows) {
 export async function loadRecords(section, track = true) {
     const text = track ? await readTracked(section.path) : await fs.readText(section.path);
     if (text === null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(section.columns.map(c => [c.name, r[c.name] ?? (c.was && r[c.was]) ?? ''])));
+    return tableRows(text, names(section), { was: Object.fromEntries(section.columns.filter(c => c.was).map(c => [c.name, c.was])) });
 }
 
 export async function saveRecords(section, rows) {
-    await writeTracked(section.path, toCSV(names(section), rows));
+    await writeTracked(section.path, tableCSV(names(section), rows));
 }
 
 /**

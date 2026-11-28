@@ -2,7 +2,7 @@
 // inputs/house/house.json, plus one records CSV per house and area next to it (and a maintenance CSV for areas with
 // a Maintenance table). An area is one page: a tab, or one part (pill) of a tab. inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { isoDate } from '../../shared/js/dates.js';
 
@@ -333,12 +333,11 @@ export const maintenanceColumns = (h, actions = []) => [
 async function readRows(path, cols, track) {
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text === null) return [];
-    const names = cols.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, cols.map(c => c.name));
 }
 
 async function writeRows(path, cols, rows) {
-    await writeTracked(path, toCSV(cols.map(c => c.name), rows));
+    await writeTracked(path, tableCSV(cols.map(c => c.name), rows));
 }
 
 /** One of an area's `tables` (t) on house `h`: its file, and its rows (the calculated columns aren't saved). */

@@ -61,6 +61,7 @@ function renderSchedule(el, v, rows, get) {
         if (schedule?.hasUnsavedEdits()) return; // don't throw away edits in progress
         const cols = scheduleColumns(v, [...new Set(log.map(r => String(r.Action || '').trim()).filter(Boolean))]);
         schedule = recordTable(el.querySelector('.sched'), {
+            columnsId: 'vehicles/schedule', sharedBy: "every vehicle's Maintenance schedule",
             columns: [cols[0], cols[1],
                 { name: 'Status', kind: 'text', calc: r => STATUS[status(r).level] || '—', badge: x => STATUS_CLASS[x] || '' },
                 { name: 'Next due', kind: 'text', calc: r => {
@@ -143,6 +144,7 @@ function renderTires(el, list, v, get) {
         if (tread?.hasUnsavedEdits()) return; // don't throw away edits in progress
         const saved = get();
         tread = recordTable(el.querySelector('.tread'), {
+            columnsId: 'vehicles/tread', sharedBy: "every vehicle's Tread depth",
             columns: [TREAD_COLUMNS[0], TREAD_COLUMNS[1],
                 { name: 'Miles on tires', kind: 'number', calc: r => { const m = treadMiles(v, get().log, r); return Number.isFinite(m) ? m : ''; } },
                 ...TREAD_COLUMNS.slice(2, -1),
@@ -293,6 +295,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
         now.innerHTML = currentMileage(v, miles);
         mileage = recordTable(el.querySelector('#miles'), {
             columns: [...MILEAGE_COLUMNS, ...mileageRateColumns(v, () => saved.readings)],
+            columnsId: 'vehicles/mileage', sharedBy: "every vehicle's mileage log",
             rows: miles,
             save: async rows => { await saveMileage(v, rows); saved.readings = rows; now.innerHTML = currentMileage(v, rows); redraw(); },
         });
@@ -303,6 +306,7 @@ export async function renderVehicle(el, list, v, onListChanged, part) {
     });
     table = recordTable(el.querySelector('#maint'), {
         columns: maintenanceColumns(v, (plan || []).map(r => r.Item)), // the schedule's items are offered first as Actions
+        columnsId: 'vehicles/maintenance', sharedBy: "every vehicle's Maintenance",
         rows,
         filesDir: invoicesDir(v),
         save: async rows => { await saveMaintenance(v, rows); saved.log = rows; redraw(); },

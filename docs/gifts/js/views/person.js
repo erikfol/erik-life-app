@@ -166,6 +166,7 @@ export async function renderPerson(el, data, p, onListChanged) {
 
     table = recordTable(el.querySelector('#gifts'), {
         columns: giftColumns(upcomingDates(p).map(d => d.label)),
+        columnsId: 'gifts/gifts', sharedBy: "every person's Gifts",
         rows: gifts,
         save: async rows => { await saveGifts(p, rows); drawSummary(rows); },
     });

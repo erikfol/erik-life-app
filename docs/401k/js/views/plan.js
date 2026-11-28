@@ -72,11 +72,13 @@ export async function renderPlan(el) {
     noteEl.innerHTML = investmentsNote(investments, balance);
     const inv = recordTable(el.querySelector('#investments'), {
         columns: INVESTMENT_COLUMNS,
+        columnsId: '401k/investments',
         rows: investments,
         save: async r => { await saveInvestments(r); noteEl.innerHTML = investmentsNote(r, balance); },
     });
     const docs = recordTable(el.querySelector('#documents'), {
         columns: DOCUMENT_COLUMNS,
+        columnsId: '401k/documents',
         rows: documents,
         filesDir: DOCUMENTS_DIR,
         save: r => saveDocuments(r),
@@ -85,6 +87,7 @@ export async function renderPlan(el) {
     bannerEl.innerHTML = limitsBanner(limits);
     const lim = recordTable(el.querySelector('#limits'), {
         columns: LIMIT_COLUMNS,
+        columnsId: '401k/limits',
         rows: limits,
         save: async r => { await saveLimits(r); bannerEl.innerHTML = limitsBanner(r); },
     });

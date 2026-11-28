@@ -2,7 +2,7 @@
 // The profile is a JSON file of label/value fields; every other page is one or more CSV tables (the shared record
 // table's columns); tailored resumes are kept in resumes.json.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const CAREER_DIR = 'inputs/career';
@@ -108,10 +108,10 @@ const names = id => TABLES[id].columns.map(c => c.name);
 export async function loadTable(id, track = true) {
     const text = track ? await readTracked(tablePath(id)) : await fs.readText(tablePath(id));
     if (text === null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(names(id).map(c => [c, r[c] ?? ''])));
+    return tableRows(text, names(id));
 }
 
-export const saveTable = (id, rows) => writeTracked(tablePath(id), toCSV(names(id), rows));
+export const saveTable = (id, rows) => writeTracked(tablePath(id), tableCSV(names(id), rows));
 
 /** The profile's fields, [{ label, value }]; blank starting fields until it's first saved. */
 export async function loadProfile(track = true) {

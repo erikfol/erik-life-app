@@ -1,7 +1,7 @@
 // Pets: the list (with each pet's information) in inputs/pets/pets.json, and one records CSV per pet next to it.
 // inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const PETS_DIR = 'inputs/pets';
@@ -80,12 +80,11 @@ export const invoicesDir = p => `${PETS_DIR}/invoices/${p.id}`;
 export async function loadRecords(p, track = true) {
     const text = track ? await readTracked(recordsPath(p)) : await fs.readText(recordsPath(p));
     if (text === null) return [];
-    const names = RECORD_COLUMNS.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, RECORD_COLUMNS.map(c => c.name));
 }
 
 export async function saveRecords(p, rows) {
-    await writeTracked(recordsPath(p), toCSV(RECORD_COLUMNS.map(c => c.name), rows));
+    await writeTracked(recordsPath(p), tableCSV(RECORD_COLUMNS.map(c => c.name), rows));
 }
 
 // Future appointments: one CSV per pet next to its records.
@@ -102,12 +101,11 @@ export const APPOINTMENT_COLUMNS = [
 export async function loadAppointments(p, track = true) {
     const text = track ? await readTracked(appointmentsPath(p)) : await fs.readText(appointmentsPath(p));
     if (text === null) return [];
-    const names = APPOINTMENT_COLUMNS.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, APPOINTMENT_COLUMNS.map(c => c.name));
 }
 
 export async function saveAppointments(p, rows) {
-    await writeTracked(appointmentsPath(p), toCSV(APPOINTMENT_COLUMNS.map(c => c.name), rows));
+    await writeTracked(appointmentsPath(p), tableCSV(APPOINTMENT_COLUMNS.map(c => c.name), rows));
 }
 
 export { appointmentStatus } from '../../shared/js/appointments.js';

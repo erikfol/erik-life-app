@@ -3,7 +3,7 @@
 // each tax year the documents to gather (<year>-documents.csv, their files in documents/<year>/) and the things to
 // remember for that return (<year>-notes.csv, receipts in notes/<year>/). inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { MON, todayIso } from '../../shared/js/dates.js';
 
@@ -115,11 +115,10 @@ export const NOTE_COLUMNS = [
 async function loadCsv(path, columns, track, missing = []) {
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text === null) return missing;
-    const names = columns.filter(c => !c.calc).map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, columns.filter(c => !c.calc).map(c => c.name));
 }
 async function saveCsv(path, columns, rows) {
-    await writeTracked(path, toCSV(columns.filter(c => !c.calc).map(c => c.name), rows));
+    await writeTracked(path, tableCSV(columns.filter(c => !c.calc).map(c => c.name), rows));
 }
 export const loadReturns = (track = true) => loadCsv(RETURNS_PATH, RETURN_COLUMNS, track);
 export const saveReturns = rows => saveCsv(RETURNS_PATH, RETURN_COLUMNS, rows);

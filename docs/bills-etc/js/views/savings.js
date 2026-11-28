@@ -290,6 +290,7 @@ export default {
             }
         };
         activityTable = recordTable($('#activity'), {
+            columnsId: 'bills-etc/savings-activity',
             columns: [...ACTIVITY_COLUMNS.map(c => (c.name === 'Type' ? { ...c, default: 'Deposit', badge: v => (/^withdraw/i.test(v) ? 'withdrawal' : 'deposit') } // green / red
                 : c.name === 'Date' ? { ...c, default: () => isoDate(today()) } : c)),
                 { name: 'Balance', kind: 'money', total: false, calc: r => L.after.get(r) ?? '' },

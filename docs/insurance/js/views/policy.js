@@ -65,6 +65,7 @@ export async function renderPolicy(el, list, p, onListChanged) {
     });
     table = recordTable(el.querySelector('#records'), {
         columns: RECORD_COLUMNS,
+        columnsId: 'insurance/records', sharedBy: "every policy's Records",
         rows,
         filesDir: invoicesDir(p),
         save: rows => saveRecords(p, rows),

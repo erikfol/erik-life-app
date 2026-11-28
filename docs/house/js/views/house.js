@@ -159,6 +159,7 @@ async function renderArea(el, list, h, tab, a) {
     }));
     extras = tables.map((t, i) => recordTable(el.querySelector(`#table-${i}`), {
         columns: t.columns(h, a),
+        columnsId: `house/${a.id}-${t.key}`,
         rows: tableRows[i],
         choices: t.choices?.(h, a, tableRows[i]) || {},
         save: async r => { await saveAreaTable(h, a, t, r); tableRows[i] = r; drawTables(); },
@@ -181,6 +182,7 @@ async function renderArea(el, list, h, tab, a) {
     if (a.maintenance) maint = recordTable(el.querySelector('#maintenance'), {
         // Action offers this page's schedule items first, so what's logged counts for them
         columns: maintenanceColumns(h, [...sched.items.filter(r => pageOfItem(r) === a).map(r => r.Item), ...(a.actions || [])]),
+        columnsId: `house/${a.id}-maintenance`,
         rows: maintRows,
         filesDir: invoicesDir(h, `${a.id}-maintenance`),
         save: async r => {
@@ -191,6 +193,7 @@ async function renderArea(el, list, h, tab, a) {
     });
     if (hasRecords) table = recordTable(el.querySelector('#records'), {
         columns: recordColumns(h, a),
+        columnsId: `house/${a.id}-records`,
         rows,
         filesDir: invoicesDir(h, `${a.id}-records`),
         save: r => saveRecords(h, a, r),
@@ -217,6 +220,7 @@ async function renderTableTab(el, h, tab, t) {
         <section><h2>${esc(t.label)}</h2><div id="records"></div></section>`;
     table = recordTable(el.querySelector('#records'), {
         columns,
+        columnsId: `house/${t.id}`,
         rows,
         choices,
         filesDir: invoicesDir(h, t.id), // Updates Done's invoices

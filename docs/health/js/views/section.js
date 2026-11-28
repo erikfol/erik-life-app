@@ -103,6 +103,7 @@ export async function renderSection(el, section) {
         };
         const apptTable = recordTable(el.querySelector('#appointments'), {
             columns: appts.columns.map(c => (c.name === 'Location' ? { ...c, suggestions: offices } : c)),
+            columnsId: `health/${section.id}-appointments`,
             rows: apptRows,
             save: async r => { await saveRecords(appts, r); drawBanner(r); },
             rowActions: [{ label: '→ Records', title: 'Move this appointment down to Records: the columns Records has are filled in from it, the rest is left blank to fill in', run: moveToRecords }],
@@ -115,6 +116,7 @@ export async function renderSection(el, section) {
     drawOwed(rows);
     const table = recordTable(el.querySelector('#records'), {
         columns: section.columns,
+        columnsId: `health/${section.id}-records`,
         rows,
         save: async rows => { await saveRecords(section, rows); drawOwed(rows); },
         choices: { Location: location, ...PAID_CHOICES },
@@ -124,6 +126,7 @@ export async function renderSection(el, section) {
     if (notes) { // General Health's Personal Notes: its body Location list is the same as the old Records'
         const notesTable = recordTable(el.querySelector('#notes'), {
             columns: notes.columns,
+            columnsId: `health/${section.id}-notes`,
             rows: noteRows,
             save: rows => saveRecords(notes, rows),
             choices: { Location: location },
@@ -269,6 +272,7 @@ function accountBox(box, section, account, rows, ctx) {
     showBalance(rows);
     const table = recordTable(box.querySelector('[data-records]'), {
         columns: section.columns,
+        columnsId: 'health/hsa', sharedBy: 'every HSA account',
         rows,
         filesDir: invoicesDir(section, account),
         save: async rows => { await saveRecords(sec, rows); showBalance(rows); ctx.entriesSaved(account.id, rows); },

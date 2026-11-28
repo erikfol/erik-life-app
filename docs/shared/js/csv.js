@@ -39,3 +39,31 @@ export function toCSV(columns, rows) {
     for (const r of rows) lines.push(columns.map(c => escapeCell(r[c])).join(','));
     return lines.join('\n') + '\n';
 }
+
+/**
+ * A table's rows from its CSV text: each of `names` (blank when the file lacks it), then every other column the file
+ * has (one added on the page with ⚙ Columns, or by hand), so saving with tableCSV keeps them.
+ *   was:  { name: its old column name } reads a renamed column's old one (which then isn't kept as a column of its own)
+ *   trim: trim every value
+ */
+export function tableRows(text, names, { was = {}, trim = false } = {}) {
+    const { columns, rows } = parseCSV(text);
+    const old = new Set(Object.values(was));
+    const extra = columns.filter(c => c && !names.includes(c) && !old.has(c));
+    const clean = v => (trim ? String(v ?? '').trim() : v ?? '');
+    return rows.map(r => Object.fromEntries([
+        ...names.map(c => [c, clean(r[c] ?? (was[c] ? r[was[c]] : undefined))]),
+        ...extra.map(c => [c, clean(r[c])]),
+    ]));
+}
+
+/** A table's CSV text: `names` first, then every other column its rows have (see tableRows). Keys starting with _ are a page's own, never saved. */
+export function tableCSV(names, rows) {
+    const extra = [];
+    for (const r of rows) {
+        for (const [k, v] of Object.entries(r)) {
+            if (typeof v === 'string' && !k.startsWith('_') && !names.includes(k) && !extra.includes(k)) extra.push(k);
+        }
+    }
+    return toCSV([...names, ...extra], rows);
+}

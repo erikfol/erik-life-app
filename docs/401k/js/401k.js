@@ -3,7 +3,7 @@
 // with the files in documents/), each change to what you put in (contribution_changes.csv) and the IRS limits
 // (irs_limits.csv). inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { isoDate, todayIso } from '../../shared/js/dates.js';
 
@@ -80,12 +80,11 @@ export const LIMIT_COLUMNS = [
 async function loadCsv(path, columns, track, missing = []) {
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text === null) return missing;
-    const names = columns.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, columns.map(c => c.name));
 }
 
 async function saveCsv(path, columns, rows) {
-    await writeTracked(path, toCSV(columns.map(c => c.name), rows));
+    await writeTracked(path, tableCSV(columns.map(c => c.name), rows));
 }
 
 export const loadBalances = (track = true) => loadCsv(BALANCES_PATH, BALANCE_COLUMNS, track);

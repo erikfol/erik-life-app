@@ -401,6 +401,7 @@ function renderFees(el, yearsEl, account, rows, onSaved) {
     yearsEl.innerHTML = feeYears(rows);
     feeTables.push(recordTable(el, {
         columns: FEE_COLUMNS,
+        columnsId: 'bills-etc/annual-fees', sharedBy: "every timeshare's Annual maintenance fees",
         choices: FEE_CHOICES,
         filesDir: feeInvoicesDir(account),
         rows,

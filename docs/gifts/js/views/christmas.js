@@ -107,6 +107,7 @@ export async function renderChristmas(el, data, year, onChanged) {
     draw(rows);
     const table = recordTable(el.querySelector('#x-table'), {
         columns: christmasColumns(people),
+        columnsId: 'gifts/christmas', sharedBy: "every year's Christmas list",
         choices: CHRISTMAS_CHOICES,
         rows,
         save: async r => { await saveChristmas(year, r); draw(r); },

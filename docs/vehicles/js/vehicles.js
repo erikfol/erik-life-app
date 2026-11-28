@@ -1,7 +1,7 @@
 // Vehicles: the list (with each vehicle's information) in inputs/vehicles/vehicles.json, and one maintenance CSV
 // per vehicle next to it. inputs/ is kept out of git.
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 
 export const VEHICLES_DIR = 'inputs/vehicles';
@@ -96,12 +96,11 @@ export const invoicesDir = v => `${VEHICLES_DIR}/invoices/${v.id}`;
 async function loadRows(path, cols, track) {
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text === null) return [];
-    const names = cols.map(c => c.name);
-    return parseCSV(text).rows.map(r => Object.fromEntries(names.map(c => [c, r[c] ?? ''])));
+    return tableRows(text, cols.map(c => c.name));
 }
 
 async function saveRows(path, cols, rows) {
-    await writeTracked(path, toCSV(cols.map(c => c.name), rows));
+    await writeTracked(path, tableCSV(cols.map(c => c.name), rows));
 }
 
 export const loadMaintenance = (v, track = true) => loadRows(maintenancePath(v), maintenanceColumns(v), track);

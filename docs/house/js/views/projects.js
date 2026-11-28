@@ -41,8 +41,8 @@ async function saveTab(list, h, fields) {
 }
 const saveProjects = (list, h, items) => saveTab(list, h, { items });
 
-/** Rows for a table, every column filled in (rows saved before a column was added just lack it). */
-const filled = (rows, cols) => (rows || []).map(r => Object.fromEntries(cols.map(c => [c.name, r[c.name] ?? ''])));
+/** Rows for a table, every column filled in (rows saved before a column was added just lack it), and any columns added with ⚙ Columns kept. */
+const filled = (rows, cols) => (rows || []).map(r => ({ ...r, ...Object.fromEntries(cols.map(c => [c.name, r[c.name] ?? ''])) }));
 
 const newId = (items, title) => {
     const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
@@ -232,6 +232,7 @@ export async function renderProject(el, list, h, top, p) {
 
     const places = (h.places || []).map(x => x.name); // offered as a Source
     materials = recordTable(el.querySelector('#p-materials'), {
+        columnsId: 'house/materials', sharedBy: "every project's Materials",
         columns: MATERIAL_COLUMNS.flatMap(c => (c.name === 'Source' ? [{ ...c, suggestions: places }]
             : c.name === 'Price' ? [{ ...c, total: false }, { name: 'Total', kind: 'money', calc: materialCost }] // price × quantity
             : [c])),

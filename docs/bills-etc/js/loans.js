@@ -14,7 +14,7 @@
 //   maintenance  <id>-maintenance.csv  Year, Fee, Amount, Paid?, Notes, Invoice   (Paid?: Yes / Not Yet, like Home Heating's;
 //                Invoice: the names of its images / PDFs, kept in invoices/<id>/)
 import * as fs from '../../shared/js/fs.js';
-import { parseCSV, toCSV } from '../../shared/js/csv.js';
+import { parseCSV, toCSV, tableRows, tableCSV } from '../../shared/js/csv.js';
 import { readTracked, writeTracked } from '../../shared/js/fileguard.js';
 import { parseBillDate, parseMoney, sheetDate } from './sheet.js';
 
@@ -68,9 +68,9 @@ export async function loadFees(account, track = true) {
     const path = maintenanceFileOf(account);
     const text = track ? await readTracked(path) : await fs.readText(path);
     if (text == null) return [];
-    return parseCSV(text).rows.map(r => Object.fromEntries(FEE_COLS.map(c => [c, r[c] ?? '']))).map(r => ({ ...r, 'Paid?': r['Paid?'] || 'Not Yet' }));
+    return tableRows(text, FEE_COLS).map(r => ({ ...r, 'Paid?': r['Paid?'] || 'Not Yet' }));
 }
-export const saveFees = (account, rows) => writeTracked(maintenanceFileOf(account), toCSV(FEE_COLS, rows));
+export const saveFees = (account, rows) => writeTracked(maintenanceFileOf(account), tableCSV(FEE_COLS, rows));
 
 /** Fees not paid yet, a group per year (in year order): [{ year, rows, total }]. */
 export function unpaidFees(rows) {

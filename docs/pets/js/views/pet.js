@@ -109,12 +109,14 @@ export async function renderPet(el, list, p, onListChanged) {
     };
     appts = recordTable(el.querySelector('#appointments'), {
         columns: withVets(APPOINTMENT_COLUMNS),
+        columnsId: 'pets/appointments', sharedBy: "every pet's Future appointments",
         rows: apptRows,
         save: async r => { await saveAppointments(p, r); drawBanner(r); },
         rowActions: [{ label: '→ Records', title: 'Move this appointment down to Records: the columns Records has are filled in from it, the rest is left blank to fill in', run: moveToRecords }],
     });
     table = recordTable(el.querySelector('#records'), {
         columns: withVets(RECORD_COLUMNS),
+        columnsId: 'pets/records', sharedBy: "every pet's Records",
         rows,
         filesDir: invoicesDir(p),
         save: rows => saveRecords(p, rows),

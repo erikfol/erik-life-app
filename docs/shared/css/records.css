@@ -27,6 +27,12 @@
 .scroll-table td.wide { min-width: 300px; }
 .scroll-table .clip { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: pointer; }
 .scroll-table .clip.open { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+/* ⚙ Columns (recordTable): the table's columns with ↑ ↓, name, kind and ✕; the ones taken off below, each with ＋ Put back */
+[data-cols-edit] .table-wrap { max-width: 820px; }
+.columns-edit input[data-col-name] { width: 100%; min-width: 200px; }
+.cols-off { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cols-off .file-chip { max-width: none; }
+.cols-off .file-chip button { color: var(--blue); font-size: 0.85em; }
 /* A standing note at the top of a section (House maintenance: how often it's due and who does it) */
 .section-note { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--blue); background: var(--head); border-radius: 0 6px 6px 0; }
 /* ↑ ↓ buttons in edit lists (shared/js/infobox.js), first in each row of a table being edited */

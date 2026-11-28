@@ -1,6 +1,6 @@
 // Forgettable Subs page: subscriptions that are easy to forget about, in one table that's read-only (sort and filter on
 // every column) until Edit, then every cell can be changed and rows added or removed. Saved in its own CSV.
-import { parseCSV, toCSV } from '../../../shared/js/csv.js';
+import { tableRows, tableCSV } from '../../../shared/js/csv.js';
 import { esc } from '../../../shared/js/util.js';
 import { requireFolder } from '../app.js';
 import { readTracked, writeTracked } from '../../../shared/js/fileguard.js';
@@ -27,15 +27,16 @@ export default {
         if (!requireFolder(el)) return;
         el.innerHTML = '<p class="muted">Loading…</p>';
         const text = await readTracked(SUBS_PATH);
-        const rows = text === null ? [] : parseCSV(text).rows.map(r => Object.fromEntries(NAMES.map(c => [c, r[c] ?? ''])));
+        const rows = text === null ? [] : tableRows(text, NAMES);
         el.innerHTML = `
             <h1 class="page">Forgettable Subs</h1>
             <p class="lead">Saved in <code>${esc(SUBS_PATH)}</code> in your folder.</p>
             <section id="subs"></section>`;
         table = recordTable(el.querySelector('#subs'), {
             columns: COLUMNS,
+            columnsId: 'bills-etc/forgettable-subs',
             rows,
-            save: rows => writeTracked(SUBS_PATH, toCSV(NAMES, rows)),
+            save: rows => writeTracked(SUBS_PATH, tableCSV(NAMES, rows)),
         });
     },
 
