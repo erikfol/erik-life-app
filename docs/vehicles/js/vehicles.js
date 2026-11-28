@@ -86,7 +86,7 @@ export const maintenanceColumns = (v, actions = []) => [
     { name: 'Location', kind: 'suggest', suggestions: (v.places || []).map(p => p.name) }, // where it was done
     { name: 'Description', kind: 'text' },
     { name: 'Cost', kind: 'money' },
-    { name: 'Additional Notes', kind: 'text', wide: true }, // more room in the compact table
+    { name: 'Additional Notes', kind: 'text' },
     { name: 'Invoices', kind: 'files', noun: 'invoice' }, // images / PDFs in invoicesDir(v)
 ];
 /** Where a vehicle's maintenance invoices are kept. */
@@ -209,7 +209,7 @@ export const scheduleColumns = (v, actions = []) => [
     { name: 'First (months)', kind: 'number' },
     { name: 'Due by (month)', kind: 'suggest', suggestions: MONTHS },
     { name: 'Also counts', kind: 'suggest', suggestions: actions },
-    { name: 'Notes', kind: 'text', wide: true }, // more room in the compact table
+    { name: 'Notes', kind: 'text' },
 ];
 export const loadSchedule = (v, track = true) => loadRows(schedulePath(v), scheduleColumns(v), track);
 export const saveSchedule = (v, rows) => saveRows(schedulePath(v), scheduleColumns(v), rows);

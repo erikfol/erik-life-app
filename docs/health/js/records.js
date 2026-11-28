@@ -14,7 +14,7 @@ const APPOINTMENT_COLUMNS = [
     { name: 'Time', kind: 'suggest' },
     { name: 'Location', kind: 'suggest' }, // where it is (offers the ones used before), not General Health's body locations
     { name: 'Description', kind: 'text' },
-    { name: 'Additional Notes', kind: 'text', wide: true },
+    { name: 'Additional Notes', kind: 'text' },
 ];
 
 // The Records of General Health, Dental and Eye: each visit, where (the office: offers the ones used before, not
@@ -28,7 +28,7 @@ const RECORD_COLUMNS = [
     { name: 'Out of Pocket', kind: 'money' },
     { name: 'I Owe', kind: 'money' },
     { name: 'Paid?', kind: 'choice', badge: v => (v === 'Paid' ? 'paid' : v === 'Not paid' ? 'not-paid' : '') },
-    { name: 'Additional Notes', kind: 'text', wide: true },
+    { name: 'Additional Notes', kind: 'text' },
     { name: 'Invoices', kind: 'files', noun: 'invoice' },
 ];
 // Dental's Records split the cost: what was paid at the dentist, and what Cigna still has to pay (this column was
@@ -58,7 +58,7 @@ export const SECTIONS = [
             { name: 'Date', kind: 'date' },
             { name: 'Location', kind: 'choice' },
             { name: 'Description', kind: 'text' },
-            { name: 'Additional Notes', kind: 'text', wide: true },
+            { name: 'Additional Notes', kind: 'text' },
         ] },
         appointments: { path: `${HEALTH_DIR}/general_appointments.csv`, columns: APPOINTMENT_COLUMNS } },
     { id: 'dental', label: 'Dental', path: `${HEALTH_DIR}/dental.csv`,

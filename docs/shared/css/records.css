@@ -14,7 +14,7 @@
 .record-table .changed { background: #fffbea !important; border-color: #f5e1a4 !important; }
 .record-table td.remove, .record-table td.move { width: 1%; white-space: nowrap; }
 .record-table td.remove button { padding: 3px 9px; }
-/* A compact record table (recordTable's compact; Health → Records): scrolls inside a box about a screen tall, so its
+/* Every record table (shared/js/recordtable.js; looks like Health → Dental → Records): scrolls inside a box about a screen tall, so its
    left/right scrollbar is always in view, with the column names on top, the Total row at the bottom and the first
    column (the date) on the left kept in view. Each text is cut to 3 lines (…) until it's clicked. */
 .scroll-table .table-wrap { max-height: 70vh; overflow: auto; border: 1px solid var(--line-strong); border-radius: 6px; }

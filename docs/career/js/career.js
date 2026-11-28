@@ -21,8 +21,8 @@ export const TABLES = {
         { name: 'Title', kind: 'suggest' },
         { name: 'Location', kind: 'suggest' },
         { name: 'Type', kind: 'suggest', suggestions: ['Full-time', 'Part-time', 'Contract', 'Internship', 'Volunteer'] },
-        { name: 'Summary', kind: 'text' },
-        { name: 'Accomplishments', kind: 'text' }, // one per line: the resume's bullets
+        { name: 'Summary', kind: 'text', wide: true },
+        { name: 'Accomplishments', kind: 'text', wide: true }, // one per line: the resume's bullets
         { name: 'Skills Used', kind: 'text' }, // comma-separated
         { name: 'Supervisor', kind: 'suggest' },
         { name: 'Starting Pay', kind: 'money', total: false },
@@ -60,8 +60,8 @@ export const TABLES = {
         { name: 'Title', kind: 'suggest' },
         { name: 'Type', kind: 'suggest', suggestions: ['Award', 'Project', 'Recognition', 'Publication', 'Presentation', 'Patent', 'Volunteer'] },
         { name: 'Company', kind: 'suggest' },
-        { name: 'Description', kind: 'text' },
-        { name: 'Results', kind: 'text' },
+        { name: 'Description', kind: 'text', wide: true },
+        { name: 'Results', kind: 'text', wide: true },
         { name: 'Skills Used', kind: 'text' },
     ] },
     references: { file: 'references.csv', columns: [
